@@ -3,6 +3,7 @@ import { dirname, join, resolve } from 'path'
 import { fileURLToPath, pathToFileURL } from 'url'
 
 import walk from 'klaw'
+import ts from 'typescript'
 import {
     ConfigService,
     fileUtil,
@@ -95,5 +96,64 @@ for await (const [resource_type, resource] of Object.entries(resources)) {
 
     const typeDef = (resource.data! as any).typeDef as mcdoc.McdocType
 
-    Bun.write(type_path, `const original = ${JSON.stringify(typeDef, null, 4)}`)
+    const file = `const original = ${JSON.stringify(typeDef, null, 4)}`
+
+    const resourceId = ts.factory.createIdentifier(resource_type.replaceAll('/', '_'))
+
+    if (typeDef.kind === 'struct') {
+        const members: readonly ts.TypeElement[] = typeDef.fields.filter((field) => field.kind === 'pair' && typeof field.key === 'string').map((_field) => {
+            const field = _field as mcdoc.StructTypePairField
+
+            const node = ts.factory.createTypeReferenceNode(
+                ts.factory.createQualifiedName(
+                    resourceId,
+                    ts.factory.createIdentifier(camel_case(field.key as string))
+                )
+            )
+
+            return {
+                ...ts.factory.createTypeAliasDeclaration(
+                    undefined,
+                    field.key as string,
+                    undefined,
+                    field.optional ? ts.factory.createOptionalTypeNode(node) : node,
+                ),
+                _typeElementBrand: undefined,
+            }
+        })
+
+        const resourceType = ts.factory.createMappedTypeNode(
+            undefined,
+            ts.factory.createTypeParameterDeclaration(
+                undefined,
+                resourceId,
+                undefined,
+                undefined
+            ),
+            undefined,
+            undefined,
+            undefined,
+            ts.factory.createNodeArray(
+                members,
+                true
+            )
+        )
+
+        function print(nodes: any[]) {
+            const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed });
+            const resultFile = ts.createSourceFile(
+              "temp.ts",
+              "",
+              ts.ScriptTarget.Latest,
+              false,
+              ts.ScriptKind.TS
+            );
+
+            console.log(printer.printList(ts.ListFormat.MultiLine, nodes as unknown as ts.NodeArray<ts.Node>, resultFile));
+          }
+          
+          print([resourceType]);
+    }
+
+    Bun.write(type_path, file)
 }

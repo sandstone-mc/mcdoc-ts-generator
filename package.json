@@ -13,6 +13,7 @@
     "@spyglassmc/java-edition": "^0.3.10",
     "@spyglassmc/mcdoc": "^0.3.10",
     "@types/klaw": "^3.0.6",
-    "klaw": "^4.1.0"
+    "klaw": "^4.1.0",
+    "typescript": "^5.5.3"
   }
 }
