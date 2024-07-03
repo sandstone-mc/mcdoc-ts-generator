@@ -1,0 +1,18 @@
+{
+  "name": "@sandstone/mcdoc-ts-generator",
+  "module": "index.ts",
+  "type": "module",
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@spyglassmc/core": "^0.4.7",
+    "@spyglassmc/java-edition": "^0.3.10",
+    "@spyglassmc/mcdoc": "^0.3.10",
+    "@types/klaw": "^3.0.6",
+    "klaw": "^4.1.0"
+  }
+}
