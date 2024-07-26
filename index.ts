@@ -88,9 +88,9 @@ const dispatchers = service.project.symbols.getVisibleSymbols('mcdoc/dispatcher'
 const resources = dispatchers['minecraft:resource']!.members!
 
 for await (const [resource_type, resource] of Object.entries(resources)) {
-    const resource_path = resource.definition![0].uri.match(/mcdoc\/java\/(\w+)\//)![1]
+    const local_path = resource.definition![0].uri.match(/mcdoc\/java\/(\w+)\/([\w\/]+)/)!
 
-    const pack_type = resource_path === 'data' ? 'datapack' : 'resourcepack'
+    const pack_type = local_path[1] === 'data' ? 'datapack' : 'resourcepack'
 
     const type_path = join(generated_path, pack_type, `${camel_case(resource_type)}.ts`)
 
@@ -98,23 +98,23 @@ for await (const [resource_type, resource] of Object.entries(resources)) {
 
     let file = `const original = ${JSON.stringify(typeDef, null, 4)}\n\n`
 
-    let resourceType: ts.TypeAliasDeclaration | undefined = resolveType(resource_type.replaceAll('/', '_'), typeDef)
+    const resolved_resource_type = resolveRootType(resource_type.replaceAll('/', '_'), typeDef, `java/${local_path[1]}/${local_path[2]}`)
 
     /* @ts-ignore */
     if (resourceType !== undefined) {
-        file += compileTypes([resourceType])
+        file += compileTypes([resolved_resource_type])
     }
 
     Bun.write(type_path, file)
 }
 
-function resolveType(name: string, type: mcdoc.McdocType) {
+function resolveRootType(name: string, type: mcdoc.McdocType, current_location: string) {
     if (type.kind === 'struct') {
         return ts.factory.createTypeAliasDeclaration(
             [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             ts.factory.createIdentifier(name),
             undefined,
-            createStruct(type),
+            createStruct(type, current_location),
         )
     }
 }
@@ -132,101 +132,437 @@ function compileTypes(nodes: any[]) {
     return printer.printList(ts.ListFormat.MultiLine, nodes as unknown as ts.NodeArray<ts.Node>, resultFile)
 }
 
-function createStruct(typeDef: mcdoc.StructType, location: string) {
+type StructMember = {
+    type: ts.IndexSignatureDeclaration | ts.PropertySignature;
+    add_import?: ts.ImportDeclaration;
+    module?: ts.TypeAliasDeclaration;
+}
+
+function createStruct(typeDef: mcdoc.StructType, current_location: string) {
     const anyFallback = ts.factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword)
 
-    const members: readonly ts.TypeElement[] = typeDef.fields.filter((field) => {
-        let old = false
-        if (field.attributes && field.attributes.includes((attr: mcdoc.Attribute) => attr.name === 'until')) {
-            old = true
-        }
-        return field.kind === 'pair' && !old
-    }).map((_field) => {
-        const field = _field as mcdoc.StructTypePairField
+    const member_types: (ts.IndexSignatureDeclaration | ts.PropertySignature)[] = []
 
-        if (typeof field.key === 'string') {
-            return ts.factory.createPropertySignature(
-                undefined,
-                bindKey(field.key),
-                field.optional ? ts.factory.createToken(ts.SyntaxKind.QuestionToken) : undefined,
-                field.type.kind === 'struct' ? createStruct(field.type, location) : anyFallback,
-            )
-        } else if (field.key.kind === 'string') {
-            if (field.key.attributes && field.key.attributes.includes((attr: mcdoc.Attribute) => attr.name === 'id')) {
-                console.log('hello???')
+    const imports: ts.ImportDeclaration[] = []
+    
+    const modules: ts.TypeAliasDeclaration[] = []
+
+    for (const field of typeDef.fields) {
+        if (field.attributes !== undefined && field.attributes.includes((attr: mcdoc.Attribute) => attr.name === 'until')) {
+            continue
+        }
+        if (field.kind === 'pair') {
+            const resolvePair: () => StructMember = () => {
+                if (typeof field.key === 'string') {
+                    return ts.factory.createPropertySignature(
+                        undefined,
+                        bindKey(field.key),
+                        field.optional ? ts.factory.createToken(ts.SyntaxKind.QuestionToken) : undefined,
+                        field.type.kind === 'struct' ? createStruct(field.type, current_location) : anyFallback,
+                    )
+                } else if (field.key.kind === 'string') {
+                    if (field.key.attributes && field.key.attributes.includes((attr: mcdoc.Attribute) => attr.name === 'id')) {
+                        console.log('hello???')
+                        return ts.factory.createIndexSignature(
+                            undefined,
+                            [
+                                ts.factory.createParameterDeclaration(
+                                    undefined,
+                                    undefined,
+                                    ts.factory.createIdentifier('id'),
+                                    undefined,
+                                    ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                                )
+                            ],
+                            field.type.kind === 'struct' ? createStruct(field.type, current_location) : anyFallback,
+                        )
+                    }
+                    let index = (value: ts.TypeNode) => ts.factory.createIndexSignature(
+                        undefined,
+                        [
+                            ts.factory.createParameterDeclaration(
+                                undefined,
+                                undefined,
+                                ts.factory.createIdentifier('key'),
+                                undefined,
+                                ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                            )
+                        ],
+                        value,
+                    )
+        
+                    if (field.type.kind === 'struct') return {
+                        type: index(createStruct(field.type, current_location))
+                    }
+                    if (field.type.kind === 'reference') {
+                        const resolved = resolveReference(field.type, current_location)
+
+                        if (resolved.import) return {
+                            add_import: resolved.import,
+                            type: ts.factory.createIdentifier(resolved.name)
+                        }
+                        return {
+                            type: resolved.name,
+                            module: resolved.module
+                        }
+                    }
+        
+                    return index(anyFallback)
+                }
+                const key = field.key as mcdoc.ReferenceType
+        
                 return ts.factory.createIndexSignature(
                     undefined,
                     [
                         ts.factory.createParameterDeclaration(
                             undefined,
                             undefined,
-                            ts.factory.createIdentifier('id'),
+                            ts.factory.createIdentifier(key.path!.split('::').pop()!),
                             undefined,
                             ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
                         )
                     ],
-                    field.type.kind === 'struct' ? createStruct(field.type, location) : anyFallback,
+                    field.type.kind === 'struct' ? createStruct(field.type, current_location) : anyFallback,
                 )
             }
-            let index = (value: ts.TypeNode) => ts.factory.createIndexSignature(
-                undefined,
-                [
-                    ts.factory.createParameterDeclaration(
-                        undefined,
-                        undefined,
-                        ts.factory.createIdentifier('key'),
-                        undefined,
-                        ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                    )
-                ],
-                value,
-            )
 
-            if (field.type.kind === 'struct') return {
-                type: index(createStruct(field.type, location))
+
+        }
+
+        if (field.kind === 'spread') {
+            continue
+        }
+
+        if (typeof field.key === 'string') {
+            if (field.type.kind === 'struct') {
+                const struct = createStruct(field.type, current_location)
+
+                member_types.push(ts.factory.createPropertySignature(
+                    undefined,
+                    bindKey(field.key),
+                    field.optional ? ts.factory.createToken(ts.SyntaxKind.QuestionToken) : undefined,
+                    struct.type,
+                ))
+
+                if (struct.imports.length > 0) {
+                    imports.push(...struct.imports)
+                }
+
+                if (struct.modules.length > 0) {
+                    modules.push(...struct.modules)
+                }
+                continue
             }
             if (field.type.kind === 'reference') {
-                const resolved = resolveReference(field.type, location)
+                const resolved = resolveReference(field.type, current_location)
 
-                if (resolved.import) return {
-                    import: resolved.import,
-                    type: ts.factory.createIdentifier(resolved.name)
+                member_types.push(ts.factory.createPropertySignature(
+                    undefined,
+                    bindKey(field.key),
+                    field.optional ? ts.factory.createToken(ts.SyntaxKind.QuestionToken) : undefined,
+                    ts.factory.createTypeReferenceNode(resolved.name),
+                ))
+
+                if (resolved.import) {
+                    imports.push(resolved.import)
+                } else if (resolved.module) {
+                    modules.push(resolved.module)
                 }
-                return {
-                    type: resolved.name,
-                    module: resolved.module
-                }
+                continue
+            }
+            if (field.type.kind === 'any') {
+                member_types.push(ts.factory.createPropertySignature(
+                    undefined,
+                    bindKey(field.key),
+                    field.optional ? ts.factory.createToken(ts.SyntaxKind.QuestionToken) : undefined,
+                    anyFallback,
+                ))
+                continue
             }
 
-            return index(anyFallback)
         }
-        const key = field.key as mcdoc.ReferenceType
-
-        return ts.factory.createIndexSignature(
-            undefined,
-            [
-                ts.factory.createParameterDeclaration(
-                    undefined,
-                    undefined,
-                    ts.factory.createIdentifier(key.path!.split('::').pop()!),
-                    undefined,
-                    ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                )
-            ],
-            field.type.kind === 'struct' ? createStruct(field.type, location) : anyFallback,
-        )
-    })
+    }
 
     /* @ts-ignore */
     if (members.length === 0) console.log(typeDef.fields[0].key)
 
-    return ts.factory.createTypeLiteralNode(members)
+    return {
+        type: ts.factory.createTypeLiteralNode(member_types),
+        imports,
+        modules
+    }
+}
+
+let inline_enum_count = 0
+
+/**
+ * TODO: Remember to add this!!!
+ * ```js
+ * type ArrayLengthMutationKeys = 'splice' | 'push' | 'pop' | 'shift' |  'unshift'
+ * type FixedLengthArray<T, L extends number, TObj = [T, ...Array<T>]> =
+ *   Pick<TObj, Exclude<keyof TObj, ArrayLengthMutationKeys>>
+ *   & {
+ *       readonly length: L 
+ *       [ I : number ] : T
+ *       [Symbol.iterator]: () => IterableIterator<T>   
+ *   }
+ * ```
+ */
+function resolveValueType(type: mcdoc.McdocType, current_location: string): {
+    type: ts.TypeLiteralNode | ts.TypeReferenceNode | ts.KeywordTypeNode | ts.UnionTypeNode | ts.LiteralTypeNode;
+    imports: ts.ImportDeclaration[] | never[];
+    modules: (ts.TypeAliasDeclaration | ts.EnumDeclaration)[] | never[];
+} | undefined {
+    switch (type.kind) {
+        case 'struct':
+            return createStruct(type, current_location)
+        case 'reference':
+            const resolved = resolveReference(type, current_location)
+
+            return {
+                type: ts.factory.createTypeReferenceNode(resolved.name),
+                imports: resolved.import ? [resolved.import] : [],
+                modules: resolved.module ? [resolved.module] : []
+            }
+        case 'boolean': 
+            return {
+                type: ts.factory.createKeywordTypeNode(ts.SyntaxKind.BooleanKeyword),
+                imports: [],
+                modules: []
+            }
+        case 'string':
+            return {
+                type: ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                imports: [],
+                modules: []
+            }
+        case 'byte':
+            return {
+                type: ts.factory.createTypeReferenceNode('NBTByte'),
+                imports: [ bindImport('NBTByte', 'sandstone/variables/nbt') ],
+                modules: []
+            }
+        case 'short':
+            return {
+                type: ts.factory.createTypeReferenceNode('NBTShort'),
+                imports: [ bindImport('NBTShort', 'sandstone/variables/nbt') ],
+                modules: []
+            }
+        case 'int':
+            return {
+                type: ts.factory.createTypeReferenceNode('NBTInt'),
+                imports: [ bindImport('NBTInt', 'sandstone/variables/nbt') ],
+                modules: []
+            }
+        case 'long':
+            return {
+                type: ts.factory.createTypeReferenceNode('NBTLong'),
+                imports: [ bindImport('NBTLong', 'sandstone/variables/nbt') ],
+                modules: []
+            }
+        case 'float':
+            return {
+                type: ts.factory.createTypeReferenceNode('NBTFloat'),
+                imports: [ bindImport('NBTFloat', 'sandstone/variables/nbt') ],
+                modules: []
+            }
+        case 'double':
+            return {
+                type: ts.factory.createTypeReferenceNode('NBTDouble'),
+                imports: [ bindImport('NBTDouble', 'sandstone/variables/nbt') ],
+                modules: []
+            }
+        case 'list': {
+            const item = resolveValueType(type.item, current_location)!
+
+            if (type.lengthRange) {
+                const range = bindRangedInt(type.lengthRange)
+                if (range) {
+                    return {
+                        type: ts.factory.createTypeReferenceNode('FixedLengthArray', [item.type, {
+                            ...range,
+                            _typeNodeBrand: ''
+                        }]),
+                        imports: [ bindImport('FixedLengthArray', 'sandstone/utils'), ...item.imports ],
+                        modules: item.modules
+                    }
+                }
+            }
+            return {
+                type: ts.factory.createTypeReferenceNode('Array', [item.type]),
+                imports: item.imports,
+                modules: item.modules
+            }
+        }
+        case 'byte_array': {
+            return {
+                type: ts.factory.createTypeReferenceNode('NBTByteArray'),
+                imports: [ bindImport('NBTByteArray', 'sandstone/variables/nbt') ],
+                modules: []
+            }
+        }
+        case 'int_array': {
+            return {
+                type: ts.factory.createTypeReferenceNode('NBTIntArray'),
+                imports: [ bindImport('NBTIntArray', 'sandstone/variables/nbt') ],
+                modules: []
+            }
+        }
+        case 'long_array': {
+            return {
+                type: ts.factory.createTypeReferenceNode('NBTLongArray'),
+                imports: [ bindImport('NBTLongArray', 'sandstone/variables/nbt') ],
+                modules: []
+            }
+        }
+        case 'union': {
+            const types = type.members.map((type) => resolveValueType(type, current_location)!)
+
+            return {
+                type: ts.factory.createUnionTypeNode(types.map((type) => type.type)),
+                imports: types.flatMap((type) => type.imports),
+                modules: types.flatMap((type) => type.modules)
+            }
+        }
+        case 'enum': {
+            const enum_identifier = ts.factory.createIdentifier(`inlineEnum${inline_enum_count++}`) // :husk:
+
+            return {
+                type: ts.factory.createTypeReferenceNode(enum_identifier),
+                imports: [],
+                modules: [ createEnum(enum_identifier, type) ]
+            }
+        }
+        case 'literal': {
+            switch (type.value.kind) {
+                case 'boolean':
+                    return {
+                        type: type.value.value ? 
+                            ts.factory.createLiteralTypeNode(ts.factory.createTrue()) 
+                            : ts.factory.createLiteralTypeNode(ts.factory.createFalse()),
+                        imports: [],
+                        modules: []
+                    }
+                case 'string':
+                    return {
+                        type: ts.factory.createLiteralTypeNode(ts.factory.createStringLiteral(type.value.value)),
+                        imports: [],
+                        modules: []
+                    }
+                case 'byte': {
+                    return {
+                        type: ts.factory.createTypeReferenceNode('NBTByte', [{
+                            ...ts.factory.createNumericLiteral(type.value.value),
+                            _typeNodeBrand: ''
+                        }]),
+                        imports: [
+                            bindImport('NBTByte', 'sandstone/variables/nbt')
+                        ],
+                        modules: []
+                    }
+                }
+                case 'short': {
+                    return {
+                        type: ts.factory.createTypeReferenceNode('NBTShort', [{
+                            ...ts.factory.createNumericLiteral(type.value.value),
+                            _typeNodeBrand: ''
+                        }]),
+                        imports: [
+                            bindImport('NBTShort', 'sandstone/variables/nbt')
+                        ],
+                        modules: []
+                    }
+                }
+                case 'float': {
+                    return {
+                        type: ts.factory.createTypeReferenceNode('NBTFloat', [{
+                            ...ts.factory.createNumericLiteral(type.value.value),
+                            _typeNodeBrand: ''
+                        }]),
+                        imports: [
+                            bindImport('NBTFloat', 'sandstone/variables/nbt')
+                        ],
+                        modules: []
+                    }
+                }
+                default: // This is a hack, but it works. `double` is the default decimal SNBT value type, `int` is the default integer SNBT value type.
+                    return {
+                        type: ts.factory.createLiteralTypeNode(ts.factory.createNumericLiteral(type.value.value)),
+                        imports: [],
+                        modules: []
+                    }
+            }
+        }
+        default:
+            return {
+                type: ts.factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
+                imports: [],
+                modules: []
+            }
+    }
+}
+
+function createEnum(name: ts.Identifier, _enum: mcdoc.EnumType) {
+    if (_enum.enumKind === 'string') {
+        return ts.factory.createEnumDeclaration(
+            undefined,
+            name,
+            _enum.values.map((value) => ts.factory.createEnumMember(value.identifier, ts.factory.createStringLiteral(value.value as string))),
+        )
+    }
+    return ts.factory.createEnumDeclaration(
+        undefined,
+        name,
+        _enum.values.map((value) => ts.factory.createEnumMember(value.identifier, ts.factory.createNumericLiteral(value.value as number))),
+    )
+}
+
+function bindRangedInt(range: mcdoc.NumericRange) {
+    const rangeString = mcdoc.NumericRange.toString(range)
+
+    if (/^[0-9]+$/.test(mcdoc.NumericRange.toString(range))) {
+        return ts.factory.createNumericLiteral(parseInt(rangeString))
+    }
+
+    if (range.min && range.max) {
+        if (range.max - range.min > 100) {
+            return
+        }
+        let values = []
+        if (mcdoc.RangeKind.isRightExclusive(range.kind)) {
+            range.max--
+        }
+        if (mcdoc.RangeKind.isLeftExclusive(range.kind)) {
+            range.min++
+        }
+        for (let i = range.min; i <= range.max; i++) {
+            values.push({
+                ...ts.factory.createNumericLiteral(i),
+                _typeNodeBrand: ''
+            })
+        }
+        return ts.factory.createUnionTypeNode(values)
+    }
 }
 
 function bindKey(key: string | mcdoc.McdocType) {
     if (typeof key === 'string') return ts.factory.createIdentifier(key)
 
     return ts.factory.createComputedPropertyName(ts.factory.createIdentifier('string'))
+}
+
+function bindImport(module_name: string, module_path: string) {
+    return ts.factory.createImportDeclaration(
+        undefined,
+        ts.factory.createImportClause(
+            true,
+            undefined,
+            ts.factory.createNamedImports([
+                ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier(module_name))
+            ])
+        ),
+        ts.factory.createStringLiteral(module_path)
+    )
 }
 
 const resolved_modules = new Map<string, string[]>()
@@ -240,7 +576,7 @@ function resolveReference(ref: mcdoc.ReferenceType, current_location: string): (
     const ref_path = ref.path!.split('::')
     const location = ref_path.slice(0, -1).join('/')
 
-    const resolve_module = () => resolveType(ref_path[-1], (symbols[ref.path!].data! as any).typeDef as mcdoc.McdocType)
+    const resolve_module = () => resolveType(ref_path[-1], (symbols[ref.path!].data! as any).typeDef as mcdoc.McdocType, current_location)
 
     if (location === current_location) return {
         import: false,
