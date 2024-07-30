@@ -154,15 +154,45 @@ function createStruct(typeDef: mcdoc.StructType, current_location: string) {
         if (field.kind === 'pair') {
             const resolvePair: () => StructMember = () => {
                 if (typeof field.key === 'string') {
+                    let value
+                    if (field.type.kind === 'struct') {
+                        const struct = createStruct(field.type, current_location)
+
+                        value = struct.type
+
+                        if (struct.imports.length > 0) {
+                            imports.push(...struct.imports)
+                        }
+                        if (struct.modules.length > 0) {
+                            modules.push(...struct.modules)
+                        }
+                    } else {
+                        value = anyFallback
+                    }
                     return ts.factory.createPropertySignature(
                         undefined,
                         bindKey(field.key),
                         field.optional ? ts.factory.createToken(ts.SyntaxKind.QuestionToken) : undefined,
-                        field.type.kind === 'struct' ? createStruct(field.type, current_location) : anyFallback,
+                        value,
                     )
                 } else if (field.key.kind === 'string') {
                     if (field.key.attributes && field.key.attributes.includes((attr: mcdoc.Attribute) => attr.name === 'id')) {
                         console.log('hello???')
+                        let value
+                        if (field.type.kind === 'struct') {
+                            const struct = createStruct(field.type, current_location)
+
+                            value = struct.type
+
+                            if (struct.imports.length > 0) {
+                                imports.push(...struct.imports)
+                            }
+                            if (struct.modules.length > 0) {
+                                modules.push(...struct.modules)
+                            }
+                        } else {
+                            value = anyFallback
+                        }
                         return ts.factory.createIndexSignature(
                             undefined,
                             [
@@ -174,7 +204,7 @@ function createStruct(typeDef: mcdoc.StructType, current_location: string) {
                                     ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
                                 )
                             ],
-                            field.type.kind === 'struct' ? createStruct(field.type, current_location) : anyFallback,
+                            value,
                         )
                     }
                     let index = (value: ts.TypeNode) => ts.factory.createIndexSignature(
@@ -191,8 +221,19 @@ function createStruct(typeDef: mcdoc.StructType, current_location: string) {
                         value,
                     )
         
-                    if (field.type.kind === 'struct') return {
-                        type: index(createStruct(field.type, current_location))
+                    if (field.type.kind === 'struct') {
+                        const struct = createStruct(field.type, current_location)
+
+                        if (struct.imports.length > 0) {
+                            imports.push(...struct.imports)
+                        }
+                        if (struct.modules.length > 0) {
+                            modules.push(...struct.modules)
+                        }
+
+                        return {
+                            type: index(struct.type)
+                        }
                     }
                     if (field.type.kind === 'reference') {
                         const resolved = resolveReference(field.type, current_location)
@@ -208,8 +249,14 @@ function createStruct(typeDef: mcdoc.StructType, current_location: string) {
                     }
         
                     return index(anyFallback)
+                } else if (field.key.kind === 'dispatcher') {
+                    symbols[field.key.registry]!.members[field.key.parallelIndices]
+
+                    
                 }
                 const key = field.key as mcdoc.ReferenceType
+
+                let value = createStruct(field.type, current_location)
         
                 return ts.factory.createIndexSignature(
                     undefined,
@@ -630,4 +677,29 @@ function resolveReference(ref: mcdoc.ReferenceType, current_location: string): (
         name: ref_path[-1],
         module: false
     }
+}
+
+// Kill me. This is the reason I didn't want mcdoc/runtime to be a thing. All of this would ideally be resolved statically AoT by the language server.
+function resolveDispatcher(dispatcher: mcdoc.DispatcherType, parent_type: mcdoc.StructType) {
+    const indices = dispatcher.parallelIndices
+
+    let dynamic = false
+
+    const string_index: string[] = []
+
+    for (const index of indices) {
+        if (index.kind === 'static') {
+            string_index.push(index.value)
+        } else {
+            if (typeof index.accessor === 'string') {
+            } else {
+                if (typeof index.accessor[0] === 'string') {
+                    string_index.push(index.accessor[0])
+                } else {
+                    dynamic = true
+                }
+            }
+        }
+    }
+    return 
 }
