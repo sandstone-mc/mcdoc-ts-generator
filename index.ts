@@ -9,6 +9,7 @@ import {
     fileUtil,
     Service,
     VanillaConfig,
+    type SymbolMap,
 } from '@spyglassmc/core'
 import { NodeJsExternals } from '@spyglassmc/core/lib/nodejs.js'
 import * as mcdoc from '@spyglassmc/mcdoc'
@@ -16,6 +17,10 @@ import * as mcdoc from '@spyglassmc/mcdoc'
 const cache_root = join(dirname(fileURLToPath(import.meta.url)), 'cache')
 
 const project_path = resolve(process.cwd(), 'mcdoc')
+
+const resolved_modules = new Map<string, string[]>()
+
+const module_files = new Map<string, ts.TypeAliasDeclaration[]>()
 
 await fileUtil.ensureDir(NodeJsExternals, project_path)
 
@@ -98,24 +103,58 @@ for await (const [resource_type, resource] of Object.entries(resources)) {
 
     let file = `const original = ${JSON.stringify(typeDef, null, 4)}\n\n`
 
-    const resolved_resource_type = resolveRootType(resource_type.replaceAll('/', '_'), typeDef, `java/${local_path[1]}/${local_path[2]}`)
+    const resolved_resource_types = resolveRootTypes(resource_type.replaceAll('/', '_'), typeDef, `java/${local_path[1]}/${local_path[2]}`)
 
-    /* @ts-ignore */
-    if (resourceType !== undefined) {
-        file += compileTypes([resolved_resource_type])
-    }
+    file += compileTypes(resolved_resource_types)
 
     Bun.write(type_path, file)
 }
 
-function resolveRootType(name: string, type: mcdoc.McdocType, current_location: string) {
+function resolveRootTypes(name: string, type: mcdoc.McdocType, current_location: string) {
     if (type.kind === 'struct') {
-        return ts.factory.createTypeAliasDeclaration(
+        const result = createStruct(type, current_location)
+
+        const types = [ts.factory.createTypeAliasDeclaration(
             [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             ts.factory.createIdentifier(name),
             undefined,
-            createStruct(type, current_location),
-        )
+            result.type,
+        )] as (ts.TypeAliasDeclaration | ts.ImportDeclaration | ts.EnumDeclaration)[]
+
+        if (result.modules.length > 0) {
+            types.push(...result.modules)
+        }
+
+        if (result.imports.length > 0) {
+            types.unshift(...result.imports)
+        }
+        
+        return types
+    } else {
+        return []
+    }
+}
+
+function resolveTypes(name: string, type: mcdoc.McdocType, current_location: string) {
+    if (type.kind === 'struct') {
+        const result = createStruct(type, current_location)
+
+        return {
+            type: ts.factory.createTypeAliasDeclaration(
+                [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+                ts.factory.createIdentifier(name),
+                undefined,
+                result.type,
+            ),
+            imports: result.imports,
+            modules: result.modules
+        }
+    } else {
+        return {
+            type: undefined,
+            imports: [],
+            modules: []
+        }
     }
 }
 
@@ -133,19 +172,21 @@ function compileTypes(nodes: any[]) {
 }
 
 type StructMember = {
-    type: ts.IndexSignatureDeclaration | ts.PropertySignature;
+    type: ts.IndexSignatureDeclaration | ts.PropertySignature | ts.Identifier;
     add_import?: ts.ImportDeclaration;
     module?: ts.TypeAliasDeclaration;
 }
 
+let dispatcher_count = 0
+
 function createStruct(typeDef: mcdoc.StructType, current_location: string) {
     const anyFallback = ts.factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword)
 
-    const member_types: (ts.IndexSignatureDeclaration | ts.PropertySignature)[] = []
+    const member_types: (ts.IndexSignatureDeclaration | ts.PropertySignature | ts.Identifier)[] = []
 
     const imports: ts.ImportDeclaration[] = []
     
-    const modules: ts.TypeAliasDeclaration[] = []
+    const modules: (ts.TypeAliasDeclaration | ts.EnumDeclaration)[] = []
 
     for (const field of typeDef.fields) {
         if (field.attributes !== undefined && field.attributes.includes((attr: mcdoc.Attribute) => attr.name === 'until')) {
@@ -169,12 +210,14 @@ function createStruct(typeDef: mcdoc.StructType, current_location: string) {
                     } else {
                         value = anyFallback
                     }
-                    return ts.factory.createPropertySignature(
-                        undefined,
-                        bindKey(field.key),
-                        field.optional ? ts.factory.createToken(ts.SyntaxKind.QuestionToken) : undefined,
-                        value,
-                    )
+                    return {
+                        type: ts.factory.createPropertySignature(
+                            undefined,
+                            bindKey(field.key),
+                            field.optional ? ts.factory.createToken(ts.SyntaxKind.QuestionToken) : undefined,
+                            value,
+                        )
+                    }
                 } else if (field.key.kind === 'string') {
                     if (field.key.attributes && field.key.attributes.includes((attr: mcdoc.Attribute) => attr.name === 'id')) {
                         console.log('hello???')
@@ -193,19 +236,21 @@ function createStruct(typeDef: mcdoc.StructType, current_location: string) {
                         } else {
                             value = anyFallback
                         }
-                        return ts.factory.createIndexSignature(
-                            undefined,
-                            [
-                                ts.factory.createParameterDeclaration(
-                                    undefined,
-                                    undefined,
-                                    ts.factory.createIdentifier('id'),
-                                    undefined,
-                                    ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                                )
-                            ],
-                            value,
-                        )
+                        return {
+                            type: ts.factory.createIndexSignature(
+                                undefined,
+                                [
+                                    ts.factory.createParameterDeclaration(
+                                        undefined,
+                                        undefined,
+                                        ts.factory.createIdentifier('id'),
+                                        undefined,
+                                        ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                                    )
+                                ],
+                                value,
+                            )
+                        }
                     }
                     let index = (value: ts.TypeNode) => ts.factory.createIndexSignature(
                         undefined,
@@ -243,37 +288,78 @@ function createStruct(typeDef: mcdoc.StructType, current_location: string) {
                             type: ts.factory.createIdentifier(resolved.name)
                         }
                         return {
-                            type: resolved.name,
-                            module: resolved.module
+                            type: ts.factory.createIdentifier(resolved.name),
+                            ...(resolved.module ? { module: resolved.module } : {})
                         }
                     }
         
-                    return index(anyFallback)
+                    return {
+                        type: index(anyFallback)
+                    }
                 } else if (field.key.kind === 'dispatcher') {
-                    symbols[field.key.registry]!.members[field.key.parallelIndices]
+                    const value = resolveDispatcher(field.key, current_location)
 
-                    
+                    if (value) {
+                        if (value.import) {
+                            imports.push(value.import)
+                        }
+                        if (typeof value.module !== 'boolean') {
+                            modules.push(value.module)
+                        }
+
+                        const name = typeof value.name === 'string' ? value.name : `dispatcher_${dispatcher_count++}`
+
+                        return {
+                            type: ts.factory.createPropertySignature(
+                                undefined,
+                                bindKey('dispatcher'),
+                                field.optional ? ts.factory.createToken(ts.SyntaxKind.QuestionToken) : undefined,
+                                ts.factory.createTypeReferenceNode(name),
+                            )
+                        }
+                    }
+
                 }
                 const key = field.key as mcdoc.ReferenceType
 
-                let value = createStruct(field.type, current_location)
+                let value = resolveValueType(field.type, current_location)!
+
+                if (value.imports?.length > 0) {
+                    imports.push(...value.imports)
+                }
+
+                if (value.modules?.length > 0) {
+                    modules.push(...value.modules)
+                }
         
-                return ts.factory.createIndexSignature(
-                    undefined,
-                    [
-                        ts.factory.createParameterDeclaration(
-                            undefined,
-                            undefined,
-                            ts.factory.createIdentifier(key.path!.split('::').pop()!),
-                            undefined,
-                            ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                        )
-                    ],
-                    field.type.kind === 'struct' ? createStruct(field.type, current_location) : anyFallback,
-                )
+                return {
+                    type: ts.factory.createIndexSignature(
+                        undefined,
+                        [
+                            ts.factory.createParameterDeclaration(
+                                undefined,
+                                undefined,
+                                ts.factory.createIdentifier(key.path!.split('::').pop()!),
+                                undefined,
+                                ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                            )
+                        ],
+                        value.type,
+                    )
+                }
             }
 
+            const pair = resolvePair()
 
+            member_types.push(pair.type)
+
+            if (pair.add_import) {
+                imports.push(pair.add_import)
+            }
+
+            if (pair.module) {
+                modules.push(pair.module)
+            }
         }
 
         if (field.kind === 'spread') {
@@ -331,9 +417,10 @@ function createStruct(typeDef: mcdoc.StructType, current_location: string) {
     }
 
     /* @ts-ignore */
-    if (members.length === 0) console.log(typeDef.fields[0].key)
+    if (member_types.length === 0) console.log(typeDef.fields[0].key)
 
     return {
+        /* @ts-ignore */ // TODO: Make sure this is okay
         type: ts.factory.createTypeLiteralNode(member_types),
         imports,
         modules
@@ -612,26 +699,26 @@ function bindImport(module_name: string, module_path: string) {
     )
 }
 
-const resolved_modules = new Map<string, string[]>()
-
-const module_files = new Map<string, ts.TypeAliasDeclaration[]>()
-
 function resolveReference(ref: mcdoc.ReferenceType, current_location: string): (
     { import: false, name: string, module: ts.TypeAliasDeclaration | false } | 
     { import: ts.ImportDeclaration, name: string, module: false }
 ) {
-    const ref_path = ref.path!.split('::')
+    const ref_path = ref.path!.split('::').slice(1)
+    const ref_name = ref_path.slice(-1)[0]
     const location = ref_path.slice(0, -1).join('/')
 
-    const resolve_module = () => resolveType(ref_path[-1], (symbols[ref.path!].data! as any).typeDef as mcdoc.McdocType, current_location)
+    const resolve_module = () => resolveTypes(ref_name, (symbols[ref.path!].data! as any).typeDef as mcdoc.McdocType, current_location)
 
-    if (location === current_location) return {
-        import: false,
-        name: ref_path[-1],
-        module: resolve_module() ?? false
+    if (location === current_location) {
+        const module = resolve_module()
+        return {
+            import: false,
+            name: ref_name,
+            module: module.type ?? false
+        }
     }
 
-    const module_path = join(generated_path, `${location}/${ref_path[-1]}.ts`)
+    const module_path = `${generated_path}/${location}/${ref_name}.ts`
 
     const module_import = ts.factory.createImportDeclaration(
         undefined,
@@ -639,7 +726,7 @@ function resolveReference(ref: mcdoc.ReferenceType, current_location: string): (
             true,
             undefined,
             ts.factory.createNamedImports([
-                ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier(ref_path[-1]))
+                ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier(ref_name))
             ])
         ),
         ts.factory.createStringLiteral(module_path)
@@ -647,7 +734,7 @@ function resolveReference(ref: mcdoc.ReferenceType, current_location: string): (
 
     if (resolved_modules.has(location) && resolved_modules.get(location)!.includes(module_path)) return {
         import: module_import,
-        name: ref_path[-1],
+        name: ref_name,
         module: false
     }
     const module = resolve_module()
@@ -655,51 +742,115 @@ function resolveReference(ref: mcdoc.ReferenceType, current_location: string): (
     if (!resolved_modules.has(location)) {
         resolved_modules.set(location, [module_path])
 
-        if (module !== undefined) {
-            module_files.set(location, [module])
+        if (module.type !== undefined) {
+            module_files.set(location, [module.type])
         }
 
         return {
             import: module_import,
-            name: ref_path[-1],
+            name: ref_name,
             module: false
         }
     }
 
     resolved_modules.get(location)!.push(module_path)
 
-    if (module !== undefined) {
-        module_files.get(location)!.push(module)
+    if (module.type !== undefined) {
+        if (!module_files.has(location)) {
+            module_files.set(location, [module.type])
+        } else {
+            module_files.get(location)!.push(module.type)
+        }
     }
 
     return {
         import: module_import,
-        name: ref_path[-1],
+        name: ref_name,
         module: false
     }
 }
 
 // Kill me. This is the reason I didn't want mcdoc/runtime to be a thing. All of this would ideally be resolved statically AoT by the language server.
-function resolveDispatcher(dispatcher: mcdoc.DispatcherType, parent_type: mcdoc.StructType) {
-    const indices = dispatcher.parallelIndices
+function resolveDispatcher(dispatcher: mcdoc.DispatcherType, parent_struct: string, parent_key?: mcdoc.StructKeyNode) {
+    const index = dispatcher.parallelIndices[0]
 
-    let dynamic = false
-
-    const string_index: string[] = []
-
-    for (const index of indices) {
-        if (index.kind === 'static') {
-            string_index.push(index.value)
-        } else {
-            if (typeof index.accessor === 'string') {
-            } else {
-                if (typeof index.accessor[0] === 'string') {
-                    string_index.push(index.accessor[0])
-                } else {
-                    dynamic = true
+    if (index.kind === 'static') {
+        const module_import = ts.factory.createImportDeclaration(
+            undefined,
+            ts.factory.createImportClause(
+                true,
+                undefined,
+                ts.factory.createNamedImports([
+                    ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier(index.value))
+                ])
+            ),
+            ts.factory.createStringLiteral(generated_path + `/${dispatcher.registry.split(':')[1]}/${index.value}.ts`)
+        )
+        return {
+            import: module_import,
+            name: index.value,
+            module: false
+        }
+    } else {
+        if (typeof index.accessor[0] === 'object') {
+            if (index.accessor[0].keyword === 'key') {
+                const registry = dispatcher.registry.replaceAll('/', '_').split(':')[1]
+                const registry_import = ts.factory.createImportDeclaration(
+                    undefined,
+                    ts.factory.createImportClause(
+                        true,
+                        undefined,
+                        ts.factory.createNamedImports([
+                            ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier(registry))
+                        ])
+                    ),
+                    ts.factory.createStringLiteral(generated_path +`/${dispatcher.registry.split(':')[1]}/index.ts`)
+                )
+                return {
+                    import: registry_import,
+                    name: false,
+                    module: ts.factory.createTypeAliasDeclaration(
+                        undefined,
+                        ts.factory.createIdentifier(`${parent_struct}_${registry}`),
+                        undefined,
+                        ts.factory.createMappedTypeNode(
+                            undefined,
+                            ts.factory.createTypeParameterDeclaration(
+                                undefined,
+                                ts.factory.createIdentifier('Key'),
+                                ts.factory.createTypeOperatorNode(
+                                    ts.SyntaxKind.KeyOfKeyword,
+                                    ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(registry), undefined)
+                                ),
+                                undefined
+                            ),
+                            undefined,
+                            ts.factory.createToken(ts.SyntaxKind.QuestionToken),
+                            ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(registry), [
+                                ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Key'), undefined)
+                            ]),
+                            undefined
+                        )
+                    )
                 }
+            } else {
+                let parentCount = 1
+
+                let path: string[] = []
+
+                for (const accessor of index.accessor.slice(1)) {
+                    if (typeof accessor === 'object') {
+                        if (accessor.keyword === 'parent') {
+                            parentCount++
+                        } else {
+                            throw new Error('Invalid accessor keyword')
+                        }
+                    }
+                    path.push(accessor as string)
+                }
+
+                // Kill me
             }
         }
     }
-    return 
 }
