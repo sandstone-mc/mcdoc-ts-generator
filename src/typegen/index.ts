@@ -2,7 +2,13 @@ import type { Service, SymbolMap } from '@spyglassmc/core'
 import * as mcdoc from '@spyglassmc/mcdoc'
 import ts from 'typescript'
 
+/**
+ * Help:
+ * - https://ts-ast-viewer.com/
+ * - https://stackoverflow.com/questions/67575784/typescript-ast-factory-how-to-use-comments
+ */
 const { factory } = ts
+
 
 export class TypesGenerator {
     constructor(private service: Service, private symbols: SymbolMap, private dispatchers: SymbolMap) {}
