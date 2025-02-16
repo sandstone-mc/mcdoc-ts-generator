@@ -174,8 +174,10 @@ dist
 # Finder (MacOS) folder config
 .DS_Store
 
-mcdoc/
+dummy/
 
 cache/
 
 types/
+
+cachehttp
