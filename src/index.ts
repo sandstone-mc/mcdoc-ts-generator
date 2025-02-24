@@ -10,7 +10,6 @@ import {
     MetaRegistry,
     type SymbolRegistrar,
     type ProjectInitializer,
-    type SymbolMap,
     ResourcepackCategories,
     type ResourcepackCategory,
 } from '@spyglassmc/core'
@@ -26,8 +25,7 @@ const cache_root = join(dirname(fileURLToPath(import.meta.url)), 'cache')
 
 const project_path = resolve(process.cwd(), 'dummy')
 
-const resolved_modules = new Map<string, string[]>()
-
+// TODO: Actually export these
 const module_files = new Map<string, ts.TypeAliasDeclaration[]>()
 
 await fileUtil.ensureDir(NodeJsExternals, project_path)
@@ -242,7 +240,7 @@ const dispatchers = service.project.symbols.getVisibleSymbols('mcdoc/dispatcher'
 
 const resources = dispatchers['minecraft:resource']!.members!
 
-const TypeGen = new TypesGenerator(service, symbols, dispatchers)
+const TypeGen = new TypesGenerator(service, symbols, dispatchers, module_files, generated_path)
 
 for await (const [resource_type, resource] of Object.entries(resources)) {
     const pack_type = ResourcepackCategories.includes(resource_type as ResourcepackCategory) ? 'resourcepack' : 'datapack'
