@@ -12,6 +12,7 @@ import {
     type ProjectInitializer,
     ResourcepackCategories,
     type ResourcepackCategory,
+    AllCategories,
 } from '@spyglassmc/core'
 import { NodeJsExternals } from '@spyglassmc/core/lib/nodejs.js'
 import * as je from '@spyglassmc/java-edition'
@@ -21,6 +22,10 @@ import { errorMessage } from './util'
 import { fetchWithCache } from './util/fetch'
 import { TypesGenerator } from './typegen'
 
+function last<T extends any[]>(list: T) {
+    return list[list.length - 1]
+}
+
 const cache_root = join(dirname(fileURLToPath(import.meta.url)), 'cache')
 
 const project_path = resolve(process.cwd(), 'dummy')
@@ -28,6 +33,8 @@ const project_path = resolve(process.cwd(), 'dummy')
 // TODO: Actually export these
 const module_files = new Map<string, ts.TypeAliasDeclaration[]>()
 
+// haha funny Bun
+/* @ts-ignore */
 await fileUtil.ensureDir(NodeJsExternals, project_path)
 
 function registerAttributes(meta: MetaRegistry, release: ReleaseVersion) {
@@ -169,7 +176,7 @@ const initialize: ProjectInitializer = async (ctx) => {
 
 	meta.registerUriBinder(je.binder.uriBinder)
 
-	const version = await (await fetch('https://github.com/misode/mcmeta/blob/1b221f1ccc1c12b6f995496eab448ba56d397f0d/version.json?raw=true')).json()
+	const version = await (await fetch('https://github.com/misode/mcmeta/blob/summary/version.json?raw=true')).json()
     const release = version.id
 
     const [registries, registriesETag] = await fetchRegistries(version.id)
@@ -212,6 +219,8 @@ const service = new Service({
         defaultConfig: ConfigService.merge(VanillaConfig, {
             env: { dependencies: [] },
         }),
+        // haha funny Bun
+        /* @ts-ignore */
         externals: NodeJsExternals,
         initializers: [mcdoc.initialize, initialize],
         projectRoots: [fileUtil.ensureEndingSlash(
@@ -223,7 +232,9 @@ const service = new Service({
 await service.project.ready()
 await service.project.cacheService.save()
 
-const generated_path = 'types'
+const parent_dir = 'types'
+
+const generated_path = `${parent_dir}/resources`
 
 function camel_case(name: string) {
     const words = name.split('_')
@@ -234,6 +245,46 @@ function camel_case(name: string) {
         .join('')
 }
 
+function pluralize(name: string) {
+    if (name.endsWith('y')) return name.slice(0, -1) + 'ies'
+    if (name.endsWith('s') || name.endsWith('ch') || name.endsWith('sh') || name.endsWith('x') || name.endsWith('z')) return name + 'es'
+    return name + 's'
+}
+
+const type_names: Record<string, string> = {}
+
+let type_exports = ''
+
+for await (const registry_name of AllCategories) {
+    if (registry_name === 'mcdoc' || registry_name === 'mcdoc/dispatcher') continue
+
+    const registry = Object.keys(service.project.symbols.getVisibleSymbols(registry_name))
+
+    if (registry.length === 0) continue
+
+    const type_name = pluralize(registry_name.split('/').join('_')).toUpperCase()
+
+    type_names[registry_name] = type_name
+
+    const type_path = `${parent_dir}/registries/${registry_name}.ts`
+
+    type_exports += `export type * from './${registry_name}.ts'\n`
+
+    await Bun.write(
+        type_path,
+
+        `/* eslint-disable */\n` +
+        `/* Auto-generated */\n` +
+        `export type ${type_name} = (\n` +
+        `  '${registry.join('\' |\n  \'')}'\n` +
+        `)`
+    )
+}
+
+await Bun.write(join(parent_dir, 'registries', 'index.ts'), type_exports)
+
+
+
 const symbols = service.project.symbols.getVisibleSymbols('mcdoc')
 
 const dispatchers = service.project.symbols.getVisibleSymbols('mcdoc/dispatcher')
@@ -242,18 +293,66 @@ const resources = dispatchers['minecraft:resource']!.members!
 
 const TypeGen = new TypesGenerator(service, symbols, dispatchers, module_files, generated_path)
 
+const resource_contents: Record<string, string> = {}
+
+const sub_resources: [type: 'resourcepack' | 'datapack', parent: string, resource: string, types: string][] = []
+
 for await (const [resource_type, resource] of Object.entries(resources)) {
     const pack_type = ResourcepackCategories.includes(resource_type as ResourcepackCategory) ? 'resourcepack' : 'datapack'
 
-    const type_path = join(generated_path, pack_type, `${camel_case(resource_type)}.ts`)
+    const reference = (resource.data! as any).typeDef as mcdoc.ReferenceType
 
-    const typeDef = (resource.data! as any).typeDef as mcdoc.McdocType
+	const type_def = (symbols[reference.path!].data! as { typeDef: mcdoc.McdocType}).typeDef
 
-    let file = `export const original = ${JSON.stringify(typeDef, null, 4)}\n\n`
+    const resource_type_parts = resource_type.split('/')
 
-    const resolved_resource_types = TypeGen.resolveRootTypes(resource_type.replaceAll('/', '_'), typeDef)
+    // eg. worldgen
+    const resource_section = resource_type_parts.length > 1 ? resource_type_parts.slice(0, -1) : []
 
-    file += compileTypes(resolved_resource_types)
+    const resource_name = resource_type_parts[resource_type_parts.length - 1]
+
+    // eg. variants
+    const resource_group = symbols[reference.path!].identifier.split('::').slice(3 + (resource_section.length), -2)
+
+    const resolved_resource_types = TypeGen.resolveRootTypes([...resource_section, resource_name].join('_')/*, pack_type*/, type_def)
+
+    const file = compileTypes(resolved_resource_types) + `\n\nexport const original = ${JSON.stringify(type_def, null, 4)}`
+
+    if (resource_group.length === 1) {
+        const parent = Object.hasOwn(resources, resource_group[0]) ? resource_group[0] : false
+
+        if (parent !== false) {
+            sub_resources.push([pack_type, parent, resource_type, file])
+
+            continue
+        }
+    }
+
+    resource_contents[resource_type] = file
+
+    const type_path = join(...[generated_path, pack_type, ...resource_section, ...resource_group, `${camel_case(resource_name)}.ts`])
+
+    await Bun.write(type_path, file)
+}
+
+if (sub_resources.length > 0) {
+    for await (const [pack_type, parent, resource, types] of sub_resources) {
+        const parent_path = join(...[generated_path, pack_type, `${parent}.ts`])
+
+        const existing = resource_contents[parent]!
+
+        const content = existing + `\n\n// ${resource}\n` + types.replace('export const original', `export const ${resource.replaceAll('/', '_')}_original`)
+
+        resource_contents[parent] = content
+
+        await Bun.write(parent_path, content)
+    }
+}
+
+for await (const [module_path, type_aliases] of module_files.entries()) {
+    const file = compileTypes(type_aliases)
+
+    const type_path = join(generated_path, ...module_path.split('/')) + '/index.ts'
 
     await Bun.write(type_path, file)
 }
@@ -268,13 +367,18 @@ function compileTypes(nodes: any[]) {
       ts.ScriptKind.TS
     );
 
-    return printer.printList(ts.ListFormat.MultiLine, nodes as unknown as ts.NodeArray<ts.Node>, resultFile)
+    // Yeah this semicolon remover is dumb but I can't be bothered to find the setting, no fucking idea what omitTrailingSemicolon is supposed to be.
+    return printer.printList(ts.ListFormat.MultiLine, nodes as unknown as ts.NodeArray<ts.Node>, resultFile).replaceAll(/\;$/gm, '')
 }
 
 await Bun.write(join(generated_path, 'tsconfig.json'), JSON.stringify({
     "compilerOptions": {
         baseUrl: "./",
-        rootDir: "./"
+        rootDir: "./",
+        paths: {
+            'resources/*': [`./*`],
+            'registries/*': ['./*']
+        }
     }
 }))
 
