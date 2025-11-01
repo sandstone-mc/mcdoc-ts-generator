@@ -9,6 +9,26 @@ import ts from 'typescript'
  */
 const { factory } = ts
 
+type DispatcherReferenceCounter = {
+    locations: Map<string, number>
+    location_counts: [string, number][]
+}
+
+type ValueType = ts.TypeLiteralNode | ts.TypeReferenceNode | ts.KeywordTypeNode | ts.UnionTypeNode | ts.LiteralTypeNode | ts.ParenthesizedTypeNode | ts.IntersectionTypeNode | ts.KeywordTypeNode<ts.SyntaxKind.AnyKeyword> | ts.TypeNode
+
+type ResolvedValueType = {
+    type: ValueType;
+    imports: ts.ImportDeclaration[] | never[];
+    modules: (ts.TypeAliasDeclaration | ts.EnumDeclaration)[] | never[];
+}
+
+function pascal_case(name: string) {
+    const words = name.split('_')
+    if (words.length === 1) return name
+    return words
+        .map((word) => word[0].toUpperCase() + word.slice(1))
+        .join('')
+}
 
 export class TypesGenerator {
     private key_dispatcher_count = 0
@@ -17,7 +37,13 @@ export class TypesGenerator {
 
     private inner_dispatcher_count = 0
 
+    private resolved_resources = new Set<string>()
+
     private resolved_modules = new Map<string, string[]>()
+
+    private dispatcher_references = new Map<string, DispatcherReferenceCounter>()
+
+    private resolved_dispatchers = new Set<string>()
 
     constructor(private service: Service, private symbols: SymbolMap, private dispatchers: SymbolMap, private module_files: Map<string, ts.TypeAliasDeclaration[]>, private generated_path: string) { }
 
@@ -25,9 +51,22 @@ export class TypesGenerator {
         return list[list.length - 1] as T[number]
     }
 
-    resolveRootTypes(export_name: string, typeDef: mcdoc.McdocType) {
+    emptyObject = factory.createTypeReferenceNode(
+        factory.createIdentifier("Record"),
+        [
+            factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+            factory.createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
+        ]
+    )
+
+    resolveRootTypes(export_name: string, original_file: string, typeDef: mcdoc.McdocType) {
+        this.resolved_resources.add(original_file)
+
         if (typeDef.kind === 'struct') {
-            const result = this.createStruct(typeDef, export_name)
+            if (typeDef.attributes !== undefined && typeDef.attributes.findIndex((attr: mcdoc.Attribute) => attr.name == 'until') !== -1) {
+                return []
+            }
+            const result = this.createStruct(typeDef, original_file)
 
             const types = [factory.createTypeAliasDeclaration(
                 [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
@@ -50,14 +89,183 @@ export class TypesGenerator {
         }
     }
 
+    resolveDispatcherTypes(generic_name: string, dispatcher: string) {
+        const original_type_map = this.dispatchers[dispatcher].members!
+        
+        const original_type_names = Object.keys(original_type_map)
+
+        let locations = new Map<string, number>()
+
+        let location_counts: [string, number][] = []
+
+        for (const location of original_type_names) {
+            const typeDef = (original_type_map[location].data! as any).typeDef as mcdoc.McdocType
+
+            if (typeDef.kind === 'reference') {
+                if (!locations.has(typeDef.path!)) {
+                    locations.set(typeDef.path!, location_counts.length)
+
+                    location_counts.push([typeDef.path!, 1])
+                } else {
+                    const index = locations.get(typeDef.path!)!
+                    location_counts[index][1]++
+                }
+            } else if (typeDef.kind === 'concrete' && typeDef.typeArgs.length !== 0) {
+                const reference = typeDef.typeArgs.find(arg => arg.kind === 'reference') as mcdoc.ReferenceType | undefined
+
+                if (reference) {
+                    if (!locations.has(reference.path!)) {
+                        locations.set(reference.path!, location_counts.length)
+
+                        location_counts.push([reference.path!, 1])
+                    } else {
+                        const index = locations.get(reference.path!)!
+                        location_counts[index][1]++
+                    }
+                }
+            }
+        }
+        let locator: string | undefined = undefined
+
+        if (location_counts.length > 1) {
+            if (location_counts.length > 2) {
+                location_counts.sort((a, b) => b[1] - a[1])
+            }
+            locator = location_counts[0][0]
+        }
+
+        const resolved_imports: ts.ImportDeclaration[] = []
+
+        const resolved_types: (ts.TypeAliasDeclaration | ts.EnumDeclaration)[] = []
+
+        const mapped_types: ts.PropertySignature[] = []
+
+        let parent: string = ''
+
+        for (const original_type_name of original_type_names) {
+            if (this.resolved_dispatchers.has(`${dispatcher}:${original_type_name}`)) {
+                continue
+            }
+            this.resolved_dispatchers.add(`${dispatcher}:${original_type_name}`)
+
+            const definition_path = Object.keys(original_type_map[original_type_name])
+
+            const typeDef = (original_type_map[original_type_name].data! as any).typeDef as mcdoc.McdocType
+
+            if (original_type_name.startsWith('%')) {
+                // TODO
+                continue
+            } else if (locator === undefined) {
+                const reference_counter = this.dispatcher_references.get(dispatcher)
+
+                if (reference_counter === undefined) {
+                    // TODO
+                    //console.warn('[TypesGenerator#resolveDispatcherTypes] Unable to find dispatcher reference counter')
+                    continue
+                }
+
+                if (reference_counter.location_counts.length === 1) {
+                    locator = reference_counter.location_counts[0][0]
+                } else if (reference_counter.location_counts.length > 1) {
+                    reference_counter.location_counts.sort((a, b) => b[1] - a[1])
+                    locator = reference_counter.location_counts[0][0]
+                } else {
+                    throw new Error('[TypesGenerator#resolveDispatcherTypes] Unable to determine locator for dispatcher type generation')
+                }
+            }
+
+            parent = locator.split('::').slice(-2)[0]
+
+            if (original_type_name.includes(':')) {
+                // TODO
+                //console.log(original_type_name)
+                throw new Error('[TypesGenerator#resolveDispatcherTypes] Non-minecraft dispatcher types are not yet supported')
+            }
+
+            const type_name = `${pascal_case(original_type_name.replace('/', '_'))}Dispatcher`
+
+            
+
+            //console.log(parent)
+
+            const value = this.resolveValueType(typeDef, parent)
+
+            if (value === undefined) {
+                // TODO
+                continue
+                throw new Error(`[TypesGenerator#resolveDispatcherTypes] Unable to resolve dispatcher type: ${original_type_name}@${dispatcher}`)
+            }
+
+            resolved_types.push(
+                factory.createTypeAliasDeclaration(
+                    undefined,
+                    factory.createIdentifier(type_name),
+                    undefined,
+                    value.type
+                )
+            )
+
+            if (value.imports.length > 0) {
+                resolved_imports.push(...value.imports)
+            }
+            if (value.modules.length > 0) {
+                resolved_types.push(...value.modules)
+            }
+
+            mapped_types.push(
+                factory.createPropertySignature(
+                    undefined,
+                    factory.createStringLiteral(type_name, true),
+                    undefined,
+                    factory.createTypeReferenceNode(
+                        factory.createIdentifier(type_name),
+                        undefined
+                    )
+                )
+            )
+        }
+
+        resolved_types.push(
+            factory.createTypeAliasDeclaration(
+                [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+                factory.createIdentifier(generic_name),
+                undefined,
+                factory.createTypeLiteralNode(mapped_types)
+            )
+        )
+
+        resolved_imports.push(this.bindImport('GetKeys', 'sandstone/utils'))
+
+        resolved_types.push(
+            factory.createTypeAliasDeclaration(
+                [factory.createToken(ts.SyntaxKind.ExportKeyword)],
+                factory.createIdentifier(`${generic_name}Keys`),
+                undefined,
+                factory.createTypeReferenceNode(
+                    factory.createIdentifier('GetKeys'),
+                    [factory.createTypeReferenceNode(
+                        factory.createIdentifier(generic_name),
+                        undefined
+                    )]
+                )
+            )
+        )
+
+        if (this.resolved_resources.has(parent)) {
+            return {
+                imports: resolved_imports.length !== 0 ? resolved_imports : (false as false),
+                types: resolved_types,
+                locator
+            }
+        }
+    }
+
     createStruct(typeDef: mcdoc.StructType, parent: string) {
         const anyFallback = factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword)
 
-        type ValueType = NonNullable<ReturnType<TypesGenerator['resolveValueType']>>['type'] | ts.KeywordTypeNode<ts.SyntaxKind.AnyKeyword> | ts.TypeNode
-
         const member_types: (ts.IndexSignatureDeclaration | ts.PropertySignature)[] = []
 
-        const intersection_types: (ts.TypeLiteralNode | ts.TypeReferenceNode | ts.ParenthesizedTypeNode | ts.IntersectionTypeNode)[] = []
+        const intersection_types: ValueType[] = []
 
         const imports: ts.ImportDeclaration[] = []
 
@@ -70,7 +278,7 @@ export class TypesGenerator {
 
         for (const field of typeDef.fields) {
             /** Skip all removed fields */
-            if (field.attributes !== undefined && field.attributes.includes((attr: mcdoc.Attribute) => attr.name === 'until')) {
+            if (field.attributes !== undefined && field.attributes.findIndex((attr: mcdoc.Attribute) => attr.name == 'until') !== -1) {
                 continue
             }
 
@@ -88,12 +296,12 @@ export class TypesGenerator {
                         undefined,
                         this.bindKey(field.key),
                         optional,
-                        value
+                        value as ts.TypeNode
                     )
                     /** Key has dynamic properties to it */
                 } else if (field.key.kind === 'string') {
                     /** Key is proceeded by `minecraft:` but isn't derived from a registry or enum, in vanilla-mcdoc is only followed by a struct */
-                    if (field.key.attributes && field.key.attributes.includes((attr: mcdoc.Attribute) => attr.name === 'id')) {
+                    if (field.key.attributes !== undefined && field.key.attributes.findIndex((attr: mcdoc.Attribute) => attr.name === 'id') !== -1) {
                         if (field.type.kind === 'struct') {
                             const struct = this.createStruct(field.type, parent)
 
@@ -154,8 +362,8 @@ export class TypesGenerator {
 
                             if (resolved.import) {
                                 imports.push(resolved.import)
-                            } else if (resolved.module) {
-                                modules.push(resolved.module)
+                            } else if (resolved.modules) {
+                                modules.push(...resolved.modules)
                             }
                         }
                     }
@@ -217,7 +425,6 @@ export class TypesGenerator {
 
                 /* @ts-ignore */
                 if (key !== undefined) {
-                    // yeah this is a hack
                     const resolved = this.resolveValueType(field.type, parent) || {
                         type: anyFallback,
                         imports: [],
@@ -234,14 +441,18 @@ export class TypesGenerator {
             } else if (field.kind === 'spread') {
                 const spread = field as mcdoc.StructTypeSpreadField
 
+                if (spread.attributes !== undefined && spread.attributes.findIndex((attr: mcdoc.Attribute) => attr.name == 'until') !== -1) {
+                    continue
+                }
+
                 switch (spread.type.kind) {
                     case 'reference': {
                         const reference = this.resolveReference(spread.type, parent)
 
                         if (reference.import !== false) {
                             imports.push(reference.import)
-                        } else if (reference.module !== false) {
-                            modules.push(reference.module)
+                        } else if (reference.modules !== false) {
+                            modules.push(...reference.modules)
                         }
 
                         intersection_types.push(factory.createTypeReferenceNode(
@@ -250,9 +461,16 @@ export class TypesGenerator {
                         ))
                     } break
                     case 'struct': {
-                        const struct = this.createStruct(spread.type, parent)
+                        // TODO
+                        //console.log(spread)
+                        if (spread.type.attributes !== undefined && spread.type.attributes.findIndex((attr: mcdoc.Attribute) => attr.name == 'until') !== -1) {
+                            continue
+                        }
+                        if (spread.type.fields.length === 0) {
+                            continue
+                        }
 
-                        intersection_types.push(struct.type)
+                        const struct = this.createStruct(spread.type, parent)
 
                         if (struct.imports.length > 0) {
                             imports.push(...struct.imports)
@@ -260,11 +478,39 @@ export class TypesGenerator {
                         if (struct.modules.length > 0) {
                             modules.push(...struct.modules)
                         }
+                        if (Object.hasOwn(struct.type, 'members') === true) {
+                            const members = (struct.type as any).members as (ts.IndexSignatureDeclaration | ts.PropertySignature)[]
+                            member_types.push(...members)
+                        } else {
+                            intersection_types.push(struct.type)
+                        }
+                    } break
+                    case 'dispatcher': {
+                        const _value = this.resolveDispatcher(spread.type, parent)
+
+                        if (_value) {
+                            if (typeof _value.import !== 'boolean') {
+                                imports.push(_value.import)
+                            }
+                            if (typeof _value.module !== 'boolean') {
+                                modules.push(_value.module)
+                            }
+
+                            if (_value.inner_dispatcher) {
+                                inner_dispatchers.push(_value.inner_dispatcher)
+                                continue
+                            }
+
+                            intersection_types.push(factory.createTypeReferenceNode(
+                                typeof _value.name === 'string' ? _value.name : `dispatcher_${this.key_dispatcher_count++}`,
+                                undefined
+                            ))
+                        }
                     } break
                     default: {
                         // TODO
                         //console.log(parent)
-                        //console.log(spread.type)
+                        // console.log(spread.type)
                     }
                 }
                 
@@ -272,7 +518,18 @@ export class TypesGenerator {
         }
 
         /* @ts-ignore */
-        if (member_types.length === 0) console.log(typeDef.fields[0].key)
+        if (member_types.length === 0) {
+            if (typeDef.fields.length === 0) {
+                return {
+                    type: this.emptyObject,
+                    imports,
+                    modules
+                }
+            } else {
+                // TODO
+                //console.log(typeDef, parent, '#279')
+            }
+        }
 
         if (inner_dispatchers.length !== 0) {
             if (intersection_types.length !== 0) {
@@ -283,9 +540,9 @@ export class TypesGenerator {
                     /* @ts-ignore */ // TODO
                     type: factory.createParenthesizedType(factory.createUnionTypeNode(Object.keys(this.dispatchers[inner_dispatchers[0].registry].members).map((registry_item) => {
                         return factory.createTypeReferenceNode(
-                            factory.createIdentifier(inner_dispatchers[0].name),
+                            factory.createIdentifier(`${inner_dispatchers[0].name}Joined`),
                             [
-                              factory.createLiteralTypeNode(factory.createStringLiteral(registry_item)),
+                              factory.createLiteralTypeNode(factory.createStringLiteral(registry_item, true)),
                               /* @ts-ignore */ // TODO: Make sure this is okay
                               factory.createTypeLiteralNode(member_types)
                             ]
@@ -300,7 +557,9 @@ export class TypesGenerator {
         }
 
         if (intersection_types.length !== 0) {
-            intersection_types.unshift(factory.createTypeLiteralNode(member_types))
+            if (member_types.length !== 0) {
+                intersection_types.unshift(factory.createTypeLiteralNode(member_types))
+            }
 
             return {
                 type: factory.createIntersectionTypeNode(intersection_types),
@@ -323,8 +582,8 @@ export class TypesGenerator {
     }
 
     resolveReference(ref: mcdoc.ReferenceType, parent?: string): (
-        { import: false, name: string, module: ts.TypeAliasDeclaration | false } |
-        { import: ts.ImportDeclaration, name: string, module: false }
+        { import: false, name: string, modules: ts.TypeAliasDeclaration[] | false } |
+        { import: ts.ImportDeclaration, name: string, modules: false }
     ) {
         const ref_path = ref.path!.split('::').slice(2)
         if (ref_path[0] === 'data') {
@@ -337,16 +596,20 @@ export class TypesGenerator {
         const ref_name = ref_path.slice(-1)[0]
         const location = ref_path.slice(0, -1).join('/')
 
-        const resolve_module = () => this.resolveRootTypes(ref_name, (this.symbols[ref.path!].data! as any).typeDef as mcdoc.McdocType)
+        const resolve_module = () => this.resolveRootTypes(ref_name, ref_path[ref_path.length - 2], (this.symbols[ref.path!].data! as any).typeDef as mcdoc.McdocType)
 
         /** Determine whether to embed the referenced module in the same file */
-        if (location === parent) {
+        
+        if (ref_path[ref_path.length - 2] === parent) {
             const module = resolve_module()
             return {
                 import: false,
                 name: ref_name,
-                module: module[0] as ts.TypeAliasDeclaration
+                modules: module as ts.TypeAliasDeclaration[]
             }
+        } else {
+            // TODO
+            //console.log(ref_path[ref_path.length - 2], parent)
         }
 
         const module_path = `${this.generated_path.split('/').slice(1).join('/')}/${location}/index.ts`
@@ -356,7 +619,7 @@ export class TypesGenerator {
         if (this.resolved_modules.has(location) && this.resolved_modules.get(location)!.includes(module_path)) return {
             import: module_import,
             name: ref_name,
-            module: false
+            modules: false
         }
         const module = resolve_module()
 
@@ -364,13 +627,13 @@ export class TypesGenerator {
             this.resolved_modules.set(location, [module_path])
 
             if (module[0] !== undefined) {
-                this.module_files.set(location, [module[0] as ts.TypeAliasDeclaration])
+                this.module_files.set(location, module as ts.TypeAliasDeclaration[])
             }
 
             return {
                 import: module_import,
                 name: ref_name,
-                module: false
+                modules: false
             }
         }
 
@@ -378,34 +641,40 @@ export class TypesGenerator {
 
         if (module[0] !== undefined) {
             if (!this.module_files.has(location)) {
-                this.module_files.set(location, [module[0] as ts.TypeAliasDeclaration])
+                this.module_files.set(location, module as ts.TypeAliasDeclaration[])
             } else {
-                this.module_files.get(location)!.push(module[0] as ts.TypeAliasDeclaration)
+                this.module_files.get(location)!.push(...(module as ts.TypeAliasDeclaration[]))
             }
         }
 
         return {
             import: module_import,
             name: ref_name,
-            module: false
+            modules: false
         }
     }
 
-    resolveDispatcher(dispatcher: mcdoc.DispatcherType, parent_path?: string) {
+    resolveDispatcher(dispatcher: mcdoc.DispatcherType, parent_path: string) {
+        if (this.dispatcher_references.has(dispatcher.registry) === false) {
+            this.dispatcher_references.set(dispatcher.registry, {
+                locations: new Map<string, number>(),
+                location_counts: []
+            })
+        }
+        const dispatcher_counter = this.dispatcher_references.get(dispatcher.registry)!
+
+        if (!dispatcher_counter.locations.has(parent_path)) {
+            dispatcher_counter.locations.set(parent_path, dispatcher_counter.location_counts.length)
+            dispatcher_counter.location_counts.push([parent_path, 1])
+        } else {
+            const index = dispatcher_counter.locations.get(parent_path)!
+            dispatcher_counter.location_counts[index][1]++
+        }
+        
         const index = dispatcher.parallelIndices[0]
 
         if (index.kind === 'static') {
-            const module_import = ts.factory.createImportDeclaration(
-                undefined,
-                ts.factory.createImportClause(
-                    true,
-                    undefined,
-                    ts.factory.createNamedImports([
-                        ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier(index.value))
-                    ])
-                ),
-                ts.factory.createStringLiteral(this.generated_path + `/${dispatcher.registry.split(':')[1]}/${index.value}.ts`)
-            )
+            const module_import = this.bindImport(index.value, this.generated_path + `/${dispatcher.registry.split(':')[1]}/${index.value}.ts`)
             return {
                 import: module_import,
                 name: index.value,
@@ -415,17 +684,8 @@ export class TypesGenerator {
             if (typeof index.accessor[0] === 'object') {
                 if (index.accessor[0].keyword === 'key') {
                     const registry = dispatcher.registry.replaceAll('/', '_').split(':')[1]
-                    const registry_import = ts.factory.createImportDeclaration(
-                        undefined,
-                        ts.factory.createImportClause(
-                            true,
-                            undefined,
-                            ts.factory.createNamedImports([
-                                ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier(registry))
-                            ])
-                        ),
-                        ts.factory.createStringLiteral(this.generated_path + `/${dispatcher.registry.split(':')[1]}/index.ts`)
-                    )
+                    const registry_import = this.bindImport(registry, this.generated_path + `/${dispatcher.registry.split(':')[1]}/index.ts`)
+
                     return {
                         import: registry_import,
                         name: false,
@@ -541,11 +801,7 @@ export class TypesGenerator {
      *   }
      * ```
      */
-    resolveValueType(type: mcdoc.McdocType, parent?: string): {
-        type: ts.TypeLiteralNode | ts.TypeReferenceNode | ts.KeywordTypeNode | ts.UnionTypeNode | ts.LiteralTypeNode | ts.ParenthesizedTypeNode | ts.IntersectionTypeNode;
-        imports: ts.ImportDeclaration[] | never[];
-        modules: (ts.TypeAliasDeclaration | ts.EnumDeclaration)[] | never[];
-    } | undefined {
+    resolveValueType(type: mcdoc.McdocType, parent: string): ResolvedValueType | undefined {
         switch (type.kind) {
             case 'struct':
                 return this.createStruct(type, parent || '')
@@ -555,7 +811,7 @@ export class TypesGenerator {
                 return {
                     type: factory.createTypeReferenceNode(factory.createIdentifier(resolved.name), undefined),
                     imports: resolved.import ? [resolved.import] : [],
-                    modules: resolved.module ? [resolved.module] : []
+                    modules: resolved.modules ? resolved.modules : []
                 }
             case 'boolean':
                 return {
@@ -649,7 +905,19 @@ export class TypesGenerator {
                 }
             }
             case 'union': {
-                const types = type.members.map((type) => this.resolveValueType(type, parent)!)
+                const types: ResolvedValueType[] = []
+                for (const member_type of type.members) {
+                    if (member_type.attributes !== undefined && member_type.attributes.findIndex((attr: mcdoc.Attribute) => attr.name == 'until') !== -1) {
+                        continue
+                    }
+                    const resolved_union_member = this.resolveValueType(member_type, parent)
+
+                    if (resolved_union_member === undefined) {
+                        continue
+                    }
+
+                    types.push(resolved_union_member)
+                }
 
                 return {
                     type: factory.createUnionTypeNode(types.map((type) => type.type)),
@@ -679,7 +947,7 @@ export class TypesGenerator {
                         }
                     case 'string':
                         return {
-                            type: factory.createLiteralTypeNode(factory.createStringLiteral(type.value.value)),
+                            type: factory.createLiteralTypeNode(factory.createStringLiteral(type.value.value, true)),
                             imports: [],
                             modules: []
                         }
@@ -730,7 +998,7 @@ export class TypesGenerator {
             case 'dispatcher': {
                 const resolved = this.resolveDispatcher(type, parent)
 
-                console.log(resolved)
+                //console.log(resolved)
             } break
             default: {
                 return {
@@ -752,7 +1020,7 @@ export class TypesGenerator {
                     factory.createImportSpecifier(false, undefined, factory.createIdentifier(module_name))
                 ])
             ),
-            factory.createStringLiteral(module_path)
+            factory.createStringLiteral(module_path, true)
         )
     }
 
@@ -800,7 +1068,7 @@ export class TypesGenerator {
             return factory.createEnumDeclaration(
                 undefined,
                 name,
-                _enum.values.map((value) => factory.createEnumMember(value.identifier, factory.createStringLiteral(value.value as string))),
+                _enum.values.map((value) => factory.createEnumMember(value.identifier, factory.createStringLiteral(value.value as string, true))),
             )
         }
         return factory.createEnumDeclaration(

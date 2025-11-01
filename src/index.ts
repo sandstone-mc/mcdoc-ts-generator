@@ -38,23 +38,12 @@ const module_files = new Map<string, ts.TypeAliasDeclaration[]>()
 await fileUtil.ensureDir(NodeJsExternals, project_path)
 
 function registerAttributes(meta: MetaRegistry, release: ReleaseVersion) {
+    // We always generate for the latest version
 	mcdoc.runtime.registerAttribute(meta, 'since', mcdoc.runtime.attribute.validator.string, {
-		filterElement: (config, ctx) => {
-			if (!config.startsWith('1.')) {
-				ctx.logger.warn(`Invalid mcdoc attribute for "since": ${config}`)
-				return true
-			}
-			return ReleaseVersion.cmp(release, config as ReleaseVersion) >= 0
-		},
+		filterElement: () => false,
 	})
 	mcdoc.runtime.registerAttribute(meta, 'until', mcdoc.runtime.attribute.validator.string, {
-		filterElement: (config, ctx) => {
-			if (!config.startsWith('1.')) {
-				ctx.logger.warn(`Invalid mcdoc attribute for "until": ${config}`)
-				return true
-			}
-			return ReleaseVersion.cmp(release, config as ReleaseVersion) < 0
-		},
+		filterElement: () => true,
 	})
 	mcdoc.runtime.registerAttribute(
 		meta,
@@ -244,6 +233,13 @@ function camel_case(name: string) {
         .map((word) => word[0].toUpperCase() + word.slice(1))
         .join('')
 }
+function pascal_case(name: string) {
+    const words = name.split('_')
+    if (words.length === 1) return name
+    return words
+        .map((word) => word[0].toUpperCase() + word.slice(1))
+        .join('')
+}
 
 function pluralize(name: string) {
     if (name.endsWith('y')) return name.slice(0, -1) + 'ies'
@@ -293,14 +289,23 @@ const resources = dispatchers['minecraft:resource']!.members!
 
 const TypeGen = new TypesGenerator(service, symbols, dispatchers, module_files, generated_path)
 
-const resource_contents: Record<string, string> = {}
+type ResourceContent = {
+    file_path: string
+    types: (ts.TypeAliasDeclaration | ts.ImportDeclaration | ts.EnumDeclaration)[]
+}
 
-const sub_resources: [type: 'resourcepack' | 'datapack', parent: string, resource: string, types: string][] = []
+const resource_contents: Map<string, ResourceContent> = new Map()
+
+const sub_resources: [type: 'resourcepack' | 'datapack', parent: string, resource: string, types: (ts.TypeAliasDeclaration | ts.ImportDeclaration | ts.EnumDeclaration)[]][] = []
+
+// TODO: parenting still has an incorrect implementation; if files are named the same thing it will break. I need to figure out a way to pass around the path and properly handle it
 
 for await (const [resource_type, resource] of Object.entries(resources)) {
     const pack_type = ResourcepackCategories.includes(resource_type as ResourcepackCategory) ? 'resourcepack' : 'datapack'
 
     const reference = (resource.data! as any).typeDef as mcdoc.ReferenceType
+
+    const reference_path = reference.path!.split('::')
 
 	const type_def = (symbols[reference.path!].data! as { typeDef: mcdoc.McdocType}).typeDef
 
@@ -314,38 +319,38 @@ for await (const [resource_type, resource] of Object.entries(resources)) {
     // eg. variants
     const resource_group = symbols[reference.path!].identifier.split('::').slice(3 + (resource_section.length), -2)
 
-    const resolved_resource_types = TypeGen.resolveRootTypes([...resource_section, resource_name].join('_')/*, pack_type*/, type_def)
-
-    const file = compileTypes(resolved_resource_types) + `\n\nexport const original = ${JSON.stringify(type_def, null, 4)}`
+    const resolved_resource_types = TypeGen.resolveRootTypes([...resource_section, resource_name].join('_'), reference_path[reference_path.length - 2], type_def)
 
     if (resource_group.length === 1) {
         const parent = Object.hasOwn(resources, resource_group[0]) ? resource_group[0] : false
 
         if (parent !== false) {
-            sub_resources.push([pack_type, parent, resource_type, file])
+            sub_resources.push([pack_type, reference_path[reference_path.length - 2], resource_type, resolved_resource_types])
 
             continue
         }
     }
 
-    resource_contents[resource_type] = file
-
     const type_path = join(...[generated_path, pack_type, ...resource_section, ...resource_group, `${camel_case(resource_name)}.ts`])
 
-    await Bun.write(type_path, file)
+    resource_contents.set(reference_path[reference_path.length - 2], {
+        types: resolved_resource_types,
+        file_path: type_path,
+    })
 }
 
 if (sub_resources.length > 0) {
     for await (const [pack_type, parent, resource, types] of sub_resources) {
-        const parent_path = join(...[generated_path, pack_type, `${parent}.ts`])
+        const existing = resource_contents.get(parent)
 
-        const existing = resource_contents[parent]!
+        if (existing === undefined) {
+            console.warn(`Parent resource "${parent}" not found for sub-resource "${resource}"`)
+            continue
+        }
 
-        const content = existing + `\n\n// ${resource}\n` + types.replace('export const original', `export const ${resource.replaceAll('/', '_')}_original`)
+        // TODO: Handle imports properly
 
-        resource_contents[parent] = content
-
-        await Bun.write(parent_path, content)
+        existing.types.push(...types)
     }
 }
 
@@ -355,6 +360,38 @@ for await (const [module_path, type_aliases] of module_files.entries()) {
     const type_path = join(generated_path, ...module_path.split('/')) + '/index.ts'
 
     await Bun.write(type_path, file)
+}
+
+const dispatcher_keys = Object.keys(dispatchers)
+
+for (const dispatcher_key of dispatcher_keys) {
+    if (dispatcher_key === 'minecraft:resource') {
+        continue
+    }
+    
+    const members = TypeGen.resolveDispatcherTypes(pascal_case(dispatcher_key.replace('/', '_')), dispatcher_key)
+
+    if (members === undefined || members.locator === undefined) {
+        continue
+    }
+
+    const resource = resource_contents.get(members.locator.split('::').slice(-2)[0])
+
+    if (resource === undefined) {
+        continue
+    }
+
+    if (members.imports !== false) {
+        resource.types.unshift(...members.imports)
+    }
+
+    resource.types.push(...members.types)
+}
+
+for await (const [_, resource_content] of resource_contents.entries()) {
+    const file = compileTypes(resource_content.types)
+
+    await Bun.write(resource_content.file_path, file)
 }
 
 function compileTypes(nodes: any[]) {
