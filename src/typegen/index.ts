@@ -24,7 +24,6 @@ type ResolvedValueType = {
 
 function pascal_case(name: string) {
     const words = name.split('_')
-    if (words.length === 1) return name
     return words
         .map((word) => word[0].toUpperCase() + word.slice(1))
         .join('')
@@ -182,7 +181,7 @@ export class TypesGenerator {
                 throw new Error('[TypesGenerator#resolveDispatcherTypes] Non-minecraft dispatcher types are not yet supported')
             }
 
-            const type_name = `${pascal_case(original_type_name.replace('/', '_'))}Dispatcher`
+            const type_name = `${generic_name}${pascal_case(original_type_name.replace('/', '_'))}`
 
             
 
@@ -199,7 +198,7 @@ export class TypesGenerator {
             resolved_types.push(
                 factory.createTypeAliasDeclaration(
                     undefined,
-                    factory.createIdentifier(type_name),
+                    factory.createIdentifier(`${type_name}Type`),
                     undefined,
                     value.type
                 )
@@ -215,10 +214,10 @@ export class TypesGenerator {
             mapped_types.push(
                 factory.createPropertySignature(
                     undefined,
-                    factory.createStringLiteral(type_name, true),
+                    factory.createStringLiteral(`${type_name}Type`, true),
                     undefined,
                     factory.createTypeReferenceNode(
-                        factory.createIdentifier(type_name),
+                        factory.createIdentifier(`${type_name}Type`),
                         undefined
                     )
                 )
@@ -228,7 +227,7 @@ export class TypesGenerator {
         resolved_types.push(
             factory.createTypeAliasDeclaration(
                 [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
-                factory.createIdentifier(generic_name),
+                factory.createIdentifier(`${generic_name}Type`),
                 undefined,
                 factory.createTypeLiteralNode(mapped_types)
             )
@@ -239,12 +238,12 @@ export class TypesGenerator {
         resolved_types.push(
             factory.createTypeAliasDeclaration(
                 [factory.createToken(ts.SyntaxKind.ExportKeyword)],
-                factory.createIdentifier(`${generic_name}Keys`),
+                factory.createIdentifier(`${generic_name}TypeKeys`),
                 undefined,
                 factory.createTypeReferenceNode(
                     factory.createIdentifier('GetKeys'),
                     [factory.createTypeReferenceNode(
-                        factory.createIdentifier(generic_name),
+                        factory.createIdentifier(`${generic_name}Type`),
                         undefined
                     )]
                 )
@@ -862,7 +861,12 @@ export class TypesGenerator {
                     modules: []
                 }
             case 'list': {
-                const item = this.resolveValueType(type.item, parent)!
+                // TODO: Fix what is getting returned as undefined from resolveValueType
+                const item = this.resolveValueType(type.item, parent) || {
+                    type: factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
+                    imports: [],
+                    modules: []
+                }
 
                 if (type.lengthRange) {
                     const range = this.bindRangedInt(type.lengthRange)

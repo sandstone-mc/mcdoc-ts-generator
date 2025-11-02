@@ -235,7 +235,6 @@ function camel_case(name: string) {
 }
 function pascal_case(name: string) {
     const words = name.split('_')
-    if (words.length === 1) return name
     return words
         .map((word) => word[0].toUpperCase() + word.slice(1))
         .join('')
@@ -365,11 +364,12 @@ for await (const [module_path, type_aliases] of module_files.entries()) {
 const dispatcher_keys = Object.keys(dispatchers)
 
 for (const dispatcher_key of dispatcher_keys) {
-    if (dispatcher_key === 'minecraft:resource') {
+    // TODO: Figure out why entity_sub_predicate is causing a maxed call stack size scenario
+    if (dispatcher_key === 'minecraft:resource' || dispatcher_key === 'minecraft:entity_sub_predicate') {
         continue
     }
-    
-    const members = TypeGen.resolveDispatcherTypes(pascal_case(dispatcher_key.replace('/', '_')), dispatcher_key)
+
+    const members = TypeGen.resolveDispatcherTypes(pascal_case(dispatcher_key.replace(/^minecraft:/, '').replace('/', '_')), dispatcher_key)
 
     if (members === undefined || members.locator === undefined) {
         continue
