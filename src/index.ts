@@ -1,4 +1,4 @@
-import { dirname, join, resolve } from 'path'
+import { dirname, resolve } from 'path'
 import { fileURLToPath, pathToFileURL } from 'url'
 
 import ts from 'typescript'
@@ -22,16 +22,14 @@ import { errorMessage } from './util'
 import { fetchWithCache } from './util/fetch'
 import { TypesGenerator } from './typegen'
 
-function last<T extends any[]>(list: T) {
-    return list[list.length - 1]
-}
+// fuck you windows
+const join = (...paths: string[]) => paths.join('/')
 
 const cache_root = join(dirname(fileURLToPath(import.meta.url)), 'cache')
 
 const project_path = resolve(process.cwd(), 'dummy')
 
-// TODO: Actually export these
-const module_files = new Map<string, ts.TypeAliasDeclaration[]>()
+const module_files = new Map<string, Record<string, ts.TypeAliasDeclaration | ts.EnumDeclaration | ts.ImportDeclaration>>
 
 // haha funny Bun
 /* @ts-ignore */
@@ -286,16 +284,19 @@ const dispatchers = service.project.symbols.getVisibleSymbols('mcdoc/dispatcher'
 
 const resources = dispatchers['minecraft:resource']!.members!
 
-const TypeGen = new TypesGenerator(service, symbols, dispatchers, module_files, generated_path)
-
 type ResourceContent = {
-    file_path: string
+    target_path: string
     types: (ts.TypeAliasDeclaration | ts.ImportDeclaration | ts.EnumDeclaration)[]
 }
 
+const resource_targets: Map<string, string> = new Map()
 const resource_contents: Map<string, ResourceContent> = new Map()
 
-const sub_resources: [type: 'resourcepack' | 'datapack', parent: string, resource: string, types: (ts.TypeAliasDeclaration | ts.ImportDeclaration | ts.EnumDeclaration)[]][] = []
+const sub_resource_map: Map<string, string> = new Map()
+
+const sub_resources: [parent: string, resource: string, types: (ts.TypeAliasDeclaration | ts.ImportDeclaration | ts.EnumDeclaration)[]][] = []
+
+const TypeGen = new TypesGenerator(service, symbols, dispatchers, module_files, generated_path, resource_contents, sub_resource_map)
 
 // TODO: parenting still has an incorrect implementation; if files are named the same thing it will break. I need to figure out a way to pass around the path and properly handle it
 
@@ -303,8 +304,6 @@ for await (const [resource_type, resource] of Object.entries(resources)) {
     const pack_type = ResourcepackCategories.includes(resource_type as ResourcepackCategory) ? 'resourcepack' : 'datapack'
 
     const reference = (resource.data! as any).typeDef as mcdoc.ReferenceType
-
-    const reference_path = reference.path!.split('::')
 
 	const type_def = (symbols[reference.path!].data! as { typeDef: mcdoc.McdocType}).typeDef
 
@@ -318,28 +317,32 @@ for await (const [resource_type, resource] of Object.entries(resources)) {
     // eg. variants
     const resource_group = symbols[reference.path!].identifier.split('::').slice(3 + (resource_section.length), -2)
 
-    const resolved_resource_types = TypeGen.resolveRootTypes([...resource_section, resource_name].join('_'), reference_path[reference_path.length - 2], type_def)
+    const target_path = join(pack_type, ...resource_section, ...resource_group, camel_case(resource_name))
+
+    const resolved_resource_types = TypeGen.resolveRootTypes([...resource_section, resource_name].join('_'), reference.path!, target_path, type_def)
 
     if (resource_group.length === 1) {
-        const parent = Object.hasOwn(resources, resource_group[0]) ? resource_group[0] : false
+        const parent = resources[resource_group[0]]
 
-        if (parent !== false) {
-            sub_resources.push([pack_type, reference_path[reference_path.length - 2], resource_type, resolved_resource_types])
-
+        if (parent !== undefined) {
+            const parent_symbol: string = (parent.data as any).typeDef.path
+            sub_resources.push([parent_symbol, resource_type, resolved_resource_types])
+            sub_resource_map.set(reference.path!, parent_symbol)
+ 
             continue
         }
     }
 
-    const type_path = join(...[generated_path, pack_type, ...resource_section, ...resource_group, `${camel_case(resource_name)}.ts`])
+    resource_targets.set(target_path, reference.path!)
 
-    resource_contents.set(reference_path[reference_path.length - 2], {
+    resource_contents.set(reference.path!, {
         types: resolved_resource_types,
-        file_path: type_path,
+        target_path,
     })
 }
 
 if (sub_resources.length > 0) {
-    for await (const [pack_type, parent, resource, types] of sub_resources) {
+    for await (const [parent, resource, types] of sub_resources) {
         const existing = resource_contents.get(parent)
 
         if (existing === undefined) {
@@ -347,37 +350,39 @@ if (sub_resources.length > 0) {
             continue
         }
 
-        // TODO: Handle imports properly
-
         existing.types.push(...types)
     }
 }
 
-for await (const [module_path, type_aliases] of module_files.entries()) {
-    const file = compileTypes(type_aliases)
+for (const dispatcher_key of Object.keys(dispatchers)) {
+    if (dispatcher_key === 'minecraft:resource') {
+        continue
+    }
+    const members = TypeGen.resolveDispatcherTypes(pascal_case(dispatcher_key.replace(/^minecraft:/, '').replace(/^mcdoc:/, 'mcdoc_').replace('/', '_')), dispatcher_key)
 
-    const type_path = join(generated_path, ...module_path.split('/')) + '/index.ts'
-
-    await Bun.write(type_path, file)
-}
-
-const dispatcher_keys = Object.keys(dispatchers)
-
-for (const dispatcher_key of dispatcher_keys) {
-    // TODO: Figure out why entity_sub_predicate is causing a maxed call stack size scenario
-    if (dispatcher_key === 'minecraft:resource' || dispatcher_key === 'minecraft:entity_sub_predicate') {
+    if (members === undefined || members.target_path === undefined || members.types.length === 0) {
         continue
     }
 
-    const members = TypeGen.resolveDispatcherTypes(pascal_case(dispatcher_key.replace(/^minecraft:/, '').replace('/', '_')), dispatcher_key)
-
-    if (members === undefined || members.locator === undefined) {
-        continue
-    }
-
-    const resource = resource_contents.get(members.locator.split('::').slice(-2)[0])
+    const resource = resource_contents.get(members.target_path)
 
     if (resource === undefined) {
+        const module: Record<string, ts.TypeAliasDeclaration | ts.EnumDeclaration | ts.ImportDeclaration> = {}
+
+        if (members.imports !== false) {
+            members.imports.forEach((type, i) => {
+                module[`import_${i}`] = type
+            })
+        }
+
+        members.types.forEach((type, i) => {
+            module[`member_${i}`] = type
+        })
+
+        const existing = module_files.get(members.target_path) ?? {}
+
+        module_files.set(members.target_path, { ...existing, ...Object.fromEntries(Object.entries(members.types)) })
+
         continue
     }
 
@@ -387,11 +392,27 @@ for (const dispatcher_key of dispatcher_keys) {
 
     resource.types.push(...members.types)
 }
+for await (const [module_path, module] of module_files.entries()) {
+    const types = TypeGen.collapseImports(Object.values(module))
+
+    const resource_target = resource_targets.get(module_path)
+
+    if (resource_target !== undefined) {
+        resource_contents.get(resource_target)!.types.push(...types)
+        continue
+    }
+
+    const file = compileTypes(types)
+
+    const type_path = `${join(generated_path, module_path)}.ts`
+
+    await Bun.write(type_path, file)
+}
 
 for await (const [_, resource_content] of resource_contents.entries()) {
-    const file = compileTypes(resource_content.types)
+    const file = compileTypes(TypeGen.collapseImports(resource_content.types))
 
-    await Bun.write(resource_content.file_path, file)
+    await Bun.write(join(generated_path, `${resource_content.target_path}.ts`), file)
 }
 
 function compileTypes(nodes: any[]) {
@@ -410,6 +431,7 @@ function compileTypes(nodes: any[]) {
 
 await Bun.write(join(generated_path, 'tsconfig.json'), JSON.stringify({
     "compilerOptions": {
+        allowImportingTsExtensions: true,
         baseUrl: "./",
         rootDir: "./",
         paths: {
