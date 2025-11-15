@@ -1,6 +1,11 @@
 import type { Service, SymbolMap } from '@spyglassmc/core'
 import * as mcdoc from '@spyglassmc/mcdoc'
 import ts from 'typescript'
+import { collapseImports } from './collapseImports'
+import { bindDoc, bindImport, bindNumericLiteral } from './binders'
+import { camel_case, join, pascal_case, type ResourceContent, type ValueType } from '../util'
+import { resolveValueType } from './resolveValueType'
+import { emptyObject } from './static'
 
 /**
  * Help:
@@ -14,57 +19,20 @@ type DispatcherReferenceCounter = {
     location_counts: [string, number][]
 }
 
-type ValueType = ts.TypeLiteralNode | ts.TypeReferenceNode | ts.KeywordTypeNode | ts.UnionTypeNode | ts.LiteralTypeNode | ts.ParenthesizedTypeNode | ts.IntersectionTypeNode | ts.KeywordTypeNode<ts.SyntaxKind.AnyKeyword> | ts.TypeNode
-
-type ResolvedValueType = {
-    type: ValueType
-    imports: ts.ImportDeclaration[] | never[]
-    modules: (ts.TypeAliasDeclaration | ts.EnumDeclaration | ts.ImportDeclaration)[] | never[]
-    doc?: string[]
-}
-
-type ResourceContent = {
-    target_path: string
-    types: (ts.TypeAliasDeclaration | ts.ImportDeclaration | ts.EnumDeclaration)[]
-}
-
-// fuck you windows
-const join = (...paths: string[]) => paths.join('/')
-
-function pascal_case(name: string) {
-    const words = name.split('_')
-    return words
-        .map((word) => word[0].toUpperCase() + word.slice(1))
-        .join('')
-}
-
-function camel_case(name: string) {
-    const words = name.split('_')
-    if (words.length === 1) return name
-    return words[0] + words
-        .slice(1)
-        .map((word) => word[0].toUpperCase() + word.slice(1))
-        .join('')
-}
-
-const reference_meme = new Map<string, number>()
-
-let current_file = ''
-
 export class TypesGenerator {
     private key_dispatcher_count = 0
 
-    private inline_enum_count = 0
+    inline_enum_count = 0
 
     private inner_dispatcher_count = 0
 
     private readonly resolved_resources = new Set<string>()
 
-    private readonly resolved_references = new Map<string, { name: string, import: ts.ImportDeclaration, path: string }>()
+    readonly resolved_references = new Map<string, { name: string, import: ts.ImportDeclaration, path: string }>()
 
-    private readonly dispatcher_references = new Map<string, DispatcherReferenceCounter>()
+    readonly dispatcher_references = new Map<string, DispatcherReferenceCounter>()
 
-    private readonly resolved_dispatchers = new Set<string>()
+    readonly resolved_dispatchers = new Set<string>()
 
     constructor(
         private service: Service,
@@ -75,31 +43,6 @@ export class TypesGenerator {
         private resource_contents: Map<string, ResourceContent>,
         private sub_resource_map: Map<string, string>
     ) { }
-
-    /**
-     * Helper to add a key-value pair to an object if the value is not undefined.
-     * 
-     * Unfortunately TypeScript doesn't properly support empty object types, even with this attempted workaround, we still get `{ (key): (value) | undefined }` instead of `{ (key): (value) } | Record<string, never>`.
-     *
-     * @returns An object with the key-value pair if the value is not undefined, otherwise an empty object.
-     */
-    add<K extends string, V extends NonNullable<any>>(key: K, value: V): {[P in K]: V}
-    add<K extends string, V extends undefined>(key: K, value: V): Record<string, never>
-    add(key: string, value: any) {
-        if (value === undefined) {
-            return {}
-        } else {
-            return { [key]: value }
-        }
-    }
-
-    emptyObject = factory.createTypeReferenceNode(
-        factory.createIdentifier("Record"),
-        [
-            factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-            factory.createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
-        ]
-    )
 
     resolveRootTypes(export_name: string, original_symbol: string, target_path: string, typeDef: mcdoc.McdocType) {
         this.resolved_resources.add(original_symbol)
@@ -113,7 +56,7 @@ export class TypesGenerator {
                 return [ this.createEnum(factory.createIdentifier(export_name), typeDef)]
             }
             default: {
-                const resolved = this.resolveValueType(typeDef, original_symbol, target_path)
+                const resolved = resolveValueType(typeDef, original_symbol, target_path, this)
 
                 if (resolved === undefined) {
                     return []
@@ -149,7 +92,7 @@ export class TypesGenerator {
 
     resolveDispatcherTypes(generic_name: string, dispatcher: string) {
         const original_type_map = this.dispatchers[dispatcher].members!
-        
+
         const original_type_names = Object.keys(original_type_map)
 
         let locations = new Map<string, number>()
@@ -271,7 +214,7 @@ export class TypesGenerator {
 
             const type_name = `${generic_name}${pascal_case(original_type_name.replace('/', '_'))}`
 
-            const value = this.resolveValueType(typeDef, locator, target_path)
+            const value = resolveValueType(typeDef, locator, target_path, this)
 
             if (value === undefined) {
                 // TODO
@@ -317,19 +260,17 @@ export class TypesGenerator {
             )
         )
 
-        resolved_imports.push(this.bindImport('GetKeys', 'sandstone/utils'))
-
         resolved_types.push(
             factory.createTypeAliasDeclaration(
                 [factory.createToken(ts.SyntaxKind.ExportKeyword)],
                 factory.createIdentifier(`${generic_name}TypeKeys`),
                 undefined,
-                factory.createTypeReferenceNode(
-                    factory.createIdentifier('GetKeys'),
-                    [factory.createTypeReferenceNode(
+                factory.createTypeOperatorNode(
+                    ts.SyntaxKind.KeyOfKeyword,
+                    factory.createTypeReferenceNode(
                         factory.createIdentifier(`${generic_name}Type`),
                         undefined
-                    )]
+                    )
                 )
             )
         )
@@ -526,7 +467,7 @@ export class TypesGenerator {
                         )
                     }
                 } else {
-                    const resolve = this.resolveValueType(field.type, original_symbol, target_path)!
+                    const resolve = resolveValueType(field.type, original_symbol, target_path, this)!
 
                     value = factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
 
@@ -564,7 +505,7 @@ export class TypesGenerator {
                     if (value !== undefined) {
                         member_types.push(this.bindDoc(key(value), field))
                     } else {
-                        const resolved = this.resolveValueType(field.type, original_symbol, target_path) || {
+                        const resolved = resolveValueType(field.type, original_symbol, target_path, this) || {
                             type: anyFallback,
                             imports: [],
                             modules: []
@@ -675,7 +616,7 @@ export class TypesGenerator {
         if (member_types.length === 0) {
             if (typeDef.fields.length === 0) {
                 return {
-                    type: this.emptyObject,
+                    type: emptyObject,
                     imports,
                     modules
                 }
@@ -841,25 +782,25 @@ export class TypesGenerator {
                     return {
                         import: registry_import,
                         name: false,
-                        module: ts.factory.createTypeAliasDeclaration(
+                        module: factory.createTypeAliasDeclaration(
                             undefined,
-                            ts.factory.createIdentifier(`${original_symbol?.split('::').at(-1)}_${registry}`),
+                            factory.createIdentifier(`${original_symbol?.split('::').at(-1)}_${registry}`),
                             undefined,
-                            ts.factory.createMappedTypeNode(
+                            factory.createMappedTypeNode(
                                 undefined,
-                                ts.factory.createTypeParameterDeclaration(
+                                factory.createTypeParameterDeclaration(
                                     undefined,
-                                    ts.factory.createIdentifier('Key'),
-                                    ts.factory.createTypeOperatorNode(
+                                    factory.createIdentifier('Key'),
+                                    factory.createTypeOperatorNode(
                                         ts.SyntaxKind.KeyOfKeyword,
-                                        ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(registry), undefined)
+                                        factory.createTypeReferenceNode(factory.createIdentifier(registry), undefined)
                                     ),
                                     undefined
                                 ),
                                 undefined,
-                                ts.factory.createToken(ts.SyntaxKind.QuestionToken),
-                                ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(registry), [
-                                    ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Key'), undefined)
+                                factory.createToken(ts.SyntaxKind.QuestionToken),
+                                factory.createTypeReferenceNode(factory.createIdentifier(registry), [
+                                    factory.createTypeReferenceNode(factory.createIdentifier('Key'), undefined)
                                 ]),
                                 undefined
                             )
@@ -940,510 +881,6 @@ export class TypesGenerator {
         }
     }
 
-    resolveValueType(type: mcdoc.McdocType, original_symbol: string, target_path: string): ResolvedValueType {
-        let doc_value: string[] = []
-        const doc = () => this.add('doc', doc_value.length !== 0 ? doc_value : undefined)
-
-        const meme = reference_meme.get(target_path) ?? 0
-
-        reference_meme.set(target_path, meme + 1)
-
-        //console.log('\n\n')
-        /* @ts-ignore */
-        //console.log(JSON.stringify(type, null, 2))
-
-        // TODO: implement special case value range handling
-        if (Object.hasOwn(type, 'valueRange')) {
-            const rangedType = type as (mcdoc.NumericType & { valueRange: mcdoc.NumericRange})
-
-            const beginExclusive = mcdoc.RangeKind.isLeftExclusive(rangedType.valueRange.kind)
-
-            const endExclusive = mcdoc.RangeKind.isRightExclusive(rangedType.valueRange.kind)
-
-            let exceptions: string = ''
-
-            if (beginExclusive && endExclusive) {
-                exceptions = ` Excludes minimum & maximum values of ${rangedType.valueRange.min} & ${rangedType.valueRange.max}.`
-            } else if (beginExclusive && !endExclusive) {
-                exceptions = ` Excludes minimum value of ${rangedType.valueRange.min}.`
-            } else if (endExclusive) {
-                exceptions = ` Excludes maximum value of ${rangedType.valueRange.max}.`
-            }
-
-            doc_value = [
-                `Accepts ${pascal_case(rangedType.kind)} values of (${mcdoc.NumericRange.toString(rangedType.valueRange)}).${exceptions}`
-            ]
-        }
-
-        switch (type.kind) {
-            case 'struct':
-                return this.createStruct(type, original_symbol, target_path)
-            case 'reference': {
-                const existing = this.resolved_references.get(type.path!)
-                if (existing !== undefined) {
-                    if (target_path === existing.path) {
-                        return {
-                            type: factory.createTypeReferenceNode(factory.createIdentifier(existing.name), undefined),
-                            imports: [],
-                            modules: []
-                        }
-                    } else {
-                        return {
-                            type: factory.createTypeReferenceNode(factory.createIdentifier(existing.name), undefined),
-                            imports: [existing.import],
-                            modules: []
-                        }
-                    }
-                } else {
-                    if (original_symbol === undefined) {
-                        console.log('resolveValueType', type, target_path)
-                    }
-                    const resolved = this.resolveReference(type, original_symbol, target_path)
-
-                    return {
-                        type: factory.createTypeReferenceNode(factory.createIdentifier(resolved.name), undefined),
-                        imports: resolved.import ? [resolved.import] : [],
-                        modules: resolved.modules ? resolved.modules : []
-                    }
-                }
-            }
-            case 'boolean':
-                return {
-                    type: factory.createKeywordTypeNode(ts.SyntaxKind.BooleanKeyword),
-                    imports: [],
-                    modules: []
-                }
-            case 'string':
-                return {
-                    type: factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                    imports: [],
-                    modules: []
-                }
-            case 'byte': {
-                let _type = factory.createTypeReferenceNode('NBTByte')
-
-                let imports = [this.bindImport('NBTByte', 'sandstone/variables/nbt')]
-
-                if (type.valueRange !== undefined) {
-                    const range = this.bindRangedWholeNumber(type.valueRange, 'value')
-
-                    switch (range.type) {
-                        case 'closed':
-                            _type = factory.createTypeReferenceNode('RangedNBTByte', [
-                                factory.createLiteralTypeNode(this.bindNumericLiteral(type.valueRange.min!)),
-                                factory.createLiteralTypeNode(this.bindNumericLiteral(type.valueRange.max!))
-                            ])
-                            imports = [this.bindImport('RangedNBTByte', 'sandstone/variables/nbt')]
-                            break
-                        case 'non-empty':
-                            _type = factory.createTypeReferenceNode('NonZeroNBTByte')
-                            imports = [this.bindImport('NonZeroNBTByte', 'sandstone/variables/nbt')]
-                            break
-                    }
-                }
-                return {
-                    type: _type,
-                    imports,
-                    modules: [],
-                    ...doc()
-                }
-            }
-            case 'short': {
-                let _type = factory.createTypeReferenceNode('NBTShort')
-
-                let imports = [this.bindImport('NBTShort', 'sandstone/variables/nbt')]
-
-                if (type.valueRange !== undefined) {
-                    const range = this.bindRangedWholeNumber(type.valueRange, 'value')
-
-                    switch (range.type) {
-                        case 'closed':
-                            _type = factory.createTypeReferenceNode('RangedNBTShort', [
-                                factory.createLiteralTypeNode(this.bindNumericLiteral(type.valueRange.min!)),
-                                factory.createLiteralTypeNode(this.bindNumericLiteral(type.valueRange.max!))
-                            ])
-                            imports = [this.bindImport('RangedNBTShort', 'sandstone/variables/nbt')]
-                            break
-                        case 'non-empty':
-                            _type = factory.createTypeReferenceNode('NonZeroNBTShort')
-                            imports = [this.bindImport('NonZeroNBTShort', 'sandstone/variables/nbt')]
-                            break
-                    }
-                }
-                return {
-                    type: _type,
-                    imports,
-                    modules: [],
-                    ...doc()
-                }
-            }
-            case 'int': {
-                let _type = factory.createTypeReferenceNode('NBTInt')
-
-                let imports = [this.bindImport('NBTInt', 'sandstone/variables/nbt')]
-
-                if (type.valueRange !== undefined) {
-                    const range = this.bindRangedWholeNumber(type.valueRange, 'value')
-
-                    switch (range.type) {
-                        case 'closed':
-                            _type = factory.createTypeReferenceNode('RangedNBTInt', [
-                                factory.createLiteralTypeNode(this.bindNumericLiteral(type.valueRange.min!)),
-                                factory.createLiteralTypeNode(this.bindNumericLiteral(type.valueRange.max!))
-                            ])
-                            imports = [this.bindImport('RangedNBTInt', 'sandstone/variables/nbt')]
-                            break
-                        case 'non-empty':
-                            _type = factory.createTypeReferenceNode('NonZeroNBTInt')
-                            imports = [this.bindImport('NonZeroNBTInt', 'sandstone/variables/nbt')]
-                            break
-                    }
-                }
-                return {
-                    type: _type,
-                    imports,
-                    modules: [],
-                    ...doc()
-                }
-            }
-            case 'long': {
-                let _type = factory.createTypeReferenceNode('NBTLong')
-
-                let imports = [this.bindImport('NBTLong', 'sandstone/variables/nbt')]
-
-                if (type.valueRange !== undefined) {
-                    const range = this.bindRangedWholeNumber(type.valueRange, 'value')
-
-                    switch (range.type) {
-                        case 'closed':
-                            _type = factory.createTypeReferenceNode('RangedNBTLong', [
-                                factory.createLiteralTypeNode(this.bindNumericLiteral(type.valueRange.min!)),
-                                factory.createLiteralTypeNode(this.bindNumericLiteral(type.valueRange.max!))
-                            ])
-                            imports = [this.bindImport('RangedNBTLong', 'sandstone/variables/nbt')]
-                            break
-                        case 'non-empty':
-                            _type = factory.createTypeReferenceNode('NonZeroNBTLong')
-                            imports = [this.bindImport('NonZeroNBTLong', 'sandstone/variables/nbt')]
-                            break
-                    }
-                }
-                return {
-                    type: _type,
-                    imports,
-                    modules: [],
-                    ...doc()
-                }
-            }
-            case 'float':
-                return {
-                    type: factory.createTypeReferenceNode('NBTFloat'),
-                    imports: [this.bindImport('NBTFloat', 'sandstone/variables/nbt')],
-                    modules: [],
-                    ...doc()
-                }
-            case 'double':
-                return {
-                    type: factory.createTypeReferenceNode('NBTDouble'),
-                    imports: [this.bindImport('NBTDouble', 'sandstone/variables/nbt')],
-                    modules: [],
-                    ...doc()
-                }
-            case 'list': {
-                // TODO: Fix what is getting returned as undefined from resolveValueType (its dispatchers)
-                const item = this.resolveValueType(type.item, original_symbol, target_path) || {
-                    type: factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
-                    imports: [],
-                    modules: []
-                }
-
-                if (type.lengthRange) {
-                    const range = this.bindRangedWholeNumber(type.lengthRange, 'list')
-                    switch (range.type) {
-                        case 'static':
-                            return {
-                                type: factory.createTypeReferenceNode('FixedLengthList', [
-                                    item.type,
-                                    factory.createLiteralTypeNode(factory.createNumericLiteral(range.value))
-                                ]),
-                                imports: [this.bindImport('FixedLengthList', 'sandstone/utils'), ...item.imports],
-                                modules: item.modules
-                            }
-                        case 'closed':
-                            return {
-                                type: factory.createTypeReferenceNode('RangedList', [
-                                    item.type,
-                                    factory.createLiteralTypeNode(factory.createNumericLiteral(type.lengthRange.min!)),
-                                    factory.createLiteralTypeNode(factory.createNumericLiteral(type.lengthRange.max!))
-                                ]),
-                                imports: [this.bindImport('RangedList', 'sandstone/utils'), ...item.imports],
-                                modules: item.modules
-                            }
-                        case 'non-empty':
-                            return {
-                                type: factory.createTypeReferenceNode('NonEmptyList', [item.type]),
-                                imports: [this.bindImport('NonEmptyList', 'sandstone/utils'), ...item.imports],
-                                modules: item.modules,
-                                doc: [range.doc]
-                            }
-                        case 'unbounded':
-                            return {
-                                type: factory.createTypeReferenceNode('Array', [item.type]),
-                                imports: item.imports,
-                                modules: item.modules,
-                                doc: [range.doc]
-                            }
-                    }
-                }
-                return {
-                    type: factory.createTypeReferenceNode('Array', [item.type]),
-                    imports: item.imports,
-                    modules: item.modules
-                }
-            }
-            // TODO: Implement range/size support for these
-            case 'byte_array': {
-                return {
-                    type: factory.createTypeReferenceNode('NBTByteArray'),
-                    imports: [this.bindImport('NBTByteArray', 'sandstone/variables/nbt')],
-                    modules: []
-                }
-            }
-            case 'int_array': {
-                return {
-                    type: factory.createTypeReferenceNode('NBTIntArray'),
-                    imports: [this.bindImport('NBTIntArray', 'sandstone/variables/nbt')],
-                    modules: []
-                }
-            }
-            case 'long_array': {
-                return {
-                    type: factory.createTypeReferenceNode('NBTLongArray'),
-                    imports: [this.bindImport('NBTLongArray', 'sandstone/variables/nbt')],
-                    modules: []
-                }
-            }
-            case 'union': {
-                const members: ts.TypeNode[] = []
-                const imports: ts.ImportDeclaration[] = []
-                const modules: (ts.TypeAliasDeclaration | ts.EnumDeclaration | ts.ImportDeclaration)[] = []
-                for (const member_type of type.members) {
-                    if (member_type.attributes !== undefined && member_type.attributes.findIndex((attr: mcdoc.Attribute) => attr.name == 'until') !== -1) {
-                        continue
-                    }
-                    const resolved_union_member = this.resolveValueType(member_type, original_symbol, target_path)
-
-                    if (resolved_union_member === undefined) {
-                        continue
-                    }
-
-                    members.push(resolved_union_member.type)
-                    if (resolved_union_member.imports.length > 0) {
-                        imports.push(...resolved_union_member.imports)
-                    }
-                    if (resolved_union_member.modules.length > 0) {
-                        modules.push(...resolved_union_member.modules)
-                    }
-                }
-
-                if (members.length === 1) {
-                    return {
-                        type: members[0],
-                        imports,
-                        modules
-                    }
-                }
-
-                if (members.length === 0) {
-                    return {
-                        type: factory.createKeywordTypeNode(ts.SyntaxKind.NeverKeyword),
-                        imports,
-                        modules
-                    }
-                }
-
-                return {
-                    type: factory.createParenthesizedType(factory.createUnionTypeNode(members)),
-                    imports,
-                    modules
-                }
-            }
-            case 'enum': {
-                const enum_identifier = factory.createIdentifier(`inlineEnum${this.inline_enum_count++}`) // :husk:
-
-                return {
-                    type: factory.createTypeReferenceNode(enum_identifier),
-                    imports: [],
-                    modules: [this.createEnum(enum_identifier, type)]
-                }
-            }
-            
-            case 'literal': {
-                // TODO: Add support for literal generic for these NBT primitives in Sandstone
-                switch (type.value.kind) {
-                    case 'boolean':
-                        return {
-                            type: type.value.value ?
-                                factory.createLiteralTypeNode(factory.createTrue())
-                                : factory.createLiteralTypeNode(factory.createFalse()),
-                            imports: [],
-                            modules: []
-                        }
-                    case 'string':
-                        return {
-                            type: factory.createLiteralTypeNode(factory.createStringLiteral(type.value.value, true)),
-                            imports: [],
-                            modules: []
-                        }
-                    case 'byte': {
-                        return {
-                            type: factory.createTypeReferenceNode('NBTByte', [{
-                                ...this.bindNumericLiteral(type.value.value),
-                                _typeNodeBrand: ''
-                            }]),
-                            imports: [
-                                this.bindImport('NBTByte', 'sandstone/variables/nbt')
-                            ],
-                            modules: []
-                        }
-                    }
-                    case 'short': {
-                        return {
-                            type: factory.createTypeReferenceNode('NBTShort', [{
-                                ...this.bindNumericLiteral(type.value.value),
-                                _typeNodeBrand: ''
-                            }]),
-                            imports: [
-                                this.bindImport('NBTShort', 'sandstone/variables/nbt')
-                            ],
-                            modules: []
-                        }
-                    }
-                    case 'float': {
-                        return {
-                            type: factory.createTypeReferenceNode('NBTFloat', [{
-                                ...this.bindNumericLiteral(type.value.value),
-                                _typeNodeBrand: ''
-                            }]),
-                            imports: [
-                                this.bindImport('NBTFloat', 'sandstone/variables/nbt')
-                            ],
-                            modules: []
-                        }
-                    }
-                    default: // This is a hack, but it works. `double` is the default decimal SNBT value type, `int` is the default integer SNBT value type.
-                        return {
-                            type: factory.createLiteralTypeNode(this.bindNumericLiteral(type.value.value)),
-                            imports: [],
-                            modules: []
-                        }
-                }
-            }
-            // TODO
-            /* case 'dispatcher': {
-            } break */
-            default: {
-                return {
-                    type: factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
-                    imports: [],
-                    modules: []
-                }
-            }
-        }
-    }
-
-    bindImport(module_name: string, module_path: string) {
-        return factory.createImportDeclaration(
-            undefined,
-            factory.createImportClause(
-                true,
-                undefined,
-                factory.createNamedImports([
-                    factory.createImportSpecifier(false, undefined, factory.createIdentifier(module_name))
-                ])
-            ),
-            factory.createStringLiteral(module_path, true)
-        )
-    }
-
-    bindNumericLiteral(literal: number) {
-        if (Math.sign(literal) === -1) {
-            return factory.createPrefixUnaryExpression(
-                ts.SyntaxKind.MinusToken,
-                factory.createNumericLiteral(Math.abs(literal))
-            )
-        } else {
-            return factory.createNumericLiteral(literal)
-        }
-    }
-
-    /**
-     * TODO: Remember to add these to Sandstone Utils & implement equivalents in NBT types!!!
-     * https://discord.com/channels/800035701243772969/800035701751676974/1434784900178903111
-     */
-    bindRangedWholeNumber(range: mcdoc.NumericRange, type: 'value' | 'list' | 'array'): (
-        | { type: 'static'; value: number }
-        | { type: 'closed' }
-        | { type: 'unbounded'; doc: string }
-        | { type: 'non-empty'; doc: string }
-    ) {
-        const rangeString = mcdoc.NumericRange.toString(range)
-
-        if (/^[0-9]+$/.test(mcdoc.NumericRange.toString(range))) {
-            return {
-                type: 'static',
-                value: parseInt(rangeString)
-            }
-        }
-
-        if (range.min !== undefined && range.max !== undefined) {
-            if (range.max - range.min > 100) {
-                return {
-                    type: 'non-empty',
-                    doc: `${type === 'value' ? 'Integer within ' : `${pascal_case(type)} length within`} range of (${mcdoc.NumericRange.toString(range)}).`
-                }
-            }
-            return {
-                type: 'closed'
-            }
-        } else if (range.min !== undefined) {
-            const at_least = `${type === 'value' ? 'Integer of at least ' : `${pascal_case(type)} length of at least`} ${range.min}.`
-            return {
-                type: 'non-empty',
-                doc: range.min === 1 ? (type === 'value' ? 'Integer must be higher than 0.' : `${pascal_case(type)} must not be empty.`) : at_least
-            }
-        } else {
-            return {
-                type: 'unbounded',
-                doc: `${type === 'value' ? 'Integer' : `${pascal_case(type)} length`} cannot exceed ${range.max} & ${type === 'value' ? 'can be less than 1' : 'can be empty'}.`
-            }
-        }
-    }
-
-    bindDoc<N extends ts.Node>(node: N, doc?: string[] | mcdoc.McdocBaseType): N {
-        let _doc: string[] = []
-        if (doc === undefined) {
-            return node
-        }
-        if (Array.isArray(doc)) {
-            _doc = doc
-        } else if (Object.hasOwn(doc, 'desc')) {
-            // @ts-ignore
-            const desc: string = doc.desc
-
-            // y e s
-            _doc = desc.trim().replaceAll('\n\n\n\n ', '@@bad@@').replaceAll('\n\n', '\n').replaceAll('@@bad@@', '\n\n').split('\n')
-        } else {
-            return node
-        }
-        return ts.addSyntheticLeadingComment(
-            node,
-            ts.SyntaxKind.MultiLineCommentTrivia,
-            `*\n * ${_doc.join('\n * ')}\n `, 
-            true, 
-        )
-    }
-
     createEnum(name: ts.Identifier, _enum: mcdoc.EnumType) {
         if (_enum.enumKind === 'string') {
             return factory.createEnumDeclaration(
@@ -1459,84 +896,12 @@ export class TypesGenerator {
         )
     }
 
+    readonly bindImport = bindImport
+
+    readonly bindDoc = bindDoc
+
     /**
      * Iterate through all types, collapsing imports into a single import declaration per module path
      */
-    collapseImports(types: (ts.EnumDeclaration | ts.ImportDeclaration | ts.TypeAliasDeclaration)[]) {
-        const importPaths: string[] = []
-        const importMap: Record<string, number | undefined> = {} // Map to track module paths and their indices in collapsedImports
-        const collapsedImports: ts.ImportDeclaration[] = []
-        const nonImportTypes: (ts.EnumDeclaration | ts.TypeAliasDeclaration)[] = []
-    
-        // First loop: Process types and assemble collapsedImports in sorted order
-        for (const type of types) {
-            if (ts.isImportDeclaration(type) && type.importClause?.namedBindings && ts.isNamedImports(type.importClause.namedBindings)) {
-                const modulePath = (type.moduleSpecifier as ts.StringLiteral).text
-                const specifier = type.importClause.namedBindings.elements[0] // Only one specifier per ImportDeclaration
-    
-                let importIndex = importMap[modulePath]
-                if (importIndex === undefined) {
-                    // Use binary search to find the correct insertion point for the new module path
-                    let left = 0
-                    let right = collapsedImports.length
-                    while (left < right) {
-                        const mid = Math.floor((left + right) / 2)
-                        const midPath = (collapsedImports[mid].moduleSpecifier as ts.StringLiteral).text
-                        if (modulePath.localeCompare(midPath) < 0) {
-                            right = mid
-                        } else {
-                            left = mid + 1
-                        }
-                    }
-    
-                    // Create a new ImportDeclaration and insert it at the correct position
-                    const newImport = factory.createImportDeclaration(
-                        undefined,
-                        factory.createImportClause(false, undefined, factory.createNamedImports([])),
-                        factory.createStringLiteral(modulePath, true)
-                    );
-                    collapsedImports.splice(left, 0, newImport)
-                    importPaths.splice(left, 0, modulePath)
-                    importMap[modulePath] = left
-                    importIndex = left
-    
-                    // Update indices in the map for all subsequent imports using importPaths as a reference
-                    for (let i = left + 1; i < importPaths.length; i++) {
-                        importMap[importPaths[i]] = i
-                    }
-                }
-    
-                // Add the specifier to the correct ImportDeclaration
-                const importClause = collapsedImports[importIndex].importClause!
-                const namedImports = importClause.namedBindings! as ts.NamedImports // Imagine using namespaces
-                const existingSpecifiers = namedImports.elements as (ts.NodeArray<ts.ImportSpecifier> & { splice: typeof Array['prototype']['splice'] })
-    
-                // Use binary search to insert the specifier in sorted order
-                let left = 0
-                let right = existingSpecifiers.length
-                let exists = false
-                while (left < right) {
-                    const mid = Math.floor((left + right) / 2)
-                    const comparison = specifier.name.text.localeCompare(existingSpecifiers[mid].name.text)
-                    if (comparison === 0) {
-                        exists = true // Specifier already exists, no need to insert
-                        break
-                    } else if (comparison < 0) {
-                        right = mid
-                    } else {
-                        left = mid + 1
-                    }
-                }
-    
-                if (!exists) {
-                    existingSpecifiers.splice(left, 0, specifier)
-                }
-            } else {
-                nonImportTypes.push(type as ts.EnumDeclaration | ts.TypeAliasDeclaration)
-            }
-        }
-    
-        // Combine collapsed imports with non-import types
-        return [...collapsedImports, ...nonImportTypes];
-    }
+    readonly collapseImports = collapseImports
 }

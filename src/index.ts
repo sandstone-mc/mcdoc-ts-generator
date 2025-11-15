@@ -1,5 +1,6 @@
-import { dirname, resolve } from 'path'
+import path, { dirname, resolve } from 'path'
 import { fileURLToPath, pathToFileURL } from 'url'
+import os from 'os'
 
 import ts from 'typescript'
 import {
@@ -18,12 +19,9 @@ import { NodeJsExternals } from '@spyglassmc/core/lib/nodejs.js'
 import * as je from '@spyglassmc/java-edition'
 import { ReleaseVersion } from '@spyglassmc/java-edition/lib/dependency/index.js'
 import * as mcdoc from '@spyglassmc/mcdoc'
-import { errorMessage } from './util'
+import { camel_case, errorMessage, join, pascal_case, pluralize, type ResourceContent } from './util'
 import { fetchWithCache } from './util/fetch'
 import { TypesGenerator } from './typegen'
-
-// fuck you windows
-const join = (...paths: string[]) => paths.join('/')
 
 const cache_root = join(dirname(fileURLToPath(import.meta.url)), 'cache')
 
@@ -163,7 +161,7 @@ const initialize: ProjectInitializer = async (ctx) => {
 
 	meta.registerUriBinder(je.binder.uriBinder)
 
-	const version = await (await fetch('https://github.com/misode/mcmeta/blob/summary/version.json?raw=true')).json()
+	const version = (await (await fetch('https://api.spyglassmc.com/mcje/versions')).json())[0]
     const release = version.id
 
     const [registries, registriesETag] = await fetchRegistries(version.id)
@@ -223,27 +221,6 @@ const parent_dir = 'types'
 
 const generated_path = `${parent_dir}/resources`
 
-function camel_case(name: string) {
-    const words = name.split('_')
-    if (words.length === 1) return name
-    return words[0] + words
-        .slice(1)
-        .map((word) => word[0].toUpperCase() + word.slice(1))
-        .join('')
-}
-function pascal_case(name: string) {
-    const words = name.split('_')
-    return words
-        .map((word) => word[0].toUpperCase() + word.slice(1))
-        .join('')
-}
-
-function pluralize(name: string) {
-    if (name.endsWith('y')) return name.slice(0, -1) + 'ies'
-    if (name.endsWith('s') || name.endsWith('ch') || name.endsWith('sh') || name.endsWith('x') || name.endsWith('z')) return name + 'es'
-    return name + 's'
-}
-
 const type_names: Record<string, string> = {}
 
 let type_exports = ''
@@ -276,18 +253,11 @@ for await (const registry_name of AllCategories) {
 
 await Bun.write(join(parent_dir, 'registries', 'index.ts'), type_exports)
 
-
-
 const symbols = service.project.symbols.getVisibleSymbols('mcdoc')
 
 const dispatchers = service.project.symbols.getVisibleSymbols('mcdoc/dispatcher')
 
 const resources = dispatchers['minecraft:resource']!.members!
-
-type ResourceContent = {
-    target_path: string
-    types: (ts.TypeAliasDeclaration | ts.ImportDeclaration | ts.EnumDeclaration)[]
-}
 
 const resource_targets: Map<string, string> = new Map()
 const resource_contents: Map<string, ResourceContent> = new Map()
@@ -296,9 +266,15 @@ const sub_resource_map: Map<string, string> = new Map()
 
 const sub_resources: [parent: string, resource: string, types: (ts.TypeAliasDeclaration | ts.ImportDeclaration | ts.EnumDeclaration)[]][] = []
 
-const TypeGen = new TypesGenerator(service, symbols, dispatchers, module_files, generated_path, resource_contents, sub_resource_map)
-
-// TODO: parenting still has an incorrect implementation; if files are named the same thing it will break. I need to figure out a way to pass around the path and properly handle it
+const TypeGen = new TypesGenerator(
+    service,
+    symbols,
+    dispatchers,
+    module_files,
+    generated_path,
+    resource_contents,
+    sub_resource_map
+)
 
 for await (const [resource_type, resource] of Object.entries(resources)) {
     const pack_type = ResourcepackCategories.includes(resource_type as ResourcepackCategory) ? 'resourcepack' : 'datapack'
@@ -358,7 +334,10 @@ for (const dispatcher_key of Object.keys(dispatchers)) {
     if (dispatcher_key === 'minecraft:resource') {
         continue
     }
-    const members = TypeGen.resolveDispatcherTypes(pascal_case(dispatcher_key.replace(/^minecraft:/, '').replace(/^mcdoc:/, 'mcdoc_').replace('/', '_')), dispatcher_key)
+    const members = TypeGen.resolveDispatcherTypes(
+        pascal_case(dispatcher_key.replace(/^minecraft:/, '').replace(/^mcdoc:/, 'mcdoc_').replace('/', '_')), 
+        dispatcher_key
+    )
 
     if (members === undefined || members.target_path === undefined || members.types.length === 0) {
         continue
@@ -381,7 +360,7 @@ for (const dispatcher_key of Object.keys(dispatchers)) {
 
         const existing = module_files.get(members.target_path) ?? {}
 
-        module_files.set(members.target_path, { ...existing, ...Object.fromEntries(Object.entries(members.types)) })
+        module_files.set(members.target_path, { ...module, ...existing })
 
         continue
     }
@@ -402,7 +381,7 @@ for await (const [module_path, module] of module_files.entries()) {
         continue
     }
 
-    const file = compileTypes(types)
+    const file = await compileTypes(types)
 
     const type_path = `${join(generated_path, module_path)}.ts`
 
@@ -410,12 +389,12 @@ for await (const [module_path, module] of module_files.entries()) {
 }
 
 for await (const [_, resource_content] of resource_contents.entries()) {
-    const file = compileTypes(TypeGen.collapseImports(resource_content.types))
+    const file = await compileTypes(TypeGen.collapseImports(resource_content.types))
 
     await Bun.write(join(generated_path, `${resource_content.target_path}.ts`), file)
 }
 
-function compileTypes(nodes: any[]) {
+async function compileTypes(nodes: ts.Node[]) {
     const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed, omitTrailingSemicolon: true });
     const resultFile = ts.createSourceFile(
       "code.ts",
@@ -423,14 +402,73 @@ function compileTypes(nodes: any[]) {
       ts.ScriptTarget.Latest,
       false,
       ts.ScriptKind.TS
-    );
+    )
 
-    // Yeah this semicolon remover is dumb but I can't be bothered to find the setting, no fucking idea what omitTrailingSemicolon is supposed to be.
-    return printer.printList(ts.ListFormat.MultiLine, nodes as unknown as ts.NodeArray<ts.Node>, resultFile).replaceAll(/\;$/gm, '')
+    const printed = printer.printList(ts.ListFormat.MultiLine, ts.factory.createNodeArray(nodes), resultFile)
+
+    const executable = os.platform() === 'win32' ? join('node_modules/.bin/biome.exe') : 'node_modules/@biomejs/biome/bin/biome'
+
+    const shell = Bun.spawn({
+        cmd: [executable, 'format', '--verbose', '--max-diagnostics=none', '--stdin-file-path=code.ts'],
+        stdout: 'pipe',
+        //windowsHide: true,
+        //windowsVerbatimArguments: true,
+        stdin: 'pipe',
+        stderr: 'pipe'
+    })
+
+    shell.stdin.write(printed)
+
+    shell.stdin.end()
+
+    const stdout = shell.stdout.getReader()
+
+    const decoder = new TextDecoder()
+    
+    let formatted = ''
+
+    async function* read(reader: ReadableStreamDefaultReader<Uint8Array<ArrayBufferLike>>) {
+        let done = false
+
+        while (!done) {
+            const chunk = await reader.read()
+
+            if (chunk.done) {
+                done = true
+            } else {
+                yield decoder.decode(chunk.value, {stream: true})
+            }
+        }
+    }
+
+    for await (const chunk of read(stdout)) {
+        formatted += chunk
+    }
+
+    let errors = ''
+
+    const stderr = shell.stderr.getReader()
+
+    for await (const chunk of read(stderr)) {
+        errors += chunk
+    }
+
+    await shell.exited
+
+    if (errors !== '') {
+        console.log('Errors during formatting:')
+        console.log('printed: ', printed)
+        console.log('formatted: ', formatted)
+        console.log('errors: ', errors)
+
+        return printed
+    }
+
+    return formatted
 }
 
 await Bun.write(join(generated_path, 'tsconfig.json'), JSON.stringify({
-    "compilerOptions": {
+    compilerOptions: {
         allowImportingTsExtensions: true,
         baseUrl: "./",
         rootDir: "./",
