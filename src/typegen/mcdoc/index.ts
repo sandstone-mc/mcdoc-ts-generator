@@ -1,5 +1,7 @@
 import ts from 'typescript'
 import * as mcdoc from '@spyglassmc/mcdoc'
+
+import { McdocList } from './list/list'
 import { McdocAny } from './primitives/any'
 import { McdocBoolean } from './primitives/boolean'
 import { McdocByte } from './primitives/byte'
@@ -8,20 +10,30 @@ import { McdocFloat } from './primitives/float'
 import { McdocInt } from './primitives/int'
 import { McdocLiteral } from './primitives/literal'
 import { McdocLong } from './primitives/long'
+import { McdocReference } from './primitives/reference'
 import { McdocShort } from './primitives/short'
 import { McdocString } from './primitives/string'
 
-export type NonEmptyList<T> = readonly T[] & { 0: T }
+export type NonEmptyList<T> = T[] & { 0: T }
 
 export type TypeHandlerResult = {
-    readonly type: ts.TypeNode,
-    readonly imports?: NonEmptyList<string>,
+    readonly type: ts.TypeNode | ts.EnumDeclaration,
+    readonly imports?: {
+        /**
+         * Cannot include duplicates, but uses a list to preserve order.
+         */
+        readonly ordered: NonEmptyList<string>,
+        /**
+         * Maps import strings to the the index in `ordered` where they appear.
+         */
+        readonly check: Map<string, number>,
+    },
     readonly docs?: NonEmptyList<string>,
     readonly named?: string,
 }
 
-export type TypeHandler = (type: mcdoc.McdocType, ...args: unknown[]) => (
-    (...args: unknown[]) => TypeHandlerResult
+export type TypeHandler<RESULT = TypeHandlerResult> = (type: mcdoc.McdocType, ...args: unknown[]) => (
+    (...args: unknown[]) => RESULT
 )
 
 type TypeHandlersMeta = Record<mcdoc.McdocType['kind'], TypeHandler>
@@ -38,15 +50,6 @@ class TypeHandlersClass {
      * ```
      */
     static readonly byte = McdocByte
-    /**
-     * An `NBTByteArray`.
-     * 
-     * Contains a generic with 4 possible values:
-     * - `['fixed', number]`
-     * - `['ranged', number, number]`
-     * - `['non-empty']`
-     * - `['unbounded']`
-     */
     static readonly byte_array = McdocAny
     /**
      * @deprecated deferred.
@@ -81,51 +84,22 @@ class TypeHandlersClass {
      * ```
      */
     static readonly int = McdocInt
-    /**
-     * An `NBTIntArray`.
-     * 
-     * Contains a generic with 4 possible values:
-     * - `['fixed', number]`
-     * - `['ranged', number, number]`
-     * - `['non-empty']`
-     * - `['unbounded']`
-     */
     static readonly int_array = McdocAny
     /**
      * An `NBTList`.
-     * 
-     * Contains two generics:
-     * - `TYPE`: The type of the list elements.
-     * - `LENGTH`: One of the following:
-     *   - `['fixed', number]`
-     *   - `['ranged', number, number]`
-     *   - `['non-empty']`
-     *   - `['unbounded']`
      */
-    static readonly list = McdocAny
+    static readonly list = McdocList as McdocListType
     static readonly literal = McdocLiteral
     /**
      * An `NBTLong`.
      */
     static readonly long = McdocLong
-    /**
-     * An `NBTLongArray`.
-     * 
-     * Contains a generic with 4 possible values:
-     * - `['fixed', number]`
-     * - `['ranged', number, number]`
-     * - `['non-empty']`
-     * - `['unbounded']`
-     */
     static readonly long_array = McdocAny
     /**
      * @deprecated Unused.
      */
     static readonly mapped = McdocAny
-    /**
-     * @deprecated Deferred.
-     */
-    static readonly reference = McdocAny
+    static readonly reference = McdocReference
     /**
      * An `NBTShort`.
      * 
@@ -162,3 +136,13 @@ export const TypeHandlers = TypeHandlersClass satisfies TypeHandlersMeta
 export function getTypeHandler(kind: mcdoc.McdocType['kind']): TypeHandler {
     return TypeHandlers[kind]
 }
+
+// Explicit return types for handlers that are circular
+type McdocListType = TypeHandler<{
+    readonly type: ts.TypeReferenceNode;
+    readonly imports: {
+        ordered: NonEmptyList<string>;
+        check: Map<string, number>;
+    };
+    readonly docs?: NonEmptyList<string>;
+}>

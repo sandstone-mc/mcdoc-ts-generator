@@ -19,7 +19,10 @@ function mcdoc_double(type: mcdoc.McdocType) {
                     factory.createTypeReferenceNode(NBTDoubleType),
                     factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword)
                 ])),
-                imports: [`sandstone::${NBTDoubleType}`],
+                imports: {
+                    ordered: [`sandstone::${NBTDoubleType}`] as NonEmptyList<string>,
+                    check: new Map([[`sandstone::${NBTDoubleType}`, 0]]) as Map<string, number>,
+                },
             } as const
         } else {
             return non_integral_generic(double.valueRange, NBTDoubleType, true)
@@ -35,6 +38,7 @@ export function non_integral_generic<TYPE extends string, JS_NUMBER_ALLOWED exte
         `Range: ${mcdoc.NumericRange.toString(range)}`
     ]
     const generic: ts.PropertySignature[] = []
+    // This code still sucks and I still need to rewrite it again
     let has_min = false
     let has_max = false
     const left_exclusive = mcdoc.RangeKind.isLeftExclusive(range.kind)
@@ -74,18 +78,21 @@ export function non_integral_generic<TYPE extends string, JS_NUMBER_ALLOWED exte
     }
 
     if (has_min && has_max) {
-        generic.push(factory.createPropertySignature(
-            undefined,
-            'min',
-            undefined,
-            Bind.NumericLiteral(0)
-        ))
-        generic.push(factory.createPropertySignature(
-            undefined,
-            'max',
-            undefined,
-            Bind.NumericLiteral(1)
-        ))
+        // TODO
+        if (range.min === 0 && range.max === 1) {
+            generic.push(factory.createPropertySignature(
+                undefined,
+                'min',
+                undefined,
+                Bind.NumericLiteral(0)
+            ))
+            generic.push(factory.createPropertySignature(
+                undefined,
+                'max',
+                undefined,
+                Bind.NumericLiteral(1)
+            ))
+        }
     } else if (has_min) {
         if (range.min! >= 0) {
             let number = 0
@@ -143,6 +150,9 @@ export function non_integral_generic<TYPE extends string, JS_NUMBER_ALLOWED exte
     return {
         type: returned_type as JS_NUMBER_ALLOWED extends true ? ts.ParenthesizedTypeNode : ts.TypeReferenceNode,
         docs: docs as NonEmptyList<string>,
-        imports: [`sandstone::${type}`],
+        imports: {
+            ordered: [`sandstone::${type}`] as NonEmptyList<string>,
+            check: new Map([[`sandstone::${type}`, 0]]) as Map<string, number>,
+        } as const,
     } as const
 }

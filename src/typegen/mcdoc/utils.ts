@@ -1,0 +1,48 @@
+import type { TypeHandlerResult } from '.'
+
+export function add_import(imports: NonNullable<TypeHandlerResult['imports']>, add_import: string) {
+    if (imports.ordered.length === 1) {
+        // If there's only one import, skip the binary search.
+        const existingImport = imports.ordered[0]
+        if (add_import.localeCompare(existingImport) < 0) {
+            imports.ordered.unshift(add_import)
+            imports.check.set(add_import, 0)
+            imports.check.set(existingImport, 1)
+        } else {
+            imports.ordered.push(add_import)
+            imports.check.set(add_import, 1)
+        }
+    }
+
+    // Use binary search to find the correct insertion point for the new import
+    let left = 0
+    let right = imports.ordered.length
+    while (left < right) {
+        const mid = Math.floor((left + right) / 2)
+        const midPath = imports.ordered[mid]
+        if (add_import.localeCompare(midPath) < 0) {
+            right = mid
+        } else {
+            left = mid + 1
+        }
+    }
+
+    imports.ordered.splice(left, 0, add_import)
+    imports.check.set(add_import, left)
+
+    // Update indices in the map for all subsequent imports using ordered as a reference
+    for (let i = left + 1; i < imports.ordered.length; i++) {
+        imports.check.set(imports.ordered[i], i)
+    }
+}
+
+export function merge_imports(
+    imports: NonNullable<TypeHandlerResult['imports']>,
+    new_imports: NonNullable<TypeHandlerResult['imports']>,
+) {
+    for (const import_path of new_imports.ordered) {
+        if (!imports.check.has(import_path)) {
+            add_import(imports, import_path)
+        }
+    }
+}

@@ -1,6 +1,6 @@
 import ts from 'typescript'
 import * as mcdoc from '@spyglassmc/mcdoc'
-import type { TypeHandler } from '..'
+import type { NonEmptyList, TypeHandler } from '..'
 import { Assert } from '../assert'
 import { whole_number_generic } from './int'
 
@@ -16,7 +16,10 @@ function mcdoc_byte(type: mcdoc.McdocType) {
         if (byte.valueRange === undefined) {
             return {
                 type: factory.createTypeReferenceNode(NBTByteType),
-                imports: [`sandstone::${NBTByteType}`],
+                imports: {
+                    ordered: [`sandstone::${NBTByteType}`] as NonEmptyList<string>,
+                    check: new Map([[`sandstone::${NBTByteType}`, 0]]) as Map<string, number>,
+                },
             } as const
         } else {
             return whole_number_generic(byte.valueRange, NBTByteType)

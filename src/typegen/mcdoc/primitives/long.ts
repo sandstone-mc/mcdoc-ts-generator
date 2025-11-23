@@ -1,6 +1,6 @@
 import ts from 'typescript'
 import * as mcdoc from '@spyglassmc/mcdoc'
-import type { TypeHandler } from '..'
+import type { NonEmptyList, TypeHandler } from '..'
 import { Assert } from '../assert'
 import { whole_number_generic } from './int'
 
@@ -16,7 +16,10 @@ function mcdoc_long(type: mcdoc.McdocType) {
         if (long.valueRange === undefined) {
             return {
                 type: factory.createTypeReferenceNode(NBTLongType),
-                imports: [`sandstone::${NBTLongType}`],
+                imports: {
+                    ordered: [`sandstone::${NBTLongType}`] as NonEmptyList<string>,
+                    check: new Map([[`sandstone::${NBTLongType}`, 0]]) as Map<string, number>,
+                },
             } as const
         } else {
             // Spyglass doesn't support BigInt, so we don't need to worry about a range that contains BigInts.

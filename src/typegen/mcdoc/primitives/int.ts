@@ -16,7 +16,10 @@ function mcdoc_int(type: mcdoc.McdocType) {
         if (int.valueRange === undefined) {
             return {
                 type: factory.createTypeReferenceNode(NBTIntType),
-                imports: [`sandstone::${NBTIntType}`],
+                imports: {
+                    ordered: [`sandstone::${NBTIntType}`] as NonEmptyList<string>,
+                    check: new Map([[`sandstone::${NBTIntType}`, 0]]) as Map<string, number>,
+                },
             } as const
         } else {
             return whole_number_generic(int.valueRange, NBTIntType)
@@ -32,6 +35,9 @@ export function whole_number_generic<TYPE extends string>(range: mcdoc.NumericRa
         `Range: ${mcdoc.NumericRange.toString(range)}`
     ]
     const generic: ts.PropertySignature[] = []
+
+    // This code still sucks and I still need to rewrite it again
+
     let has_min = false
     let has_max = false
     const left_exclusive = mcdoc.RangeKind.isLeftExclusive(range.kind)
@@ -39,38 +45,19 @@ export function whole_number_generic<TYPE extends string>(range: mcdoc.NumericRa
 
     if (range.min !== undefined) {
         has_min = true
-        generic.push(factory.createPropertySignature(
-            undefined,
-            'leftExclusive',
-            undefined,
-            factory.createLiteralTypeNode(
-                left_exclusive ?
-                    factory.createTrue() :
-                    factory.createFalse()
-            )
-        ))
         if (left_exclusive) {
-            docs.push(`Effective Minimum: ${range.min + 1}`)
+            docs.push(`Effective minimum: ${range.min + 1}`)
         }
     }
     if (range.max !== undefined) {
         has_max = true
-        generic.push(factory.createPropertySignature(
-            undefined,
-            'rightExclusive',
-            undefined,
-            factory.createLiteralTypeNode(
-                right_exclusive ?
-                    factory.createTrue() :
-                    factory.createFalse()
-            )
-        ))
         if (right_exclusive) {
-            docs.push(`Effective Maximum: ${range.max - 1}`)
+            docs.push(`Effective maximum: ${range.max - 1}`)
         }
     }
 
     if (has_min && has_max) {
+        // TODO
         if (integer_range_size(range.min!, range.max!) <= 100) {
             generic.push(
                 factory.createPropertySignature(
@@ -134,7 +121,10 @@ export function whole_number_generic<TYPE extends string>(range: mcdoc.NumericRa
             factory.createTypeLiteralNode(generic)
         ]),
         docs: docs as NonEmptyList<string>,
-        imports: [`sandstone::${type}`],
+        imports: {
+            ordered: [`sandstone::${type}`] as NonEmptyList<string>,
+            check: new Map([[`sandstone::${type}`, 0]]) as Map<string, number>,
+        } as const,
     } as const
 }
 
@@ -142,7 +132,7 @@ export function whole_number_generic<TYPE extends string>(range: mcdoc.NumericRa
  * Returns the number of valid values within the range.
  * Lower value must actually be lower than the upper
  */
-function integer_range_size(lower: number, upper: number) {
+export function integer_range_size(lower: number, upper: number) {
 	if (lower > upper) {
 		throw new Error()
 	}

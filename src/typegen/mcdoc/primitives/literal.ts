@@ -1,6 +1,6 @@
 import ts from 'typescript'
 import * as mcdoc from '@spyglassmc/mcdoc'
-import type { TypeHandler } from '..'
+import type { NonEmptyList, TypeHandler } from '..'
 import { Assert } from '../assert'
 import { match, P } from 'ts-pattern'
 import { Bind } from '../bind'
@@ -33,7 +33,10 @@ function mcdoc_literal(type: mcdoc.McdocType) {
                 type: factory.createTypeReferenceNode(type, [
                     Bind.NumericLiteral(byte.value)
                 ]),
-                imports: [`sandstone::${type}`] as const,
+                imports: {
+                    ordered: [`sandstone::${type}`] as NonEmptyList<string>,
+                    check: new Map([[`sandstone::${type}`, 0]]) as Map<string, number>,
+                },
             }
         }).narrow() // I have no idea why this `narrow` is only actually needed here and not after `float`
         .with({ kind: 'double' }, { kind: 'int'}, (num) => ({
@@ -46,7 +49,10 @@ function mcdoc_literal(type: mcdoc.McdocType) {
                 type: factory.createTypeReferenceNode(type, [
                     Bind.NumericLiteral(float.value)
                 ]),
-                imports: [`sandstone::${type}`] as const,
+                imports: {
+                    ordered: [`sandstone::${type}`] as NonEmptyList<string>,
+                    check: new Map([[`sandstone::${type}`, 0]]) as Map<string, number>,
+                },
             }
         })
         .with({ kind: 'long'}, (long) => {
@@ -56,7 +62,10 @@ function mcdoc_literal(type: mcdoc.McdocType) {
                 type: factory.createTypeReferenceNode(type, [
                     Bind.StringLiteral(`${long.value}`)
                 ]),
-                imports: [`sandstone::${type}`] as const,
+                imports: {
+                    ordered: [`sandstone::${type}`] as NonEmptyList<string>,
+                    check: new Map([[`sandstone::${type}`, 0]]) as Map<string, number>,
+                },
             }
         })
         .with({ kind: 'short' }, (short) => {
@@ -66,7 +75,10 @@ function mcdoc_literal(type: mcdoc.McdocType) {
                 type: factory.createTypeReferenceNode(type, [
                     Bind.NumericLiteral(short.value)
                 ]),
-                imports: [`sandstone::${type}`] as const,
+                imports: {
+                    ordered: [`sandstone::${type}`] as NonEmptyList<string>,
+                    check: new Map([[`sandstone::${type}`, 0]]) as Map<string, number>,
+                },
             }
         })
         .with({ kind: 'string' }, (string) => ({

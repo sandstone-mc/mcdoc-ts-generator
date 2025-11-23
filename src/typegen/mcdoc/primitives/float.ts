@@ -2,7 +2,7 @@ import * as mcdoc from '@spyglassmc/mcdoc'
 import ts from 'typescript'
 import { Assert } from '../assert'
 import { Bind } from '../bind'
-import type { TypeHandler } from '..'
+import type { NonEmptyList, TypeHandler } from '..'
 import { non_integral_generic } from './double'
 
 const { factory } = ts
@@ -17,7 +17,10 @@ function mcdoc_float(type: mcdoc.McdocType) {
         if (float.valueRange === undefined) {
             return {
                 type: factory.createTypeReferenceNode(NBTFloatType),
-                imports: [`sandstone::${NBTFloatType}`],
+                imports: {
+                    ordered: [`sandstone::${NBTFloatType}`] as NonEmptyList<string>,
+                    check: new Map([[`sandstone::${NBTFloatType}`, 0]]) as Map<string, number>,
+                },
             } as const
         } else {
             return non_integral_generic(float.valueRange, NBTFloatType)
