@@ -1,9 +1,8 @@
 import ts from 'typescript'
 import { match, P } from 'ts-pattern'
 import * as mcdoc from '@spyglassmc/mcdoc'
-import { TypeHandlers, type NonEmptyList, type TypeHandler, type TypeHandlerResult } from '..'
+import { TypeHandlers, type NonEmptyList, type TypeHandler } from '..'
 import { Assert } from '../assert'
-import { Bind } from '../bind'
 import { merge_imports } from '../utils'
 
 const { factory } = ts
@@ -18,7 +17,6 @@ function mcdoc_struct(type: mcdoc.McdocType) {
     const struct = type
     Assert.StructType(struct)
 
-    // TODO: The args will actually be used here, so this needs to be typed.
     return (...args: unknown[]) => {
         let has_imports = false
         const imports = {
@@ -42,11 +40,14 @@ function mcdoc_struct(type: mcdoc.McdocType) {
         const merge: StructIntersection[] = []
 
         for (const field of struct.fields) {
+            if (field.attributes?.indexOf((attr: mcdoc.Attribute) => attr.name === 'until') !== -1) {
+                continue
+            }
             match(field)
                 .with({ kind: 'pair', key: P.string, ...field_properties }, (pair) => {
                     const value = TypeHandlers[pair.type.kind](pair.type)([pair.key, ...args])
 
-                    if ('imports' in value) {
+                    if ('imports' in value && value.imports !== undefined) {
                         has_imports = true
                         merge_imports(imports, value.imports)
                     }
@@ -66,32 +67,30 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                         has_imports = true
                         merge_imports(imports, key.imports)
                     }
-                    if ('imports' in value) {
+                    if ('imports' in value && value.imports !== undefined) {
                         has_imports = true
                         merge_imports(imports, value.imports)
                     }
-
                     match(pair.key.kind)
-                        .with('reference', () => {
+                        .with('reference', 'concrete', () => {
                             inherit.push({
                                 type: factory.createParenthesizedType(factory.createMappedTypeNode(
                                     undefined,
                                     factory.createTypeParameterDeclaration(
                                         undefined,
-                                        factory.createIdentifier('K'),
-                                        key.type as ts.TypeReferenceNode,
+                                        factory.createIdentifier('K')
                                     ),
-                                    factory.createToken(ts.SyntaxKind.QuestionToken) as any, // if this breaks, pain
-                                    undefined,
+                                    key.type,
+                                    factory.createToken(ts.SyntaxKind.QuestionToken),
                                     value.type, // K is assumed, McdocConcrete will know to use it from the passed pair.key
                                     undefined
                                 ))
                             })
                         })
                         .with('string', () => {
-                            const string_key = key as Exclude<typeof key, ReturnType<ReturnType<typeof TypeHandlers['reference']>>>
+                            const string_key = key as ReturnType<ReturnType<typeof TypeHandlers['string']>>
 
-                            // Dispatcher junk
+                            // TODO: handle dispatchers
                         })
                 })
                 .with({ kind: 'spread' }, (_spread) => {
@@ -116,8 +115,34 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                 ...(has_imports ? { imports } : {}),
             }
         } else {
-            throw new Error('Structs with spreads & index signatures are not yet supported.')
-            // TODO
+            if (pair_inserted === false) {
+                if (inherit.length === 1 && merge.length === 0) {
+                    return {
+                        type: inherit[0].type,
+                        ...(has_imports ? { imports } : {})
+                    }
+                }
+                return {
+                    type: factory.createParenthesizedType(
+                        factory.createIntersectionTypeNode([
+                            ...inherit.map(i => i.type),
+                            ...merge.map(i => i.type),
+                        ])
+                    ),
+                    ...(has_imports ? { imports } : {})
+                }
+            } else {
+                return {
+                    type: factory.createParenthesizedType(
+                        factory.createIntersectionTypeNode([
+                            ...inherit.map(i => i.type),
+                            factory.createTypeLiteralNode(members),
+                            ...merge.map(i => i.type),
+                        ])
+                    ),
+                    ...(has_imports ? { imports } : {})
+                }
+            }
         }
     }
 }
