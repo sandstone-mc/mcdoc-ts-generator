@@ -7,6 +7,8 @@ import { camel_case, join, pascal_case, type ResourceContent, type ValueType } f
 import { resolveValueType } from './resolveValueType'
 import { emptyObject } from './static'
 
+// I'm rewriting everything in the `typegen` directory
+
 /**
  * Help:
  * - https://ts-ast-viewer.com/

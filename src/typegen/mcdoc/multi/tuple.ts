@@ -26,7 +26,7 @@ function mcdoc_tuple(type: mcdoc.McdocType) {
 
             const value = TypeHandlers[item.kind](item)([...args])
 
-            if ('imports' in value && value.imports !== undefined) {
+            if ('imports' in value) {
                 has_imports = true
                 merge_imports(imports, value.imports)
             }
@@ -36,7 +36,7 @@ function mcdoc_tuple(type: mcdoc.McdocType) {
         return {
             type: factory.createTupleTypeNode(members),
             ...(has_imports ? { imports } : {})
-        }
+        } as const
     }
 }
 

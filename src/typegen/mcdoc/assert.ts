@@ -101,4 +101,9 @@ export class Assert {
             throw new Error(`Type is not a StringType: ${type.kind}`)
         }
     }
+    static HasKey<Obj extends Record<string, unknown>, Key extends string>(obj: Obj, key: Key): asserts obj is (Obj & { [K in Key]: NonNullable<Obj[Key]> }) {
+        if (!(key in obj) || obj[key] === undefined) {
+            throw new Error()
+        }
+    }
 }

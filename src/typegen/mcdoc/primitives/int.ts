@@ -30,6 +30,9 @@ function mcdoc_int(type: mcdoc.McdocType) {
 export const McdocInt = mcdoc_int satisfies TypeHandler
 
 
+/**
+ * 
+ */
 export function whole_number_generic<TYPE extends string>(range: mcdoc.NumericRange, type: TYPE) {
     const docs: string[] & { 0: string } = [
         `Range: ${mcdoc.NumericRange.toString(range)}`
@@ -57,7 +60,6 @@ export function whole_number_generic<TYPE extends string>(range: mcdoc.NumericRa
     }
 
     if (has_min && has_max) {
-        // TODO
         if (integer_range_size(range.min!, range.max!) <= 100) {
             generic.push(
                 factory.createPropertySignature(
@@ -73,6 +75,17 @@ export function whole_number_generic<TYPE extends string>(range: mcdoc.NumericRa
                     Bind.NumericLiteral(range.max! - (right_exclusive ? 1 : 0))
                 )
             )
+        } else if (range.min! >= 0) {
+            let number = 0
+            if ((left_exclusive && range.min! === 0) || range.min! >= 1) {
+                number = 1
+            }
+            generic.push(factory.createPropertySignature(
+                undefined,
+                'min',
+                undefined,
+                Bind.NumericLiteral(number)
+            ))
         }
     } else if (has_min) {
         if (range.min! >= 0) {
@@ -117,7 +130,6 @@ export function whole_number_generic<TYPE extends string>(range: mcdoc.NumericRa
      */
     return {
         type: factory.createTypeReferenceNode(type, [
-            factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
             factory.createTypeLiteralNode(generic)
         ]),
         docs: docs as NonEmptyList<string>,

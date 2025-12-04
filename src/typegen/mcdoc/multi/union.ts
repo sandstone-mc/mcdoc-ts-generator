@@ -25,7 +25,7 @@ function mcdoc_union(type: mcdoc.McdocType) {
             }
             const value = TypeHandlers[member.kind](member)([...args])
 
-            if ('imports' in value && value.imports !== undefined) {
+            if ('imports' in value) {
                 has_imports = true
                 merge_imports(imports, value.imports)
             }
@@ -37,7 +37,7 @@ function mcdoc_union(type: mcdoc.McdocType) {
                 factory.createUnionTypeNode(members)
             ),
             ...(has_imports ? { imports } : {})
-        }
+        } as const
     }
 }
 

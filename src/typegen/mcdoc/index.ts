@@ -1,22 +1,20 @@
 import ts from 'typescript'
 import * as mcdoc from '@spyglassmc/mcdoc'
 
-import { McdocList } from './list/list'
-import { McdocAny } from './primitives/any'
-import { McdocBoolean } from './primitives/boolean'
-import { McdocByte } from './primitives/byte'
-import { McdocDouble } from './primitives/double'
-import { McdocFloat } from './primitives/float'
-import { McdocInt } from './primitives/int'
-import { McdocLiteral } from './primitives/literal'
-import { McdocLong } from './primitives/long'
-import { McdocReference } from './primitives/reference'
-import { McdocShort } from './primitives/short'
-import { McdocString } from './primitives/string'
-import { McdocStruct } from './multi/struct'
-import { McdocUnion } from './multi/union'
-import { McdocTuple } from './multi/tuple'
-import { McdocEnum } from './multi/enum'
+import {
+    McdocList, McdocByteArray, McdocIntArray, McdocLongArray,
+} from './list'
+import {
+    McdocAny, McdocBoolean, McdocByte, McdocConcrete, McdocDouble,
+    McdocFloat, McdocInt, McdocLiteral, McdocLong,
+    McdocReference, McdocShort, McdocString,
+} from './primitives'
+import {
+    McdocStruct, McdocUnion, McdocTuple, McdocEnum,
+} from './multi'
+import {
+    McdocDispatcher,
+} from './complex'
 
 export type NonEmptyList<T> = T[] & { 0: T }
 
@@ -33,7 +31,6 @@ export type TypeHandlerResult = {
         readonly check: Map<string, number>,
     },
     readonly docs?: NonEmptyList<string>,
-    readonly named?: string,
 }
 
 export type TypeHandler<RESULT = TypeHandlerResult> = (type: mcdoc.McdocType, ...args: unknown[]) => (
@@ -54,24 +51,28 @@ class TypeHandlersClass {
      * ```
      */
     static readonly byte = McdocByte
-    static readonly byte_array = McdocAny // TODO
     /**
-     * @deprecated deferred.
+     * An `NBTByteArray`.
+     *
+     * Contains a generic with the length range encoded when applicable.
+     */
+    static readonly byte_array = McdocByteArray
+    /**
      * A type reference with generic parameters.
-     * 
+     *
      * References `template` types or members of a dispatcher that include their own generics.
      */
-    static readonly concrete = McdocAny // TODO
+    static readonly concrete = McdocConcrete as McdocConcreteType
     /**
      * `mcdoc.symbol['namespace:...']...`
-     * 
+     *
      * With no generic defaults to `map`. Can include a generic parameter for special cases.
      * - `map`: The full symbol map.
      * - `keys`: The keys of the symbol map.
      * - `%fallback`: The union of all symbol values.
      * - `%unknown`: The intersection of all symbol values.
      */
-    static readonly dispatcher = McdocAny // TODO
+    static readonly dispatcher = McdocDispatcher
     static readonly double = McdocDouble
     /**
      * This uses a type hack because `enum` is never a value, it's only ever a base module type.
@@ -92,7 +93,12 @@ class TypeHandlersClass {
      * ```
      */
     static readonly int = McdocInt
-    static readonly int_array = McdocAny // TODO
+    /**
+     * An `NBTIntArray`.
+     *
+     * Contains a generic with the length range encoded when applicable.
+     */
+    static readonly int_array = McdocIntArray
     /**
      * An `NBTList`.
      */
@@ -102,7 +108,12 @@ class TypeHandlersClass {
      * An `NBTLong`.
      */
     static readonly long = McdocLong
-    static readonly long_array = McdocAny // TODO
+    /**
+     * An `NBTLongArray`.
+     *
+     * Contains a generic with the length range encoded when applicable.
+     */
+    static readonly long_array = McdocLongArray
     /**
      * @deprecated Unused.
      */
@@ -149,8 +160,8 @@ export function getTypeHandler(kind: mcdoc.McdocType['kind']): TypeHandler {
 type McdocListType = TypeHandler<{
     readonly type: ts.TypeReferenceNode
     readonly imports?: {
-        ordered: NonEmptyList<string>
-        check: Map<string, number>
+        readonly ordered: NonEmptyList<string>
+        readonly check: Map<string, number>
     }
     readonly docs?: NonEmptyList<string>
 }>
@@ -173,6 +184,14 @@ type McdocTupleType = TypeHandler<{
 
 type McdocUnionType = TypeHandler<{
     readonly type: ts.ParenthesizedTypeNode
+    readonly imports?: {
+        readonly ordered: NonEmptyList<string>
+        readonly check: Map<string, number>
+    }
+}>
+
+type McdocConcreteType = TypeHandler<{
+    readonly type: ts.TypeReferenceNode | ts.TypeNode
     readonly imports?: {
         readonly ordered: NonEmptyList<string>
         readonly check: Map<string, number>

@@ -1,10 +1,9 @@
 import ts from 'typescript'
-import { match, P } from 'ts-pattern'
 import * as mcdoc from '@spyglassmc/mcdoc'
 import { TypeHandlers, type NonEmptyList, type TypeHandler } from '..'
 import { Assert } from '../assert'
-import { integer_range_size } from '../primitives/int'
 import { Bind } from '../bind'
+import { integer_range_size } from '../primitives/int'
 import { add_import } from '../utils'
 
 const { factory } = ts
@@ -20,124 +19,23 @@ function mcdoc_list(type: mcdoc.McdocType) {
     return (...args: unknown[]) => {
         const item = TypeHandlers[list.item.kind](list.item)(...args)
 
-        const imports = {
-            ordered: 'imports' in item ? item.imports.ordered : ([NBTListImport] as NonEmptyList<string>),
-            check: 'imports' in item ? item.imports.check : new Map<string, number>([[NBTListImport, 0]]),
+        const imports = 'imports' in item ? {
+            ordered: item.imports.ordered,
+            check: item.imports.check,
+        } : {
+            ordered: [NBTListImport] as NonEmptyList<string>,
+            check: new Map<string, number>([[NBTListImport, 0]]),
         } as const
 
-        if ('imports' in item && !imports.check.has(NBTListImport)) {
+        if ('imports' in item ? !imports.check.has(NBTListImport) : true) {
             add_import(imports, NBTListImport)
         }
 
         if (list.lengthRange) {
-            const range = list.lengthRange
-
-            const docs: NonEmptyList<string> = [
-                `List length range: ${mcdoc.NumericRange.toString(range)}`
-            ]
-            const generic: ts.PropertySignature[] = []
-
-            // This code still sucks and I still need to rewrite it again
-
-            let has_min = false
-            let has_max = false
-            const left_exclusive = mcdoc.RangeKind.isLeftExclusive(range.kind)
-            const right_exclusive = mcdoc.RangeKind.isRightExclusive(range.kind)
-
-            // actual capabilities that will be provided inside `NBTList`
-            // FixedLengthList, RangedList, NonEmptyList, Array
-            // We can probably play around with `Exclude` too
-
-            if (range.min !== undefined) {
-                has_min = true
-                generic.push(factory.createPropertySignature(
-                    undefined,
-                    'leftExclusive',
-                    undefined,
-                    factory.createLiteralTypeNode(
-                        left_exclusive ?
-                            factory.createTrue() :
-                            factory.createFalse()
-                    )
-                ))
-                if (left_exclusive) {
-                    docs.push(`Effective minimum list length: ${range.min + 1}`)
-                }
-            }
-            if (range.max !== undefined) {
-                has_max = true
-                generic.push(factory.createPropertySignature(
-                    undefined,
-                    'rightExclusive',
-                    undefined,
-                    factory.createLiteralTypeNode(
-                        right_exclusive ?
-                            factory.createTrue() :
-                            factory.createFalse()
-                    )
-                ))
-                if (right_exclusive) {
-                    docs.push(`Effective maximum list length: ${range.max - 1}`)
-                }
-            }
-        
-            if (has_min && has_max) {
-                if (integer_range_size(range.min!, range.max!) <= 100) {
-                    generic.push(
-                        factory.createPropertySignature(
-                            undefined,
-                            'min',
-                            undefined,
-                            Bind.NumericLiteral(range.min! + (left_exclusive ? 1 : 0))
-                        ),
-                        factory.createPropertySignature(
-                            undefined,
-                            'max',
-                            undefined,
-                            Bind.NumericLiteral(range.max! - (right_exclusive ? 1 : 0))
-                        )
-                    )
-                }
-            } else if (has_min) {
-                if (range.min! >= 0) {
-                    let number = 0
-                    if ((left_exclusive && range.min! === 0) || range.min! >= 1) {
-                        number = 1
-                    }
-                    generic.push(factory.createPropertySignature(
-                        undefined,
-                        'min',
-                        undefined,
-                        Bind.NumericLiteral(number)
-                    ))
-                } else if (left_exclusive) {
-                    generic.push(factory.createPropertySignature(
-                        undefined,
-                        'min',
-                        undefined,
-                        Bind.NumericLiteral(range.min!)
-                    ))
-                }
-            } else {
-                if (range.max! < 0 || (right_exclusive && range.max! === 0)) {
-                    generic.push(factory.createPropertySignature(
-                        undefined,
-                        'max',
-                        undefined,
-                        Bind.NumericLiteral(-1)
-                    ))
-                } else if (right_exclusive) {
-                    generic.push(factory.createPropertySignature(
-                        undefined,
-                        'max',
-                        undefined,
-                        Bind.NumericLiteral(range.max!)
-                    ))
-                }
-            }
+            const { generic, docs } = length_range_generic(list.lengthRange, 'List')
 
             return {
-                type: factory.createTypeReferenceNode('NBTList', [
+                type: factory.createTypeReferenceNode(NBTListType, [
                     item.type,
                     factory.createTypeLiteralNode(generic),
                 ]),
@@ -146,7 +44,7 @@ function mcdoc_list(type: mcdoc.McdocType) {
             } as const
         } else {
             return {
-                type: factory.createTypeReferenceNode('NBTList', [item.type]),
+                type: factory.createTypeReferenceNode(NBTListType, [item.type]),
                 imports,
             } as const
         }
@@ -154,3 +52,116 @@ function mcdoc_list(type: mcdoc.McdocType) {
 }
 
 export const McdocList = mcdoc_list satisfies TypeHandler
+
+/**
+ * Generates TypeScript property signatures and documentation for a length range constraint.
+ * Used by list and primitive array types (byte_array, int_array, long_array).
+ *
+ * @param range The numeric range constraint
+ * @param label Label for docs (e.g., "List", "Array")
+ * @returns Object with `generic` (property signatures) and `docs` (documentation strings)
+ */
+export function length_range_generic(range: mcdoc.NumericRange, label: string): {
+    generic: ts.PropertySignature[]
+    docs: NonEmptyList<string>
+} {
+    const docs: NonEmptyList<string> = [
+        `${label} length range: ${mcdoc.NumericRange.toString(range)}`
+    ]
+    const generic: ts.PropertySignature[] = []
+
+    let has_min = false
+    let has_max = false
+    const left_exclusive = mcdoc.RangeKind.isLeftExclusive(range.kind)
+    const right_exclusive = mcdoc.RangeKind.isRightExclusive(range.kind)
+
+    if (range.min !== undefined) {
+        has_min = true
+        generic.push(factory.createPropertySignature(
+            undefined,
+            'leftExclusive',
+            undefined,
+            factory.createLiteralTypeNode(
+                left_exclusive ?
+                    factory.createTrue() :
+                    factory.createFalse()
+            )
+        ))
+        if (left_exclusive) {
+            docs.push(`Effective minimum ${label.toLowerCase()} length: ${range.min + 1}`)
+        }
+    }
+    if (range.max !== undefined) {
+        has_max = true
+        generic.push(factory.createPropertySignature(
+            undefined,
+            'rightExclusive',
+            undefined,
+            factory.createLiteralTypeNode(
+                right_exclusive ?
+                    factory.createTrue() :
+                    factory.createFalse()
+            )
+        ))
+        if (right_exclusive) {
+            docs.push(`Effective maximum ${label.toLowerCase()} length: ${range.max - 1}`)
+        }
+    }
+
+    if (has_min && has_max) {
+        if (integer_range_size(range.min!, range.max!) <= 100) {
+            generic.push(
+                factory.createPropertySignature(
+                    undefined,
+                    'min',
+                    undefined,
+                    Bind.NumericLiteral(range.min! + (left_exclusive ? 1 : 0))
+                ),
+                factory.createPropertySignature(
+                    undefined,
+                    'max',
+                    undefined,
+                    Bind.NumericLiteral(range.max! - (right_exclusive ? 1 : 0))
+                )
+            )
+        }
+    } else if (has_min) {
+        if (range.min! >= 0) {
+            let number = 0
+            if ((left_exclusive && range.min! === 0) || range.min! >= 1) {
+                number = 1
+            }
+            generic.push(factory.createPropertySignature(
+                undefined,
+                'min',
+                undefined,
+                Bind.NumericLiteral(number)
+            ))
+        } else if (left_exclusive) {
+            generic.push(factory.createPropertySignature(
+                undefined,
+                'min',
+                undefined,
+                Bind.NumericLiteral(range.min!)
+            ))
+        }
+    } else {
+        if (range.max! < 0 || (right_exclusive && range.max! === 0)) {
+            generic.push(factory.createPropertySignature(
+                undefined,
+                'max',
+                undefined,
+                Bind.NumericLiteral(-1)
+            ))
+        } else if (right_exclusive) {
+            generic.push(factory.createPropertySignature(
+                undefined,
+                'max',
+                undefined,
+                Bind.NumericLiteral(range.max!)
+            ))
+        }
+    }
+
+    return { generic, docs }
+}

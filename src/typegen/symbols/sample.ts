@@ -1,3 +1,8 @@
+/**
+ * `Funny` represents the name of the dispatcher symbol map.
+ * `SuperFunny` & `KindaFunny` represent members of a dispatcher symbol map
+ */
+
 type SuperFunny = {
     baz: number
     foo: string

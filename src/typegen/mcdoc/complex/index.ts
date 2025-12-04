@@ -1,0 +1,1 @@
+export { McdocDispatcher } from './dispatcher'

@@ -78,7 +78,6 @@ export function non_integral_generic<TYPE extends string, JS_NUMBER_ALLOWED exte
     }
 
     if (has_min && has_max) {
-        // TODO
         if (range.min === 0 && range.max === 1) {
             generic.push(factory.createPropertySignature(
                 undefined,
@@ -92,6 +91,40 @@ export function non_integral_generic<TYPE extends string, JS_NUMBER_ALLOWED exte
                 undefined,
                 Bind.NumericLiteral(1)
             ))
+        } else if (range.min! >= 0) {
+            let number = 0
+            if ((left_exclusive && range.min! === 0) || range.min! >= 1) {
+                number = 1
+            }
+            generic.push(factory.createPropertySignature(
+                undefined,
+                'min',
+                undefined,
+                Bind.NumericLiteral(number)
+            ))
+            if (right_exclusive) {
+                generic.push(factory.createPropertySignature(
+                    undefined,
+                    'max',
+                    undefined,
+                    Bind.NumericLiteral(range.max!)
+                ))
+            }
+        } else if (left_exclusive) {
+            generic.push(factory.createPropertySignature(
+                undefined,
+                'min',
+                undefined,
+                Bind.NumericLiteral(range.min!)
+            ))
+            if (right_exclusive) {
+                generic.push(factory.createPropertySignature(
+                    undefined,
+                    'max',
+                    undefined,
+                    Bind.NumericLiteral(range.max!)
+                ))
+            }
         }
     } else if (has_min) {
         if (range.min! >= 0) {
@@ -134,7 +167,6 @@ export function non_integral_generic<TYPE extends string, JS_NUMBER_ALLOWED exte
     const returned_type = allow_js_number ?
         factory.createParenthesizedType(factory.createUnionTypeNode([
             factory.createTypeReferenceNode(type, [
-                factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
                 factory.createTypeLiteralNode(generic)
             ]),
             /** 
@@ -143,7 +175,6 @@ export function non_integral_generic<TYPE extends string, JS_NUMBER_ALLOWED exte
             factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword)
         ])) :
         factory.createTypeReferenceNode(type, [
-            factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
             factory.createTypeLiteralNode(generic)
         ])
 

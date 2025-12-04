@@ -47,7 +47,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                 .with({ kind: 'pair', key: P.string, ...field_properties }, (pair) => {
                     const value = TypeHandlers[pair.type.kind](pair.type)([pair.key, ...args])
 
-                    if ('imports' in value && value.imports !== undefined) {
+                    if ('imports' in value) {
                         has_imports = true
                         merge_imports(imports, value.imports)
                     }
@@ -67,7 +67,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                         has_imports = true
                         merge_imports(imports, key.imports)
                     }
-                    if ('imports' in value && value.imports !== undefined) {
+                    if ('imports' in value) {
                         has_imports = true
                         merge_imports(imports, value.imports)
                     }
