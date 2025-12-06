@@ -19,6 +19,8 @@ function mcdoc_tuple(type: mcdoc.McdocType) {
 
         const members: ts.TypeNode[] = []
 
+        let child_dispatcher: 'keyed' | 'self_reference' | undefined
+
         for (const item of tuple.items) {
             if (item.attributes?.indexOf((attr: mcdoc.Attribute) => attr.name === 'until') !== -1) {
                 continue
@@ -30,12 +32,16 @@ function mcdoc_tuple(type: mcdoc.McdocType) {
                 has_imports = true
                 merge_imports(imports, value.imports)
             }
+            if ('child_dispatcher' in value) {
+                child_dispatcher = value.child_dispatcher as typeof child_dispatcher
+            }
             members.push(value.type)
         }
 
         return {
             type: factory.createTupleTypeNode(members),
-            ...(has_imports ? { imports } : {})
+            ...(has_imports ? { imports } : {}),
+            ...(child_dispatcher !== undefined ? { child_dispatcher } : {}),
         } as const
     }
 }

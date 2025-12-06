@@ -14,6 +14,7 @@ import {
 } from './multi'
 import {
     McdocDispatcher,
+    McdocIndexed,
 } from './complex'
 
 export type NonEmptyList<T> = T[] & { 0: T }
@@ -31,6 +32,7 @@ export type TypeHandlerResult = {
         readonly check: Map<string, number>,
     },
     readonly docs?: NonEmptyList<string>,
+    readonly child_dispatcher?: 'keyed' | 'self_reference'
 }
 
 export type TypeHandler<RESULT = TypeHandlerResult> = (type: mcdoc.McdocType, ...args: unknown[]) => (
@@ -80,10 +82,15 @@ class TypeHandlersClass {
     static readonly enum = McdocEnum as unknown as typeof McdocAny
     static readonly float = McdocFloat
     /**
-     * A dispatcher with generic parameters.
-     * TODO: %parent & %key nonsense.
+     * Indexes into a dispatcher type to access a specific property.
+     *
+     * Used for accessing nested properties from dispatched types, e.g.:
+     * `minecraft:environment_attribute[[%key]][attribute_track]`
+     *
+     * Generates indexed access types like:
+     * `SymbolEnvironmentAttribute['map'][K]['attribute_track']`
      */
-    static readonly indexed = McdocAny // TODO
+    static readonly indexed = McdocIndexed
     /**
      * An `NBTInt`.
      * 

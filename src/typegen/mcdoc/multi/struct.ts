@@ -39,6 +39,8 @@ function mcdoc_struct(type: mcdoc.McdocType) {
 
         const merge: StructIntersection[] = []
 
+        let child_dispatcher: 'keyed' | 'self_reference' | undefined
+
         for (const field of struct.fields) {
             let unsupported = false
 
@@ -60,35 +62,29 @@ function mcdoc_struct(type: mcdoc.McdocType) {
 
             match(field)
                 .with({ kind: 'pair', key: P.string, ...FieldProperties }, (pair) => {
-                    match(pair.type)
-                        .with({ kind: 'dispatcher' }, (dispatcher) => {
+                    const value = TypeHandlers[pair.type.kind](pair.type)([pair.key, ...args])
 
-                        })
-                        .with({ kind: 'union' }, (union) => {
-                            
-                        })
-                        .otherwise(() => {
-                            const value = TypeHandlers[pair.type.kind](pair.type)([pair.key, ...args])
+                    if ('imports' in value) {
+                        has_imports = true
+                        merge_imports(imports, value.imports)
+                    }
+                    if ('child_dispatcher' in value) {
+                        child_dispatcher = value.child_dispatcher as 'self_reference'
+                    }
 
-                            if ('imports' in value) {
-                                has_imports = true
-                                merge_imports(imports, value.imports)
-                            }
-
-                            members.push(factory.createPropertySignature(
-                                undefined,
-                                factory.createIdentifier(pair.key),
-                                pair.optional ? factory.createToken(ts.SyntaxKind.QuestionToken) : undefined,
-                                value.type,
-                            ))
-                        })
+                    members.push(factory.createPropertySignature(
+                        undefined,
+                        factory.createIdentifier(pair.key),
+                        pair.optional ? factory.createToken(ts.SyntaxKind.QuestionToken) : undefined,
+                        value.type,
+                    ))
 
                     pair_inserted = true
                 }).narrow()
                 .with({ kind: 'pair' }, (pair) => {
                     Assert.StructKeyType(pair.key)
-                    const key = TypeHandlers[pair.key.kind](pair.key)([...args])
-                    const value = TypeHandlers[pair.type.kind](pair.type)([pair.key, ...args])
+                    const key = TypeHandlers[pair.key.kind](pair.key)(...args)
+                    const value = TypeHandlers[pair.type.kind](pair.type)({ dynamic_key: pair.key, ...(args[0] as any)})
 
                     if ('imports' in key) {
                         has_imports = true
@@ -97,6 +93,9 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                     if ('imports' in value) {
                         has_imports = true
                         merge_imports(imports, value.imports)
+                    }
+                    if ('child_dispatcher' in key) {
+                        child_dispatcher = key.child_dispatcher as 'self_reference'
                     }
                     match(pair.key.kind)
                         .with('reference', 'concrete', () => {
@@ -109,7 +108,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                                     ),
                                     key.type,
                                     factory.createToken(ts.SyntaxKind.QuestionToken),
-                                    value.type, // K is assumed, McdocConcrete will know to use it from the passed pair.key
+                                    value.type, // TODO K is assumed, McdocConcrete will know to use it from the passed pair.key
                                     undefined
                                 ))
                             })
@@ -125,6 +124,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                                 // TODO: handle id, permutation, texture_slot, item_slots, translation_key, crafting_ingredient, objective, dispatcher_key
                             }
                         })
+                    
                 })
                 .with({ kind: 'spread' }, (_spread) => {
                     Assert.StructSpreadType(_spread.type)
@@ -133,6 +133,9 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                     if ('imports' in spread) {
                         has_imports = true
                         merge_imports(imports, spread.imports)
+                    }
+                    if ('child_dispatcher' in spread) {
+                        child_dispatcher = spread.child_dispatcher as typeof child_dispatcher
                     }
                     if (pair_inserted) {
                         merge.push(spread)
@@ -146,13 +149,15 @@ function mcdoc_struct(type: mcdoc.McdocType) {
             return {
                 type: factory.createTypeLiteralNode(members),
                 ...(has_imports ? { imports } : {}),
+                ...(child_dispatcher !== undefined ? { child_dispatcher } : {}),
             }
         } else {
             if (pair_inserted === false) {
                 if (inherit.length === 1 && merge.length === 0) {
                     return {
                         type: inherit[0].type,
-                        ...(has_imports ? { imports } : {})
+                        ...(has_imports ? { imports } : {}),
+                        ...(child_dispatcher !== undefined ? { child_dispatcher } : {}),
                     }
                 }
                 return {
@@ -162,7 +167,8 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                             ...merge.map(i => i.type),
                         ])
                     ),
-                    ...(has_imports ? { imports } : {})
+                    ...(has_imports ? { imports } : {}),
+                    ...(child_dispatcher !== undefined ? { child_dispatcher } : {}),
                 }
             } else {
                 return {
@@ -173,7 +179,8 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                             ...merge.map(i => i.type),
                         ])
                     ),
-                    ...(has_imports ? { imports } : {})
+                    ...(has_imports ? { imports } : {}),
+                    ...(child_dispatcher !== undefined ? { child_dispatcher } : {}),
                 }
             }
         }

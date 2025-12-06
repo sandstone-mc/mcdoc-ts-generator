@@ -32,6 +32,8 @@ function mcdoc_concrete(type: mcdoc.McdocType) {
             check: new Map<string, number>([[child.path, 0]]),
         } as const
 
+        let child_dispatcher: 'keyed' | 'self_reference' | undefined
+
         // Process each type argument
         for (const type_arg of type_args) {
             const arg_handler = TypeHandlers[type_arg.kind]
@@ -43,6 +45,9 @@ function mcdoc_concrete(type: mcdoc.McdocType) {
             if ('imports' in arg_result) {
                 merge_imports(imports, arg_result.imports)
             }
+            if ('child_dispatcher' in arg_result) {
+                child_dispatcher = arg_result.child_dispatcher as typeof child_dispatcher
+            }
         }
 
         const type_name = child.path.slice(child.path.lastIndexOf(':') + 1)
@@ -53,6 +58,7 @@ function mcdoc_concrete(type: mcdoc.McdocType) {
                 resolved_args
             ),
             imports,
+            ...(child_dispatcher !== undefined ? { child_dispatcher } : {}),
         } as const
     }
 }

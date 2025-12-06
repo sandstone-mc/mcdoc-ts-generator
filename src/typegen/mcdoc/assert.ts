@@ -1,6 +1,7 @@
 import * as mcdoc from '@spyglassmc/mcdoc'
 import { Set } from './utils'
 import { match, P } from 'ts-pattern'
+import type { NonEmptyList } from '.'
 
 
 type ReferenceType = {

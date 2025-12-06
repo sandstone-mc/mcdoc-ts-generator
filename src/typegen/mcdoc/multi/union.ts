@@ -19,6 +19,8 @@ function mcdoc_union(type: mcdoc.McdocType) {
 
         const members: ts.TypeNode[] = []
 
+        let child_dispatcher: 'keyed' | 'self_reference' | undefined
+
         for (const member of union.members) {
             if (member.attributes?.indexOf((attr: mcdoc.Attribute) => attr.name === 'until') !== -1) {
                 continue
@@ -29,6 +31,9 @@ function mcdoc_union(type: mcdoc.McdocType) {
                 has_imports = true
                 merge_imports(imports, value.imports)
             }
+            if ('child_dispatcher' in value) {
+                child_dispatcher = value.child_dispatcher
+            }
             members.push(value.type)
         }
 
@@ -36,7 +41,8 @@ function mcdoc_union(type: mcdoc.McdocType) {
             type: factory.createParenthesizedType(
                 factory.createUnionTypeNode(members)
             ),
-            ...(has_imports ? { imports } : {})
+            ...(has_imports ? { imports } : {}),
+            ...(child_dispatcher !== undefined ? { child_dispatcher } : {}),
         } as const
     }
 }

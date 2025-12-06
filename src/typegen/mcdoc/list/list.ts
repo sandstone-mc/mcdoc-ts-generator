@@ -31,6 +31,8 @@ function mcdoc_list(type: mcdoc.McdocType) {
             add_import(imports, NBTListImport)
         }
 
+        const child_dispatcher = 'child_dispatcher' in item ? item.child_dispatcher : undefined
+
         if (list.lengthRange) {
             const { generic, docs } = length_range_generic(list.lengthRange, 'List')
 
@@ -41,11 +43,13 @@ function mcdoc_list(type: mcdoc.McdocType) {
                 ]),
                 imports,
                 docs,
+                ...(child_dispatcher !== undefined ? { child_dispatcher } : {}),
             } as const
         } else {
             return {
                 type: factory.createTypeReferenceNode(NBTListType, [item.type]),
                 imports,
+                ...(child_dispatcher !== undefined ? { child_dispatcher } : {}),
             } as const
         }
     }

@@ -73,7 +73,7 @@ type DispatcherMember = { typeDef: mcdoc.McdocType }
  * type NameKeys = keyof NameMap<unknown>
  * type NameFallback<T> = NameMemberA<T> | NameMemberB<T> | NameFallbackType<T>
  * type NameUnknown<T> = NameMemberA<T> & NameMemberB<T> & NameFallbackType<T>
- * type SymbolName<CASE extends ('map' | 'keys' | '%unknown' | '%fallback') = 'map', T> = ...
+ * export type SymbolName<CASE extends ('map' | 'keys' | '%unknown' | '%fallback') = 'map', T> = ...
  * ```
  *
  * Generic parameters (e.g., `<T>`) are only present if the dispatcher members are template types.
