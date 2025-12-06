@@ -46,3 +46,16 @@ export function merge_imports(
         }
     }
 }
+
+// Thanks TypeScript
+type GetConstructorArgs<T> = T extends new (...args: infer U) => any ? U : never
+export class Set<T> extends global.Set<T> {
+    private readonly set: globalThis.Set<T>
+    constructor(...args: GetConstructorArgs<typeof global.Set<T>>) {
+        super(...args)
+        this.set = this
+    }
+    has(value: unknown) {
+        return this.set.has(value as any)
+    }
+}

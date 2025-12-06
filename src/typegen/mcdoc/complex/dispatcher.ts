@@ -6,6 +6,8 @@ import { dispatcher_registry_map } from '../../symbols'
 
 const { factory } = ts
 
+// TODO: Prompt - When a dispatcher has a dynamic parallel indices list with a single element; a dynamic index, and the accessors list only contains a single string, that string is a key on the struct the dispatcher is being used in. This means structs often need to be converted into a type with generics to represent the value of this key, and sometimes there's multiples of these in a single struct. Try to implement this
+
 /**
  * Handles `dispatcher` types which reference a dispatcher symbol map.
  *

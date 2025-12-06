@@ -2,10 +2,17 @@ import ts from 'typescript'
 import { match, P } from 'ts-pattern'
 import * as mcdoc from '@spyglassmc/mcdoc'
 import { TypeHandlers, type NonEmptyList, type TypeHandler } from '..'
-import { Assert } from '../assert'
+import { Assert, type ImplementedAttributeType } from '../assert'
 import { merge_imports } from '../utils'
 
 const { factory } = ts
+
+const FieldProperties = {
+    optional: P.optional(P.boolean),
+    deprecated: P.optional(P.boolean),
+    desc: P.optional(P.string),
+    attributes: P.optional(P.when((attributes): attributes is mcdoc.Attributes => Array.isArray(attributes))),
+}
 
 type ResolvedSpreadType = ReturnType<ReturnType<(typeof TypeHandlers[('reference' | 'dispatcher' | 'concrete' | 'template')])>>
 
@@ -24,13 +31,6 @@ function mcdoc_struct(type: mcdoc.McdocType) {
             check: new Map<string, number>(),
         } as const
 
-        const field_properties = {
-            optional: P.optional(P.boolean),
-            deprecated: P.optional(P.boolean),
-            desc: P.optional(P.string),
-            attributes: P.optional(P.when((attributes): attributes is mcdoc.Attributes => Array.isArray(attributes))),
-        }
-
         const members: ts.PropertySignature[] = []
 
         const inherit: StructIntersection[] = []
@@ -40,23 +40,50 @@ function mcdoc_struct(type: mcdoc.McdocType) {
         const merge: StructIntersection[] = []
 
         for (const field of struct.fields) {
-            if (field.attributes?.indexOf((attr: mcdoc.Attribute) => attr.name === 'until') !== -1) {
+            let unsupported = false
+
+            if (field.attributes !== undefined) {
+                Assert.Attributes(field.attributes, true)
+
+                const attributes = field.attributes
+
+                for (const attribute of attributes) {
+                    if (attribute.name === 'until' || attribute.name === 'deprecated') {
+                        unsupported = true
+                        break
+                    }
+                }
+            }
+            if (unsupported) {
                 continue
             }
-            match(field)
-                .with({ kind: 'pair', key: P.string, ...field_properties }, (pair) => {
-                    const value = TypeHandlers[pair.type.kind](pair.type)([pair.key, ...args])
 
-                    if ('imports' in value) {
-                        has_imports = true
-                        merge_imports(imports, value.imports)
-                    }
-                    members.push(factory.createPropertySignature(
-                        undefined,
-                        factory.createIdentifier(pair.key),
-                        pair.optional ? factory.createToken(ts.SyntaxKind.QuestionToken) : undefined,
-                        value.type,
-                    ))
+            match(field)
+                .with({ kind: 'pair', key: P.string, ...FieldProperties }, (pair) => {
+                    match(pair.type)
+                        .with({ kind: 'dispatcher' }, (dispatcher) => {
+
+                        })
+                        .with({ kind: 'union' }, (union) => {
+                            
+                        })
+                        .otherwise(() => {
+                            const value = TypeHandlers[pair.type.kind](pair.type)([pair.key, ...args])
+
+                            if ('imports' in value) {
+                                has_imports = true
+                                merge_imports(imports, value.imports)
+                            }
+
+                            members.push(factory.createPropertySignature(
+                                undefined,
+                                factory.createIdentifier(pair.key),
+                                pair.optional ? factory.createToken(ts.SyntaxKind.QuestionToken) : undefined,
+                                value.type,
+                            ))
+                        })
+
+                    pair_inserted = true
                 }).narrow()
                 .with({ kind: 'pair' }, (pair) => {
                     Assert.StructKeyType(pair.key)
@@ -90,7 +117,13 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                         .with('string', () => {
                             const string_key = key as ReturnType<ReturnType<typeof TypeHandlers['string']>>
 
-                            // TODO: handle dispatchers
+                            if (pair.key.attributes === undefined) {
+                                // I think this is actually in a few places
+                            } else {
+                                Assert.Attributes(pair.key.attributes, true)
+
+                                // TODO: handle id, permutation, texture_slot, item_slots, translation_key, crafting_ingredient, objective, dispatcher_key
+                            }
                         })
                 })
                 .with({ kind: 'spread' }, (_spread) => {
@@ -145,6 +178,10 @@ function mcdoc_struct(type: mcdoc.McdocType) {
             }
         }
     }
+}
+
+function dispatcher_value(dispatcher: mcdoc.DispatcherType) {
+
 }
 
 export const McdocStruct = mcdoc_struct satisfies TypeHandler
