@@ -67,3 +67,17 @@ Each mcdoc type kind has a handler in `src/typegen/mcdoc/` that:
    - `type`: TypeScript AST node
    - `imports`: Required import statements
    - `docs`: JSDoc comments
+
+## Code Style
+
+### TypeScript AST Generation
+When creating TypeScript AST nodes, use plain strings instead of `factory.createIdentifier()`:
+```ts
+// Preferred
+factory.createTypeReferenceNode('Record', [...])
+factory.createTypeParameterDeclaration(undefined, 'K', ...)
+
+// Avoid
+factory.createTypeReferenceNode(factory.createIdentifier('Record'), [...])
+factory.createTypeParameterDeclaration(undefined, factory.createIdentifier('K'), ...)
+```

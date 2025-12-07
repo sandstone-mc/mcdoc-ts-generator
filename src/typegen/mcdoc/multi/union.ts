@@ -32,7 +32,7 @@ function mcdoc_union(type: mcdoc.McdocType) {
                 merge_imports(imports, value.imports)
             }
             if ('child_dispatcher' in value) {
-                child_dispatcher = value.child_dispatcher
+                child_dispatcher = value.child_dispatcher as typeof child_dispatcher
             }
             members.push(value.type)
         }

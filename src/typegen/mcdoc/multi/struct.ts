@@ -4,6 +4,8 @@ import * as mcdoc from '@spyglassmc/mcdoc'
 import { TypeHandlers, type NonEmptyList, type TypeHandler } from '..'
 import { Assert } from '../assert'
 import { add_import, merge_imports } from '../utils'
+import { Bind } from '../bind'
+import { NonEmptyString } from '../../static'
 
 const { factory } = ts
 
@@ -83,19 +85,21 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                 }).narrow()
                 .with({ kind: 'pair' }, (pair) => {
                     Assert.StructKeyType(pair.key)
-                    const key = TypeHandlers[pair.key.kind](pair.key)(...args)
+                    
                     const value = TypeHandlers[pair.type.kind](pair.type)({ dynamic_key: pair.key, ...(args[0] as any)})
 
-                    if ('imports' in key) {
-                        has_imports = true
-                        merge_imports(imports, key.imports)
-                    }
                     if ('imports' in value) {
                         has_imports = true
                         merge_imports(imports, value.imports)
                     }
                     match(pair.key.kind)
-                        .with('reference', 'concrete', () => {
+                        .with('reference', 'concrete', (kind) => {
+                            const key = TypeHandlers[kind](pair.key)(...args)
+
+                            if ('imports' in key) {
+                                has_imports = true
+                                merge_imports(imports, key.imports)
+                            }
                             inherit.push({
                                 type: factory.createParenthesizedType(factory.createMappedTypeNode(
                                     undefined,
@@ -103,7 +107,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                                         undefined,
                                         factory.createIdentifier('K')
                                     ),
-                                    key.type, // TODO handle #[id] attribute
+                                    key.type,
                                     factory.createToken(ts.SyntaxKind.QuestionToken),
                                     value.type, // TODO K is assumed, McdocConcrete will know to use it from the passed pair.key
                                     undefined
@@ -112,14 +116,15 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                         })
                         .with('string', () => {
                             if (pair.key.attributes === undefined) {
+                                Assert.StringType(pair.key)
                                 inherit.push({
-                                    type: factory.createTypeReferenceNode(
-                                        factory.createIdentifier('Record'),
-                                        [
-                                            factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword), // TODO lengthRange support
-                                            value.type
-                                        ]
-                                    )
+                                    type: factory.createTypeReferenceNode('Record', [
+                                        ((('lengthRange' in pair.key && 'min' in pair.key.lengthRange) ? pair.key.lengthRange.min : 0) >= 1 ? 
+                                            NonEmptyString
+                                            : factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
+                                        ),
+                                        value.type
+                                    ])
                                 })
                             } else {
                                 Assert.Attributes(pair.key.attributes, true)
@@ -127,9 +132,9 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                                 // There's only ever one attribute
                                 const attribute = pair.key.attributes[0]
 
-                                switch (attribute.name) {
-                                    case 'id': {
-                                        const id_attr = attribute.value
+                                match(attribute)
+                                    .with({ name: 'id' }, (attr) => {
+                                        const id_attr = attr.value
 
                                         let registry_id: string
                                         if (id_attr === undefined) {
@@ -142,149 +147,100 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                                         }
                                         // TODO: this is using the old symbol naming/import system
                                         const registry_name = registry_id.replace(/\//g, '_').toUpperCase() + 'S'
-                                        const import_path = `registries/${registry_id}.ts`
+                                        const import_path = `mcdoc.Symbol::${registry_name}`
 
                                         has_imports = true
                                         if (!imports.check.has(import_path)) {
                                             add_import(imports, import_path)
                                         }
 
+                                        // TODO: Handle #[id()] key arguments; path, exclude, and prefix="!"
                                         inherit.push({
                                             type: factory.createParenthesizedType(factory.createMappedTypeNode(
                                                 undefined,
                                                 factory.createTypeParameterDeclaration(
                                                     undefined,
-                                                    factory.createIdentifier('K'),
-                                                    factory.createTypeReferenceNode(
-                                                        factory.createIdentifier(registry_name),
-                                                        undefined
-                                                    ),
-                                                    undefined
+                                                    'K',
+                                                    factory.createTypeReferenceNode(registry_name)
                                                 ),
                                                 undefined,
                                                 factory.createToken(ts.SyntaxKind.QuestionToken),
-                                                value.type,
+                                                value.type, // K is assumed
                                                 undefined
                                             ))
                                         })
-                                        break
-                                    }
-                                    case 'permutation': {
-                                        // TODO: Implement permutation attribute
-                                        // For now, fall back to Record<string, value>
+                                    })
+                                    .with({ name: 'item_slots' }, () => {
+                                        const ITEM_SLOTS = 'ITEM_SLOTS'
+                                        const LiteralUnion = 'LiteralUnion'
+                                        add_import(imports, `sandstone::arguments::${ITEM_SLOTS}`)
+                                        add_import(imports, `sandstone::${LiteralUnion}`)
+
                                         inherit.push({
-                                            type: factory.createTypeReferenceNode(
-                                                factory.createIdentifier('Record'),
-                                                [
-                                                    factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                                                    value.type
-                                                ]
-                                            )
+                                            type: factory.createTypeReferenceNode('Record', [
+                                                factory.createTypeReferenceNode(LiteralUnion, [
+                                                    factory.createTypeReferenceNode(ITEM_SLOTS)
+                                                ]),
+                                                value.type
+                                            ])
                                         })
-                                        break
-                                    }
-                                    case 'item_slots': {
-                                        // TODO: Implement item_slots attribute
-                                        // For now, fall back to Record<string, value>
+                                    })
+                                    .with({ name: 'objective' }, () => {
+                                        const Objective = 'ObjectiveClass'
+                                        add_import(imports, `sandstone::${Objective}`)
+
                                         inherit.push({
-                                            type: factory.createTypeReferenceNode(
-                                                factory.createIdentifier('Record'),
-                                                [
+                                            type: factory.createTypeReferenceNode('Record', [
+                                                factory.createUnionTypeNode([
                                                     factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                                                    value.type
-                                                ]
-                                            )
+                                                    factory.createTypeReferenceNode(Objective)
+                                                ]),
+                                                value.type
+                                            ])
                                         })
-                                        break
-                                    }
-                                    case 'texture_slot': {
-                                        // TODO: Implement texture_slot attribute
-                                        // For now, fall back to Record<string, value>
+                                    })
+                                    .with({ name: 'texture_slot' }, () => {
+                                        // TODO: Implement Model struct generic, this is `kind="definition"`
                                         inherit.push({
-                                            type: factory.createTypeReferenceNode(
-                                                factory.createIdentifier('Record'),
-                                                [
-                                                    factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                                                    value.type
-                                                ]
-                                            )
+                                            type: factory.createTypeReferenceNode('Record', [
+                                                factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                                                value.type
+                                            ])
                                         })
-                                        break
-                                    }
-                                    case 'translation_key': {
-                                        // TODO: Implement translation_key attribute
-                                        // For now, fall back to Record<string, value>
+                                    })
+                                    .with({ name: 'criterion' }, () => {
+                                        // TODO: Implement Advancement struct generic, this is `definition=true`
                                         inherit.push({
-                                            type: factory.createTypeReferenceNode(
-                                                factory.createIdentifier('Record'),
-                                                [
-                                                    factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                                                    value.type
-                                                ]
-                                            )
+                                            type: factory.createTypeReferenceNode('Record', [
+                                                factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                                                value.type
+                                            ])
                                         })
-                                        break
-                                    }
-                                    case 'criterion': {
-                                        // TODO: Implement criterion attribute
-                                        // For now, fall back to Record<string, value>
+                                    })
+                                    .with({ name: 'crafting_ingredient' }, () => {
+                                        // TODO: Implement CraftingShaped struct generic, this is `definition=true`
+                                        const CRAFTING_INGREDIENT = 'CRAFTING_INGREDIENT'
+                                        add_import(imports, `sandstone::arguments::${CRAFTING_INGREDIENT}`) // 'A' | 'B' | 'C' ...
+
                                         inherit.push({
-                                            type: factory.createTypeReferenceNode(
-                                                factory.createIdentifier('Record'),
-                                                [
-                                                    factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                                                    value.type
-                                                ]
-                                            )
+                                            type: factory.createTypeReferenceNode('Record', [
+                                                factory.createTypeReferenceNode(CRAFTING_INGREDIENT),
+                                                value.type
+                                            ])
                                         })
-                                        break
-                                    }
-                                    case 'crafting_ingredient': {
-                                        // TODO: Implement crafting_ingredient attribute
-                                        // For now, fall back to Record<string, value>
+                                    })
+                                    .with({ name: P.union('dispatcher_key', 'translation_key', 'permutation') }, () => {
+                                        // Permutation will be implemented as an abstracted mode of the Atlas class
                                         inherit.push({
-                                            type: factory.createTypeReferenceNode(
-                                                factory.createIdentifier('Record'),
-                                                [
-                                                    factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                                                    value.type
-                                                ]
-                                            )
+                                            type: factory.createTypeReferenceNode('Record', [
+                                                factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                                                value.type
+                                            ])
                                         })
-                                        break
-                                    }
-                                    case 'objective': {
-                                        // TODO: Implement objective attribute
-                                        // For now, fall back to Record<string, value>
-                                        inherit.push({
-                                            type: factory.createTypeReferenceNode(
-                                                factory.createIdentifier('Record'),
-                                                [
-                                                    factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                                                    value.type
-                                                ]
-                                            )
-                                        })
-                                        break
-                                    }
-                                    case 'dispatcher_key': {
-                                        // TODO: Implement dispatcher_key attribute
-                                        // For now, fall back to Record<string, value>
-                                        inherit.push({
-                                            type: factory.createTypeReferenceNode(
-                                                factory.createIdentifier('Record'),
-                                                [
-                                                    factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                                                    value.type
-                                                ]
-                                            )
-                                        })
-                                        break
-                                    }
-                                    default: {
-                                        throw new Error()
-                                    }
-                                }
+                                    })
+                                    .otherwise(() => {
+                                        throw new Error(`[mcdoc_struct] Unsupported dynamic key attribute: ${attribute}`)
+                                    })
                             }
                         })
                     

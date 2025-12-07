@@ -31,7 +31,7 @@ function mcdoc_list(type: mcdoc.McdocType) {
             add_import(imports, NBTListImport)
         }
 
-        const child_dispatcher = 'child_dispatcher' in item ? item.child_dispatcher : undefined
+        const child_dispatcher = 'child_dispatcher' in item ? (item.child_dispatcher as 'self_reference' | 'keyed') : undefined
 
         if (list.lengthRange) {
             const { generic, docs } = length_range_generic(list.lengthRange, 'List')
