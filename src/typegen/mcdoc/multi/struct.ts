@@ -2,8 +2,8 @@ import ts from 'typescript'
 import { match, P } from 'ts-pattern'
 import * as mcdoc from '@spyglassmc/mcdoc'
 import { TypeHandlers, type NonEmptyList, type TypeHandler } from '..'
-import { Assert, type ImplementedAttributeType } from '../assert'
-import { merge_imports } from '../utils'
+import { Assert } from '../assert'
+import { add_import, merge_imports } from '../utils'
 
 const { factory } = ts
 
@@ -94,9 +94,6 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                         has_imports = true
                         merge_imports(imports, value.imports)
                     }
-                    if ('child_dispatcher' in key) {
-                        child_dispatcher = key.child_dispatcher as 'self_reference'
-                    }
                     match(pair.key.kind)
                         .with('reference', 'concrete', () => {
                             inherit.push({
@@ -106,7 +103,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                                         undefined,
                                         factory.createIdentifier('K')
                                     ),
-                                    key.type,
+                                    key.type, // TODO handle #[id] attribute
                                     factory.createToken(ts.SyntaxKind.QuestionToken),
                                     value.type, // TODO K is assumed, McdocConcrete will know to use it from the passed pair.key
                                     undefined
@@ -114,14 +111,180 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                             })
                         })
                         .with('string', () => {
-                            const string_key = key as ReturnType<ReturnType<typeof TypeHandlers['string']>>
-
                             if (pair.key.attributes === undefined) {
-                                // I think this is actually in a few places
+                                inherit.push({
+                                    type: factory.createTypeReferenceNode(
+                                        factory.createIdentifier('Record'),
+                                        [
+                                            factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword), // TODO lengthRange support
+                                            value.type
+                                        ]
+                                    )
+                                })
                             } else {
                                 Assert.Attributes(pair.key.attributes, true)
 
-                                // TODO: handle id, permutation, texture_slot, item_slots, translation_key, crafting_ingredient, objective, dispatcher_key
+                                // There's only ever one attribute
+                                const attribute = pair.key.attributes[0]
+
+                                switch (attribute.name) {
+                                    case 'id': {
+                                        const id_attr = attribute.value
+
+                                        let registry_id: string
+                                        if (id_attr === undefined) {
+                                            throw new Error()
+                                        }
+                                        if (id_attr.kind === 'literal') {
+                                            registry_id = id_attr.value.value
+                                        } else {
+                                            registry_id = id_attr.values.registry.value.value
+                                        }
+                                        // TODO: this is using the old symbol naming/import system
+                                        const registry_name = registry_id.replace(/\//g, '_').toUpperCase() + 'S'
+                                        const import_path = `registries/${registry_id}.ts`
+
+                                        has_imports = true
+                                        if (!imports.check.has(import_path)) {
+                                            add_import(imports, import_path)
+                                        }
+
+                                        inherit.push({
+                                            type: factory.createParenthesizedType(factory.createMappedTypeNode(
+                                                undefined,
+                                                factory.createTypeParameterDeclaration(
+                                                    undefined,
+                                                    factory.createIdentifier('K'),
+                                                    factory.createTypeReferenceNode(
+                                                        factory.createIdentifier(registry_name),
+                                                        undefined
+                                                    ),
+                                                    undefined
+                                                ),
+                                                undefined,
+                                                factory.createToken(ts.SyntaxKind.QuestionToken),
+                                                value.type,
+                                                undefined
+                                            ))
+                                        })
+                                        break
+                                    }
+                                    case 'permutation': {
+                                        // TODO: Implement permutation attribute
+                                        // For now, fall back to Record<string, value>
+                                        inherit.push({
+                                            type: factory.createTypeReferenceNode(
+                                                factory.createIdentifier('Record'),
+                                                [
+                                                    factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                                                    value.type
+                                                ]
+                                            )
+                                        })
+                                        break
+                                    }
+                                    case 'item_slots': {
+                                        // TODO: Implement item_slots attribute
+                                        // For now, fall back to Record<string, value>
+                                        inherit.push({
+                                            type: factory.createTypeReferenceNode(
+                                                factory.createIdentifier('Record'),
+                                                [
+                                                    factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                                                    value.type
+                                                ]
+                                            )
+                                        })
+                                        break
+                                    }
+                                    case 'texture_slot': {
+                                        // TODO: Implement texture_slot attribute
+                                        // For now, fall back to Record<string, value>
+                                        inherit.push({
+                                            type: factory.createTypeReferenceNode(
+                                                factory.createIdentifier('Record'),
+                                                [
+                                                    factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                                                    value.type
+                                                ]
+                                            )
+                                        })
+                                        break
+                                    }
+                                    case 'translation_key': {
+                                        // TODO: Implement translation_key attribute
+                                        // For now, fall back to Record<string, value>
+                                        inherit.push({
+                                            type: factory.createTypeReferenceNode(
+                                                factory.createIdentifier('Record'),
+                                                [
+                                                    factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                                                    value.type
+                                                ]
+                                            )
+                                        })
+                                        break
+                                    }
+                                    case 'criterion': {
+                                        // TODO: Implement criterion attribute
+                                        // For now, fall back to Record<string, value>
+                                        inherit.push({
+                                            type: factory.createTypeReferenceNode(
+                                                factory.createIdentifier('Record'),
+                                                [
+                                                    factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                                                    value.type
+                                                ]
+                                            )
+                                        })
+                                        break
+                                    }
+                                    case 'crafting_ingredient': {
+                                        // TODO: Implement crafting_ingredient attribute
+                                        // For now, fall back to Record<string, value>
+                                        inherit.push({
+                                            type: factory.createTypeReferenceNode(
+                                                factory.createIdentifier('Record'),
+                                                [
+                                                    factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                                                    value.type
+                                                ]
+                                            )
+                                        })
+                                        break
+                                    }
+                                    case 'objective': {
+                                        // TODO: Implement objective attribute
+                                        // For now, fall back to Record<string, value>
+                                        inherit.push({
+                                            type: factory.createTypeReferenceNode(
+                                                factory.createIdentifier('Record'),
+                                                [
+                                                    factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                                                    value.type
+                                                ]
+                                            )
+                                        })
+                                        break
+                                    }
+                                    case 'dispatcher_key': {
+                                        // TODO: Implement dispatcher_key attribute
+                                        // For now, fall back to Record<string, value>
+                                        inherit.push({
+                                            type: factory.createTypeReferenceNode(
+                                                factory.createIdentifier('Record'),
+                                                [
+                                                    factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                                                    value.type
+                                                ]
+                                            )
+                                        })
+                                        break
+                                    }
+                                    default: {
+                                        throw new Error()
+                                    }
+                                }
                             }
                         })
                     

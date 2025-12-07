@@ -64,81 +64,92 @@ type CommandAttributeExtras = {
 }
 // The `attributes: never` thing is really annoying but necessary
 type ImplementedAttributes = {
-    id: (undefined | {
-        attributes: never,
-        kind: 'tree',
-        values: {
-            registry: {
-                attributes: never,
-                kind: 'literal',
-                value: {
+    id: (undefined 
+        | {
+            attributes: never
+            kind: 'literal',
+            value: {
+                attributes: never
+                kind: 'string',
+                value: string
+            }
+        }
+        | {
+            attributes: never,
+            kind: 'tree',
+            values: {
+                registry: {
                     attributes: never,
-                    kind: 'string',
-                    value: `${string}:${string}`
-                }
-            },
-            path?: {
-                attributes: never,
-                kind: 'literal',
-                value: {
-                    attributes: never,
-                    kind: 'string',
-                    value: `${string}/`
-                }
-            },
-            definition?: {
-                attributes: never,
-                kind: 'literal',
-                value: {
-                    attributes: never,
-                    kind: 'boolean',
-                    value: true
-                }
-            },
-            exclude?: {
-                attributes: never,
-                kind: 'tree',
-                values: {
-                    [K in `${number}`]: {
+                    kind: 'literal',
+                    value: {
                         attributes: never,
-                        kind: 'literal',
-                        value: {
+                        kind: 'string',
+                        value: string
+                    }
+                },
+                path?: {
+                    attributes: never,
+                    kind: 'literal',
+                    value: {
+                        attributes: never,
+                        kind: 'string',
+                        value: `${string}/`
+                    }
+                },
+                definition?: {
+                    attributes: never,
+                    kind: 'literal',
+                    value: {
+                        attributes: never,
+                        kind: 'boolean',
+                        value: true
+                    }
+                },
+                exclude?: {
+                    attributes: never,
+                    kind: 'tree',
+                    values: {
+                        [K in `${number}`]: {
                             attributes: never,
-                            kind: 'string',
-                            value: string
+                            kind: 'literal',
+                            value: {
+                                attributes: never,
+                                kind: 'string',
+                                value: string
+                            }
                         }
                     }
-                }
-            },
-            tags?: {
-                attributes: never,
-                kind: 'literal',
-                value: {
+                },
+                tags?: {
                     attributes: never,
-                    kind: 'string',
-                    value: KindType<typeof AssertKinds.RegistryAttributeTagsArgument>
-                }
-            },
-            empty?: {
-                attributes: never,
-                kind: 'literal',
-                value: {
+                    kind: 'literal',
+                    value: {
+                        attributes: never,
+                        kind: 'string',
+                        value: KindType<typeof AssertKinds.RegistryAttributeTagsArgument>
+                    }
+                },
+                empty?: {
                     attributes: never,
-                    kind: 'string',
-                    value: 'allowed'
-                }
-            },
-            prefix?: {
-                attributes: never,
-                kind: 'literal',
-                value: {
+                    kind: 'literal',
+                    value: {
+                        attributes: never,
+                        kind: 'string',
+                        value: 'allowed'
+                    }
+                },
+                prefix?: {
                     attributes: never,
-                    kind: 'string',
-                    value: '!'
-                }
-            },
+                    kind: 'literal',
+                    value: {
+                        attributes: never,
+                        kind: 'string',
+                        value: '!'
+                    }
+                },
+            }
         }
-    }),
+    ),
     since: {
         attributes: never,
         kind: 'literal',
@@ -458,66 +469,59 @@ export class Assert {
                         .with('id', () => {
                             if (attribute.value !== undefined) {
                                 match(attribute.value)
-                                .with({ kind: 'literal', value: { kind: 'string', value: P.string } }, (literal) => {
-                                    if (!/^[\w_]+:[\w_]+$/.test(literal.value.value)) {
-                                        throw new Error(`Registry Attribute Type value is not a valid id ${literal.value.value}`)
-                                    }
-                                })
-                                .with({ kind: 'tree', values: { registry: { kind: 'literal', value: { kind: 'string', value: P.string } } } }, (tree) => {
-                                    if (!/^[\w_]+:[\w_]+$/.test(tree.values.registry.value.value)) {
-                                        throw new Error(`Registry Attribute Type registry is not a valid id ${tree.values.registry.value.value}`)
-                                    }
-                                    const invalid_argument = Object.keys(tree.values).find((argument) => !AssertKinds.RegistryAttributeArgument.has(argument))
+                                    .with({ kind: 'literal', value: { kind: 'string', value: P.string } }, () => {})
+                                    .with({ kind: 'tree', values: { registry: { kind: 'literal', value: { kind: 'string', value: P.string } } } }, (tree) => {
+                                        const invalid_argument = Object.keys(tree.values).find((argument) => !AssertKinds.RegistryAttributeArgument.has(argument))
 
-                                    if (invalid_argument !== undefined) {
-                                        throw new Error(`Invalid Registry Attribute Type argument ${invalid_argument}`)
-                                    }
-                                    const args = tree.values as Record<KindType<typeof AssertKinds.RegistryAttributeArgument>, AttributeTreeChildType | undefined>
+                                        if (invalid_argument !== undefined) {
+                                            throw new Error(`Invalid Registry Attribute Type argument ${invalid_argument}`)
+                                        }
+                                        const args = tree.values as Record<KindType<typeof AssertKinds.RegistryAttributeArgument>, AttributeTreeChildType | undefined>
 
-                                    if (args.exclude !== undefined) {
-                                        if (args.exclude.kind === 'tree') {
-                                            if ('0' in args.exclude.values) {
-                                                Object.values(args.exclude.values).forEach((exclusion) => {
-                                                    if (exclusion.kind !== 'literal' || exclusion.value.kind !== 'string') {
-                                                        throw new Error(`Invalid Registry Attribute Type exclusion ${args.exclude}`)
-                                                    }
-                                                })
+                                        if (args.exclude !== undefined) {
+                                            if (args.exclude.kind === 'tree') {
+                                                if ('0' in args.exclude.values) {
+                                                    Object.values(args.exclude.values).forEach((exclusion) => {
+                                                        if (exclusion.kind !== 'literal' || exclusion.value.kind !== 'string') {
+                                                            throw new Error(`Invalid Registry Attribute Type exclusion ${args.exclude}`)
+                                                        }
+                                                    })
+                                                } else {
+                                                    throw new Error(`Invalid Registry Attribute Type exclusion ${args.exclude}`)
+                                                }
                                             } else {
                                                 throw new Error(`Invalid Registry Attribute Type exclusion ${args.exclude}`)
                                             }
-                                        } else {
-                                            throw new Error(`Invalid Registry Attribute Type exclusion ${args.exclude}`)
                                         }
-                                    }
-                                    if (args.empty !== undefined) {
-                                        if (args.empty.kind !== 'literal' || args.empty.value.value !== 'allowed') {
-                                            throw new Error(`Invalid Registry Attribute Type empty argument ${args.empty}`)
+                                        if (args.empty !== undefined) {
+                                            if (args.empty.kind !== 'literal' || args.empty.value.value !== 'allowed') {
+                                                throw new Error(`Invalid Registry Attribute Type empty argument ${args.empty}`)
+                                            }
                                         }
-                                    }
-                                    if (args.definition !== undefined) {
-                                        if (args.definition.kind !== 'literal' || args.definition?.value.value !== true) {
-                                            throw new Error(`Invalid Definition Registry Attribute Type ${args.empty}`)
+                                        if (args.definition !== undefined) {
+                                            if (args.definition.kind !== 'literal' || args.definition?.value.value !== true) {
+                                                throw new Error(`Invalid Definition Registry Attribute Type ${args.empty}`)
+                                            }
                                         }
-                                    }
-                                    if (args.path !== undefined) {
-                                        if (args.path.kind !== 'literal' || !`${args.path.value.value}`.endsWith('/')) {
-                                            throw new Error(`Invalid Pathed Registry Attribute Type ${args.path}`)
+                                        if (args.path !== undefined) {
+                                            if (args.path.kind !== 'literal' || !`${args.path.value.value}`.endsWith('/')) {
+                                                throw new Error(`Invalid Pathed Registry Attribute Type ${args.path}`)
+                                            }
                                         }
-                                    }
-                                    if (args.prefix !== undefined) {
-                                        if (args.prefix.kind !== 'literal' || args.prefix.value.value !== '!') {
-                                            throw new Error(`Invalid Registry Attribute Type prefix ${args.prefix}`)
+                                        if (args.prefix !== undefined) {
+                                            if (args.prefix.kind !== 'literal' || args.prefix.value.value !== '!') {
+                                                throw new Error(`Invalid Registry Attribute Type prefix ${args.prefix}`)
+                                            }
                                         }
-                                    }
-                                    if (args.tags !== undefined) {
-                                        if (args.tags.kind !== 'literal' || !AssertKinds.RegistryAttributeTagsArgument.has(args.tags.value.value)) {
-                                            throw new Error(`Invalid Tag Registry Attribute Type ${args.tags}`)
+                                        if (args.tags !== undefined) {
+                                            if (args.tags.kind !== 'literal' || !AssertKinds.RegistryAttributeTagsArgument.has(args.tags.value.value)) {
+                                                throw new Error(`Invalid Tag Registry Attribute Type ${args.tags}`)
+                                            }
                                         }
-                                    }
-                                })
-                                .otherwise(() => {
-                                    throw new Error()
-                                })
+                                    })
+                                    .otherwise(() => {
+                                        throw new Error()
+                                    })
                             }
                         })
                         .with('bitfield', () => {
