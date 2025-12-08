@@ -12,7 +12,7 @@ function mcdoc_int(type: mcdoc.McdocType) {
     const int = type
     Assert.NumericType<'int'>(int)
 
-    return (...args: unknown[]) => {
+    return (args: Record<string, unknown>) => {
         if (int.valueRange === undefined) {
             return {
                 type: factory.createTypeReferenceNode(NBTIntType),

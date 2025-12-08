@@ -12,7 +12,7 @@ function mcdoc_double(type: mcdoc.McdocType) {
     const double = type
     Assert.NumericType<'double'>(double)
 
-    return (...args: unknown[]) => {
+    return (args: Record<string, unknown>) => {
         if (double.valueRange === undefined) {
             return {
                 type: factory.createParenthesizedType(factory.createUnionTypeNode([

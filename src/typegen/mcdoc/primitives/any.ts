@@ -13,7 +13,7 @@ function mcdoc_any(type: mcdoc.McdocType) {
     const any = type
     Assert.KeywordType<'any'>(any)
 
-    return (...args: unknown[]) => static_value
+    return (args: Record<string, unknown>) => static_value
 }
 
 export const McdocAny = mcdoc_any satisfies TypeHandler

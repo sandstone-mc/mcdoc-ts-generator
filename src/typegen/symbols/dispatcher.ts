@@ -97,7 +97,7 @@ function dispatcher_symbol(
         throw new Error(`[dispatcher_symbol] Dispatcher "${name}" has no members`)
     }
 
-    return (...args: unknown[]): DispatcherSymbolResult => {
+    return (args: Record<string, unknown>): DispatcherSymbolResult => {
         let has_imports = false
         const imports = {
             ordered: [] as unknown as NonEmptyList<string>,
@@ -144,13 +144,7 @@ function dispatcher_symbol(
         if (has_unknown) {
             let unknown_member = (members['%unknown'].data as DispatcherMember).typeDef!
 
-            // Unwrap template type if present
-            if (unknown_member.kind === 'template') {
-                unknown_member = unknown_member.child
-            }
-
-            const handler = TypeHandlers[unknown_member.kind]
-            const result = handler(unknown_member)(...args)
+            const result = TypeHandlers[unknown_member.kind](unknown_member)(args)
 
             // Collect imports from fallback type
             if ('imports' in result && result.imports !== undefined) {
@@ -195,11 +189,6 @@ function dispatcher_symbol(
 
             let member_type = (member.data as DispatcherMember).typeDef!
 
-            // Unwrap template type if present
-            if (member_type.kind === 'template') {
-                member_type = member_type.child
-            }
-
             // Track reference paths to dispatcher id
             if (member_type.kind === 'reference' && member_type.path !== undefined) {
                 reference_dispatcher_map.set(member_type.path, id)
@@ -209,8 +198,7 @@ function dispatcher_symbol(
             const member_type_name = `${name}${member_name}`
 
             // Resolve the member type using the mcdoc type handlers
-            const handler = TypeHandlers[member_type.kind]
-            const result = handler(member_type)(...args)
+            const result = TypeHandlers[member_type.kind](member_type)(args)
 
             // Collect imports
             if ('imports' in result && result.imports !== undefined) {

@@ -9,7 +9,7 @@ function mcdoc_reference(type: mcdoc.McdocType) {
     const reference = type
     Assert.ReferenceType(reference)
 
-    return (...args: unknown[]) => {
+    return (args: Record<string, unknown>) => {
         return {
             type: factory.createTypeReferenceNode(reference.path.slice(reference.path.lastIndexOf(':') + 1)),
             imports: {

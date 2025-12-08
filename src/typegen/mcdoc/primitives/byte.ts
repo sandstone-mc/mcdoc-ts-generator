@@ -12,7 +12,7 @@ function mcdoc_byte(type: mcdoc.McdocType) {
     const byte = type
     Assert.NumericType<'byte'>(byte)
 
-    return (...args: unknown[]) => {
+    return (args: Record<string, unknown>) => {
         if (byte.valueRange === undefined) {
             return {
                 type: factory.createTypeReferenceNode(NBTByteType),

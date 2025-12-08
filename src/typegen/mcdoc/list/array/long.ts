@@ -12,7 +12,7 @@ const NBTLongArrayImport = `sandstone::${NBTLongArrayType}`
 function mcdoc_long_array(type: mcdoc.McdocType) {
     Assert.ArrayType<'long_array'>(type)
 
-    return (...args: unknown[]) => {
+    return (args: Record<string, unknown>) => {
         const imports = {
             ordered: [NBTLongArrayImport] as NonEmptyList<string>,
             check: new Map<string, number>([[NBTLongArrayImport, 0]]),

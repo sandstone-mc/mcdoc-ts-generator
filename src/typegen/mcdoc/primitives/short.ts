@@ -12,7 +12,7 @@ function mcdoc_short(type: mcdoc.McdocType) {
     const short = type
     Assert.NumericType<'short'>(short)
 
-    return (...args: unknown[]) => {
+    return (args: Record<string, unknown>) => {
         if (short.valueRange === undefined) {
             return {
                 type: factory.createTypeReferenceNode(NBTShortType),

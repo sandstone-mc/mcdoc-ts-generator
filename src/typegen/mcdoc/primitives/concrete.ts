@@ -24,7 +24,7 @@ function mcdoc_concrete(type: mcdoc.McdocType) {
 
     const type_args = type.typeArgs
 
-    return (...args: unknown[]) => {
+    return (args: Record<string, unknown>) => {
         // Resolve each type argument
         const resolved_args = [] as unknown as NonEmptyList<ts.TypeNode>
         const imports = {
@@ -32,22 +32,22 @@ function mcdoc_concrete(type: mcdoc.McdocType) {
             check: new Map<string, number>([[child.path, 0]]),
         } as const
 
-        let child_dispatcher: 'keyed' | 'self_reference' | undefined
+        let child_dispatcher: NonEmptyList<[number, string]> | undefined
 
         // Process each type argument
         for (const type_arg of type_args) {
-            const arg_handler = TypeHandlers[type_arg.kind]
-            const arg_result = arg_handler(type_arg)(...args)
+            const arg_result = TypeHandlers[type_arg.kind](type_arg)(args)
 
-            resolved_args.push(arg_result.type)
-
-            // Merge imports from type argument
             if ('imports' in arg_result) {
                 merge_imports(imports, arg_result.imports)
             }
             if ('child_dispatcher' in arg_result) {
-                child_dispatcher = arg_result.child_dispatcher as typeof child_dispatcher
+                if (child_dispatcher === undefined) {
+                    child_dispatcher = [] as unknown as typeof child_dispatcher
+                }
+                child_dispatcher!.push(...(arg_result.child_dispatcher as NonEmptyList<[number, string]>))
             }
+            resolved_args.push(arg_result.type)
         }
 
         const type_name = child.path.slice(child.path.lastIndexOf(':') + 1)

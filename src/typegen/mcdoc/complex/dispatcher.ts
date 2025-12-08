@@ -21,26 +21,13 @@ export type DispatcherArgs = {
 }
 
 /**
- * Validates and extracts dispatcher args from the unknown[] args.
+ * Validates and extracts dispatcher args from the unknown args.
  */
-function parse_dispatcher_args(args: unknown[]): DispatcherArgs {
-    if (args.length === 0) {
-        return {}
-    }
-
-    const first = args[0]
-    if (first === null || first === undefined) {
-        return {}
-    }
-
-    if (typeof first !== 'object') {
-        throw new Error(`[mcdoc_dispatcher] Expected first arg to be an object, got: ${typeof first}`)
-    }
-
+function parse_dispatcher_args(args: Record<string, unknown>): DispatcherArgs {
     const result: DispatcherArgs = {}
 
-    if ('index_keys' in first) {
-        const index_keys = (first as Record<string, unknown>).index_keys
+    if ('index_keys' in args) {
+        const index_keys = args.index_keys
         if (!Array.isArray(index_keys)) {
             throw new Error(`[mcdoc_dispatcher] index_keys must be an array`)
         }
@@ -85,7 +72,7 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
     const registry = dispatcher.registry
     const indices = dispatcher.parallelIndices
 
-    return (...args: unknown[]) => {
+    return (args: Record<string, unknown>) => {
         const dispatcher_args = parse_dispatcher_args(args)
 
         // Look up symbol name from registry
@@ -98,10 +85,10 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
 
         let result_type: ts.TypeNode
 
-        let child_dispatcher: 'keyed' | 'self_reference' | undefined
+        let child_dispatcher: NonEmptyList<[parent_count: number, property: string]> | undefined
 
         if (indices.length === 1 && indices[0].kind === 'dynamic' && indices[0].accessor.length === 1 && typeof indices[0].accessor[0] === 'string') {
-            child_dispatcher = 'self_reference'
+            child_dispatcher = [[0, indices[0].accessor[0]]]
             // Result: SymbolName[S]
             result_type = factory.createIndexedAccessTypeNode(
                 factory.createTypeReferenceNode(`Symbol${symbol_name}`),
@@ -123,7 +110,6 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
                 )
             }
         } else if (JSON.stringify(indices) === SimpleKeyIndex) {
-            child_dispatcher = 'keyed'
             // Result: SymbolName[K]
             result_type = factory.createIndexedAccessTypeNode(
                 factory.createTypeReferenceNode(`Symbol${symbol_name}`),
@@ -138,13 +124,18 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
                     )
                 }
             }
-        } else {
-            // %parent pain
+        } else if (indices.length === 1 && indices[0].kind === 'dynamic' && indices[0].accessor.length > 1 && typeof indices[0].accessor.at(-1) === 'string') {
+            child_dispatcher = [[
+                indices[0].accessor.length - 1,
+                indices[0].accessor.at(-1) as string
+            ]]
             // Result: SymbolName<'%fallback'>
             result_type = factory.createTypeReferenceNode(
                 `Symbol${symbol_name}`,
                 [Fallback]
             )
+        } else {
+            throw new Error(`[mcdoc_dispatcher] Unsupported dispatcher: ${dispatcher}`)
         }
 
         return {

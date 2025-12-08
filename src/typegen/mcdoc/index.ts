@@ -20,7 +20,7 @@ import {
 export type NonEmptyList<T> = T[] & { 0: T }
 
 export type TypeHandlerResult = {
-    readonly type: ts.TypeNode | ts.EnumDeclaration,
+    readonly type: ts.TypeNode | ts.EnumDeclaration | ts.TypeAliasDeclaration,
     readonly imports?: {
         /**
          * Cannot include duplicates, but uses a list to preserve order.
@@ -32,11 +32,11 @@ export type TypeHandlerResult = {
         readonly check: Map<string, number>,
     },
     readonly docs?: NonEmptyList<string>,
-    readonly child_dispatcher?: 'keyed' | 'self_reference'
+    readonly child_dispatcher?: NonEmptyList<[parent_count: number, property: string]>
 }
 
-export type TypeHandler<RESULT = TypeHandlerResult> = (type: mcdoc.McdocType, ...args: unknown[]) => (
-    (...args: unknown[]) => RESULT
+export type TypeHandler<RESULT = TypeHandlerResult> = (type: mcdoc.McdocType) => (
+    (args: Record<string, unknown>) => RESULT
 )
 
 type TypeHandlersMeta = Record<mcdoc.McdocType['kind'], TypeHandler>
@@ -165,6 +165,7 @@ export function getTypeHandler(kind: mcdoc.McdocType['kind']): TypeHandler {
 
 // Explicit return types for handlers that are circular
 type McdocListType = TypeHandler<{
+    readonly child_dispatcher?: NonEmptyList<[parent_count: number, property: string]>
     readonly type: ts.TypeReferenceNode
     readonly imports?: {
         readonly ordered: NonEmptyList<string>
@@ -174,6 +175,7 @@ type McdocListType = TypeHandler<{
 }>
 
 type McdocStructType = TypeHandler<{
+    readonly child_dispatcher?: NonEmptyList<[parent_count: number, property: string]>
     readonly type: ts.TypeLiteralNode | ts.TypeReferenceNode | ts.ParenthesizedTypeNode | ts.KeywordTypeNode<ts.SyntaxKind.UnknownKeyword>
     readonly imports?: {
         readonly ordered: NonEmptyList<string>
@@ -182,6 +184,7 @@ type McdocStructType = TypeHandler<{
 }>
 
 type McdocTupleType = TypeHandler<{
+    readonly child_dispatcher?: NonEmptyList<[parent_count: number, property: string]>
     readonly type: ts.TupleTypeNode
     readonly imports?: {
         readonly ordered: NonEmptyList<string>
@@ -190,6 +193,7 @@ type McdocTupleType = TypeHandler<{
 }>
 
 type McdocUnionType = TypeHandler<{
+    readonly child_dispatcher?: NonEmptyList<[parent_count: number, property: string]>
     readonly type: ts.ParenthesizedTypeNode
     readonly imports?: {
         readonly ordered: NonEmptyList<string>
@@ -198,6 +202,7 @@ type McdocUnionType = TypeHandler<{
 }>
 
 type McdocConcreteType = TypeHandler<{
+    readonly child_dispatcher?: NonEmptyList<[parent_count: number, property: string]>
     readonly type: ts.TypeReferenceNode | ts.TypeNode
     readonly imports?: {
         readonly ordered: NonEmptyList<string>

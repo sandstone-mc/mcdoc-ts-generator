@@ -16,8 +16,8 @@ function mcdoc_list(type: mcdoc.McdocType) {
     const list = type
     Assert.ListType(list)
 
-    return (...args: unknown[]) => {
-        const item = TypeHandlers[list.item.kind](list.item)(...args)
+    return (args: Record<string, unknown>) => {
+        const item = TypeHandlers[list.item.kind](list.item)(args)
 
         const imports = 'imports' in item ? {
             ordered: item.imports.ordered,
@@ -31,7 +31,12 @@ function mcdoc_list(type: mcdoc.McdocType) {
             add_import(imports, NBTListImport)
         }
 
-        const child_dispatcher = 'child_dispatcher' in item ? (item.child_dispatcher as 'self_reference' | 'keyed') : undefined
+        const child_dispatcher = 'child_dispatcher' in item ? ((item.child_dispatcher as NonEmptyList<[number, string]>).map(([parent_count, property]) => {
+            if (parent_count === 0) {
+                throw new Error(`[mcdoc_list] List contains a dynamic dispatcher with invalid parenting: ${item}`)
+            }
+            return [parent_count - 1, property]
+        }) as NonEmptyList<[number, string]>) : undefined
 
         if (list.lengthRange) {
             const { generic, docs } = length_range_generic(list.lengthRange, 'List')
@@ -43,13 +48,13 @@ function mcdoc_list(type: mcdoc.McdocType) {
                 ]),
                 imports,
                 docs,
-                ...(child_dispatcher !== undefined ? { child_dispatcher } : {}),
+                ...(child_dispatcher === undefined ? {} : { child_dispatcher }),
             } as const
         } else {
             return {
                 type: factory.createTypeReferenceNode(NBTListType, [item.type]),
                 imports,
-                ...(child_dispatcher !== undefined ? { child_dispatcher } : {}),
+                ...(child_dispatcher === undefined ? {} : { child_dispatcher }),
             } as const
         }
     }

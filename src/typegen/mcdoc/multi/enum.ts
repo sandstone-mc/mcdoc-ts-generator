@@ -25,7 +25,7 @@ function mcdoc_enum(type: mcdoc.McdocType) {
     const enum_type = type
     Assert.EnumType(enum_type)
 
-    return (...args: unknown[]) => {
+    return (args: Record<string, unknown>) => {
         // The module path generator provides the name for enums
         const [ named ] = args as [string]
 

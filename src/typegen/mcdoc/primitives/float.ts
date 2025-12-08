@@ -13,7 +13,7 @@ function mcdoc_float(type: mcdoc.McdocType) {
     const float = type
     Assert.NumericType<'float'>(float)
 
-    return (...args: unknown[]) => {
+    return (args: Record<string, unknown>) => {
         if (float.valueRange === undefined) {
             return {
                 type: factory.createTypeReferenceNode(NBTFloatType),

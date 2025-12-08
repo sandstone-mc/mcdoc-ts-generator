@@ -283,21 +283,6 @@ type ImplementedAttributes = {
             } & CommandAttributeExtras)
         )
     },
-    game_rule: {
-        attributes: never,
-        kind: 'tree',
-        values: {
-            type: {
-                attributes: never,
-                kind: 'literal',
-                value: {
-                    attributes: never,
-                    kind: 'string',
-                    value: 'int' | 'boolean'
-                }
-            }
-        }
-    },
     uuid: undefined,
     random: undefined,
     divisible_by: {
@@ -381,11 +366,6 @@ export type ImplementedAttributeType<KIND extends (keyof ImplementedAttributes |
     )
 )
 
-const foo = {} as unknown as ImplementedAttributeType
-
-if (foo.name === 'dispatcher_key') {
-}
-
 export type KindType<T> = T extends Set<infer U> ? U : never;
 export class AssertKinds {
     static readonly AttributeRootValueKind = new Set(['dispatcher', 'reference', 'literal', 'tree'] as const)
@@ -412,7 +392,6 @@ export class AssertKinds {
         'nbt_path',
         'deprecated',
         'command',
-        'game_rule',
         'uuid',
         'random',
         'divisible_by',
@@ -422,7 +401,6 @@ export class AssertKinds {
         'vector',
         'bitfield',
         'text_component',
-        'block_predicate',
     ] as const)
     static readonly RegistryAttributeArgument = new Set(['registry', 'path', 'definition', 'exclude', 'tags', 'empty', 'prefix'] as const)
     static readonly RegistryAttributeTagsArgument = new Set(['allowed', 'implicit', 'required'] as const)
@@ -626,17 +604,6 @@ export class Assert {
                                 throw new Error()
                             }
                         })
-                        .with('game_rule', () => {
-                            if (attribute.value === undefined) {
-                                throw new Error()
-                            }
-                            if (attribute.value.kind !== 'tree' || !('type' in attribute.value.values) || attribute.value.values.type.kind !== 'literal' || !/^int|boolean$/.test(`${attribute.value.values.type.value.value}`)) {
-                                throw new Error()
-                            }
-                            if (Object.keys(attribute.value.values).length > 1) {
-                                throw new Error()
-                            }
-                        })
                         .with('integer', () => {
                             // Mojang why
                             if (attribute.value === undefined) {
@@ -674,7 +641,7 @@ export class Assert {
                                 throw new Error()
                             }
                         })
-                        .with('random', 'regex_pattern', 'time_pattern', 'canonical', 'deprecated', 'text_component', 'score_holder', 'objective', 'block_predicate', 'translation_key', 'translation_value', 'item_slots', 'entity', 'uuid', () => {
+                        .with('random', 'regex_pattern', 'time_pattern', 'canonical', 'deprecated', 'text_component', 'score_holder', 'objective', 'translation_key', 'translation_value', 'item_slots', 'entity', 'uuid', () => {
                             if (attribute.value !== undefined) {
                                 throw new Error()
                             }
@@ -853,6 +820,11 @@ export class Assert {
     static StringType(type: mcdoc.McdocType): asserts type is mcdoc.StringType {
         if (type.kind !== 'string') {
             throw new Error(`Type is not a StringType: ${type.kind}`)
+        }
+    }
+    static ColorStringType(type: KindType<typeof AssertKinds.ColorAttributeKind>): asserts type is ('hex_argb' | 'hex_rgb') {
+        if (type !== 'hex_argb' && type !== 'hex_rgb') {
+            throw new Error(`String color type is not valid ${type}`)
         }
     }
 

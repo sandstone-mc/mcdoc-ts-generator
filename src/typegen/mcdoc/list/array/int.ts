@@ -12,7 +12,7 @@ const NBTIntArrayImport = `sandstone::${NBTIntArrayType}`
 function mcdoc_int_array(type: mcdoc.McdocType) {
     Assert.ArrayType<'int_array'>(type)
 
-    return (...args: unknown[]) => {
+    return (args: Record<string, unknown>) => {
         const imports = {
             ordered: [NBTIntArrayImport] as NonEmptyList<string>,
             check: new Map<string, number>([[NBTIntArrayImport, 0]]),

@@ -20,7 +20,7 @@ function mcdoc_literal(type: mcdoc.McdocType) {
     const literal = type
     Assert.LiteralType(literal)
 
-    return (...args: unknown[]) => match(literal.value)
+    return (args: Record<string, unknown>) => match(literal.value)
         .with({ kind: 'boolean' }, (boolean) => match(boolean.value)
             .with(true, () => boolean_static.true)
             .with(false, () => boolean_static.false)

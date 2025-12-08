@@ -12,7 +12,7 @@ function mcdoc_long(type: mcdoc.McdocType) {
     const long = type
     Assert.NumericType<'long'>(long)
 
-    return (...args: unknown[]) => {
+    return (args: Record<string, unknown>) => {
         if (long.valueRange === undefined) {
             return {
                 type: factory.createTypeReferenceNode(NBTLongType),
