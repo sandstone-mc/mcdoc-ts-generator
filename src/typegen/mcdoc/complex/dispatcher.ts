@@ -93,8 +93,9 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
             child_dispatcher = [[0, indices[0].accessor[0]]]
             // Result: SymbolName[S]
             result_type = factory.createIndexedAccessTypeNode(
-                factory.createTypeReferenceNode(`Symbol${symbol_name}`,
-                    [SymbolMap, ...generics]
+                factory.createTypeReferenceNode(
+                    `Symbol${symbol_name}`,
+                    dispatcher_args.generic_types === undefined ? undefined : [SymbolMap, ...dispatcher_args.generic_types]
                 ),
                 factory.createTypeReferenceNode('S')
             )
@@ -109,14 +110,20 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
             } else {
                 // Result: SymbolName['static_member']
                 result_type = factory.createIndexedAccessTypeNode(
-                    factory.createTypeReferenceNode(`Symbol${symbol_name}`, dispatcher_args.generic_types),
+                    factory.createTypeReferenceNode(
+                        `Symbol${symbol_name}`,
+                        dispatcher_args.generic_types === undefined ? undefined : [SymbolMap, ...dispatcher_args.generic_types]
+                    ),
                     Bind.StringLiteral(indices[0].value)
                 )
             }
         } else if (JSON.stringify(indices) === SimpleKeyIndex) {
             // Result: SymbolName[K]
             result_type = factory.createIndexedAccessTypeNode(
-                factory.createTypeReferenceNode(`Symbol${symbol_name}`, dispatcher_args.generic_types),
+                factory.createTypeReferenceNode(
+                    `Symbol${symbol_name}`,
+                    dispatcher_args.generic_types === undefined ? undefined : [SymbolMap, ...dispatcher_args.generic_types]
+                ),
                 factory.createTypeReferenceNode('K')
             )
             // Result: SymbolName[K]['static_index']
