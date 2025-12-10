@@ -101,8 +101,9 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
                 factory.createTypeReferenceNode('S')
             )
 
-            const properties = dispatcher_properties_map.get(symbol_name)!
-            if (properties.supports_none) {
+            // TODO: Move the dispatcher_properties_map builder out of `dispatcher_symbol`, there is a race condition here
+            const properties = dispatcher_properties_map.get(symbol_name)
+            if (properties?.supports_none) {
                 // Result: S extends undefined ? SymbolName<'%none'> : SymbolName[S]
                 result_type = factory.createConditionalTypeNode(
                     factory.createTypeReferenceNode('S'),

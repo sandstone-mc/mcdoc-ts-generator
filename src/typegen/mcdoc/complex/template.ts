@@ -78,7 +78,7 @@ function mcdoc_template(type: mcdoc.McdocType) {
             ...args
         })
 
-        if ('imports' in child_result && child_result.imports) {
+        if ('imports' in child_result) {
             has_imports = true
             merge_imports(imports, child_result.imports)
         }

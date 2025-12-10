@@ -47,6 +47,24 @@ export function merge_imports(
     }
 }
 
+export function remove_imports(
+    imports: TypeHandlerResult['imports'],
+    remove_imports: Set<string>,
+) {
+    if (imports !== undefined) {
+        for (const import_path of remove_imports) {
+            const remove_import = imports.check.get(import_path)
+            if (remove_import !== undefined) {
+                imports.check.delete(import_path)
+                imports.ordered.splice(remove_import, 1)
+                for (let i = remove_import; i < imports.ordered.length; i++) {
+                    imports.check.set(imports.ordered[i], i)
+                }
+            }
+        }
+    }
+}
+
 // Thanks TypeScript
 type GetConstructorArgs<T> = T extends new (...args: infer U) => any ? U : never
 export class Set<T> extends global.Set<T> {

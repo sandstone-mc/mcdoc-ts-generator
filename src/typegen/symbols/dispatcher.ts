@@ -1,7 +1,7 @@
 import ts from 'typescript'
 import type { SymbolMap } from '@spyglassmc/core'
 import * as mcdoc from '@spyglassmc/mcdoc'
-import { TypeHandlers, type NonEmptyList } from '../mcdoc'
+import { get_type_handler, TypeHandlers, type NonEmptyList } from '../mcdoc'
 import { merge_imports } from '../mcdoc/utils'
 import { Assert } from '../mcdoc/assert'
 import { Bind } from '../mcdoc/bind'
@@ -24,11 +24,15 @@ export type DispatcherProperties = {
  */
 export const dispatcher_properties_map = new Map<string, DispatcherProperties>()
 
-/**
- * Global map of reference type paths to the dispatcher id they belong to.
- * Populated during dispatcher_symbol calls.
- */
-export const reference_dispatcher_map = new Map<string, string>()
+export type DispatcherReferenceCounter = {
+    /**
+     * Map<path: string, location_counts_index: number>
+     */
+    locations: Map<string, number>
+    location_counts: [path: string, count: number][]
+}
+
+export const dispatcher_references = new Map<string, DispatcherReferenceCounter>()
 
 /**
  * Global map of dispatcher registry id to symbol name.
@@ -45,7 +49,7 @@ export type DispatcherSymbolResult = {
     /**
      * Supporting type aliases (member types, map, keys, fallback, unknown)
      */
-    readonly members: ts.TypeAliasDeclaration[]
+    readonly members: (ts.TypeAliasDeclaration | ts.EnumDeclaration)[]
     /**
      * Import paths required by this dispatcher
      */
@@ -97,7 +101,7 @@ function dispatcher_symbol(
             check: new Map<string, number>(),
         }
 
-        const member_types: ts.TypeAliasDeclaration[] = []
+        const member_types: (ts.TypeAliasDeclaration | ts.EnumDeclaration)[] = []
         const map_properties: ts.PropertySignature[] = []
         const member_type_refs: ts.TypeReferenceNode[] = []
 
@@ -127,12 +131,14 @@ function dispatcher_symbol(
 
         // Process %unknown to get the fallback type
         if ('%unknown' in members) {
-            let unknown_member = (members['%unknown'].data as DispatcherMember).typeDef!
+            const unknown_member = (members['%unknown'].data as DispatcherMember).typeDef!
 
-            const result = TypeHandlers[unknown_member.kind](unknown_member)(args)
+            const unknown_type_name = `${name}FallbackType`
+
+            const result = get_type_handler(unknown_member)(unknown_member)({ named: unknown_type_name })
 
             // Collect imports from fallback type
-            if ('imports' in result && result.imports !== undefined) {
+            if ('imports' in result) {
                 if (!has_imports) {
                     has_imports = true
                     imports.ordered.push(...result.imports.ordered)
@@ -144,30 +150,34 @@ function dispatcher_symbol(
                 }
             }
 
-            // Create the fallback type alias (with generics if present)
-            // This shows up as one of the options in %fallback, and is also available for those wishing to use types that are unrecognized to Sandstone
-            member_types.push(factory.createTypeAliasDeclaration(
-                [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
-                `${name}FallbackType`,
-                has_generics ? generic_params : undefined,
-                result.type
-            ))
             fallback_type_name = factory.createTypeReferenceNode(
-                `${name}FallbackType`,
+                unknown_type_name,
                 has_generics ? generic_names : undefined
             )
+            if (unknown_member.kind === 'enum' || unknown_member.kind === 'template') {
+                member_types.push(result.type as (ts.EnumDeclaration | ts.TypeAliasDeclaration))
+            } else {
+                member_types.push(factory.createTypeAliasDeclaration(
+                    undefined,
+                    unknown_type_name,
+                    undefined,
+                    result.type as ts.TypeNode
+                ))
+            }
         }
 
         const has_none = '%none' in members
 
         // Process %none to get the none type
         if (has_none) {
-            let none_member = (members['%none'].data as DispatcherMember).typeDef!
+            const none_member = (members['%none'].data as DispatcherMember).typeDef!
 
-            const result = TypeHandlers[none_member.kind](none_member)(args)
+            const none_type_name = `${name}NoneType`
+
+            const result = get_type_handler(none_member)(none_member)({ named: none_type_name })
 
             // Collect imports from none type
-            if ('imports' in result && result.imports !== undefined) {
+            if ('imports' in result) {
                 if (!has_imports) {
                     has_imports = true
                     imports.ordered.push(...result.imports.ordered)
@@ -179,14 +189,16 @@ function dispatcher_symbol(
                 }
             }
 
-            // Create the none type alias (with generics if present)
-            const none_type_alias = factory.createTypeAliasDeclaration(
-                undefined,
-                `${name}NoneType`,
-                has_generics ? generic_params : undefined,
-                result.type
-            )
-            member_types.push(none_type_alias)
+            if (none_member.kind === 'enum' || none_member.kind === 'template') {
+                member_types.push(result.type as (ts.EnumDeclaration | ts.TypeAliasDeclaration))
+            } else {
+                member_types.push(factory.createTypeAliasDeclaration(
+                    undefined,
+                    none_type_name,
+                    undefined,
+                    result.type as ts.TypeNode
+                ))
+            }
         }
 
         // Store dispatcher properties in global map
@@ -201,22 +213,26 @@ function dispatcher_symbol(
                 continue
             }
 
-            let member_type = (member.data as DispatcherMember).typeDef!
+            const member_type = (member.data as DispatcherMember).typeDef!
 
-            // Track reference paths to dispatcher id
-            if (member_type.kind === 'reference') {
-                Assert.ReferenceType(member_type)
-                reference_dispatcher_map.set(member_type.path, id)
-            }
-
-            const member_name = pascal_case(member_key.replace(/[/:]/g, '_'))
-            const member_type_name = `${name}${member_name}`
+            const member_type_name = `${name}${pascal_case(member_key.replace(/[/:]/g, '_'))}`
 
             // Resolve the member type using the mcdoc type handlers
-            const result = TypeHandlers[member_type.kind](member_type)(args)
+            const result = get_type_handler(member_type)(member_type)({
+                named: member_type_name,
+                dispatcher_symbol: () => {
+                    if (!dispatcher_references.has(id)) {
+                        dispatcher_references.set(id, {
+                            locations: new Map(),
+                            location_counts: []
+                        })
+                    }
+                    return dispatcher_references.get(id)!
+                }
+            })
 
             // Collect imports
-            if ('imports' in result && result.imports !== undefined) {
+            if ('imports' in result) {
                 if (!has_imports) {
                     has_imports = true
                     imports.ordered.push(...result.imports.ordered)
@@ -229,13 +245,16 @@ function dispatcher_symbol(
             }
 
             // Create member type alias (with generics if present)
-            const member_type_alias = factory.createTypeAliasDeclaration(
-                undefined,
-                member_type_name,
-                has_generics ? generic_params : undefined,
-                result.type
-            )
-            member_types.push(member_type_alias)
+            if (member_type.kind === 'enum' || member_type.kind === 'template') {
+                member_types.push(result.type as (ts.EnumDeclaration | ts.TypeAliasDeclaration))
+            } else {
+                member_types.push(factory.createTypeAliasDeclaration(
+                    undefined,
+                    member_type_name,
+                    undefined,
+                    result.type as ts.TypeNode
+                ))
+            }
 
             // Create reference to the member type (with generics if present)
             const member_ref = factory.createTypeReferenceNode(

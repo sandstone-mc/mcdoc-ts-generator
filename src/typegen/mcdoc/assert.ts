@@ -834,10 +834,4 @@ export class Assert {
             throw new Error(`String color type is not valid ${type}`)
         }
     }
-
-    static HasKey<Obj extends Record<string, unknown>, Key extends string>(obj: Obj, key: Key): asserts obj is (Obj & { [K in Key]: NonNullable<Obj[Key]> }) {
-        if (!(key in obj) || obj[key] === undefined) {
-            throw new Error()
-        }
-    }
 }

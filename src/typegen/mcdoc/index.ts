@@ -32,7 +32,7 @@ export type TypeHandlerResult = {
          */
         readonly check: Map<string, number>,
     },
-    readonly docs?: NonEmptyList<string>,
+    readonly docs?: NonEmptyList<string | [string]>,
     readonly child_dispatcher?: NonEmptyList<[parent_count: number, property: string]>
 }
 
