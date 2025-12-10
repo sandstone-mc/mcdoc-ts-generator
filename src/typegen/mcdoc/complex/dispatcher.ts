@@ -2,7 +2,7 @@ import ts from 'typescript'
 import * as mcdoc from '@spyglassmc/mcdoc'
 import type { NonEmptyList, TypeHandler } from '..'
 import { Assert } from '../assert'
-import { dispatcher_registry_map } from '../../symbols'
+import { dispatcher_registry_map, dispatcher_properties_map } from '../../symbols'
 import { Bind } from '../bind'
 
 const { factory } = ts
@@ -53,6 +53,7 @@ const SimpleKeyIndex = JSON.stringify({
 
 const SymbolMap = Bind.StringLiteral('map')
 const Fallback = Bind.StringLiteral('%fallback')
+const None = Bind.StringLiteral('%none')
 
 /**
  * Handles `dispatcher` types which reference a dispatcher symbol map.
@@ -91,14 +92,31 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
 
         if (indices.length === 1 && indices[0].kind === 'dynamic' && indices[0].accessor.length === 1 && typeof indices[0].accessor[0] === 'string') {
             child_dispatcher = [[0, indices[0].accessor[0]]]
-            // Result: SymbolName[S]
-            result_type = factory.createIndexedAccessTypeNode(
+
+            const indexed_type = factory.createIndexedAccessTypeNode(
                 factory.createTypeReferenceNode(
                     `Symbol${symbol_name}`,
                     dispatcher_args.generic_types === undefined ? undefined : [SymbolMap, ...dispatcher_args.generic_types]
                 ),
                 factory.createTypeReferenceNode('S')
             )
+
+            const properties = dispatcher_properties_map.get(symbol_name)!
+            if (properties.supports_none) {
+                // Result: S extends undefined ? SymbolName<'%none'> : SymbolName[S]
+                result_type = factory.createConditionalTypeNode(
+                    factory.createTypeReferenceNode('S'),
+                    factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword),
+                    factory.createTypeReferenceNode(
+                        `Symbol${symbol_name}`,
+                        [None, ...generics]
+                    ),
+                    indexed_type
+                )
+            } else {
+                // Result: SymbolName[S]
+                result_type = indexed_type
+            }
         } else if (indices.length === 1 && indices[0].kind === 'static') {
             if (indices[0].value === '%fallback') {
                 // Intentional fallback
