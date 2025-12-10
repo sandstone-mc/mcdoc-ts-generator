@@ -3,6 +3,8 @@ import type { SymbolMap } from '@spyglassmc/core'
 import * as mcdoc from '@spyglassmc/mcdoc'
 import { TypeHandlers, type NonEmptyList } from '../mcdoc'
 import { merge_imports } from '../mcdoc/utils'
+import { Assert } from '../mcdoc/assert'
+import { Bind } from '../mcdoc/bind'
 
 const { factory } = ts
 
@@ -10,10 +12,6 @@ const { factory } = ts
  * Properties describing special behavior of a dispatcher symbol map.
  */
 export type DispatcherProperties = {
-    /**
-     * Whether %unknown is present - allows arbitrary string keys with fallback type
-     */
-    readonly supports_unknown: boolean
     /**
      * Whether %none is present - allows omitting the dispatcher key
      */
@@ -55,10 +53,6 @@ export type DispatcherSymbolResult = {
         readonly ordered: NonEmptyList<string>
         readonly check: Map<string, number>
     }
-    /**
-     * Properties of this dispatcher (supports %unknown, %none)
-     */
-    readonly properties: DispatcherProperties
 }
 
 type DispatcherMember = { typeDef: mcdoc.McdocType }
@@ -66,14 +60,14 @@ type DispatcherMember = { typeDef: mcdoc.McdocType }
 /**
  * Generates a dispatcher symbol map with the following structure:
  * ```ts
- * type NameFallbackType<T> = { ... }  // Only if %unknown is present
+ * export type NameFallbackType<T> = { ... }  // Only if %unknown is present
+ * type NameNoneType<T> = { ... }  // Only if %none is present
  * type NameMemberA<T> = { ... }
  * type NameMemberB<T> = { ... }
- * type NameMap<T> = { 'a': NameMemberA<T>, 'b': NameMemberB<T> } & { [key?: string]: NameFallbackType<T> }
+ * type NameMap<T> = { 'a': NameMemberA<T>, 'b': NameMemberB<T> }
  * type NameKeys = keyof NameMap<unknown>
  * type NameFallback<T> = NameMemberA<T> | NameMemberB<T> | NameFallbackType<T>
- * type NameUnknown<T> = NameMemberA<T> & NameMemberB<T> & NameFallbackType<T>
- * export type SymbolName<CASE extends ('map' | 'keys' | '%unknown' | '%fallback') = 'map', T> = ...
+ * export type SymbolName<CASE extends ('map' | 'keys' | '%fallback' | '%none') = 'map', T> = ...
  * ```
  *
  * Generic parameters (e.g., `<T>`) are only present if the dispatcher members are template types.
@@ -81,8 +75,7 @@ type DispatcherMember = { typeDef: mcdoc.McdocType }
  * CASE always comes before any dispatcher generics in the main Symbol type.
  *
  * Special keys in dispatcher members:
- * - `%unknown`: Defines fallback type for arbitrary string keys not in the map.
- *   When present, adds index signature to Map and includes fallback in Fallback/Unknown types.
+ * - `%unknown`: Defines fallback type for arbitrary string keys not in the map, doesn't actually work because of TypeScript limitations
  * - `%none`: Indicates the dispatcher key can be omitted. Handled during dispatcher use.
  *
  * Also populates `dispatcherPropertiesMap` with the dispatcher's properties.
@@ -108,10 +101,6 @@ function dispatcher_symbol(
         const map_properties: ts.PropertySignature[] = []
         const member_type_refs: ts.TypeReferenceNode[] = []
 
-        // Check for special keys and resolve their types
-        const has_unknown = '%unknown' in members
-        const has_none = '%none' in members
-
         // Check first member for generics (if dispatcher has generics, all members have them)
         const first_member = members[Object.keys(members)[0]]
         const first_type = (first_member.data as DispatcherMember).typeDef
@@ -126,22 +115,18 @@ function dispatcher_symbol(
             for (const type_param of template.typeParams) {
                 // Extract the generic name from the path (last segment)
                 const param_name = type_param.path.split('::').pop()!
-                generic_params.push(
-                    factory.createTypeParameterDeclaration(
-                        undefined,
-                        factory.createIdentifier(param_name),
-                        undefined,
-                        undefined
-                    )
-                )
+
+                generic_params.push(factory.createTypeParameterDeclaration(undefined, param_name))
                 generic_names.push(factory.createTypeReferenceNode(param_name))
             }
         }
 
+        // Check for special keys and resolve their types
+
         let fallback_type_name: ts.TypeReferenceNode | undefined
 
         // Process %unknown to get the fallback type
-        if (has_unknown) {
+        if ('%unknown' in members) {
             let unknown_member = (members['%unknown'].data as DispatcherMember).typeDef!
 
             const result = TypeHandlers[unknown_member.kind](unknown_member)(args)
@@ -160,25 +145,54 @@ function dispatcher_symbol(
             }
 
             // Create the fallback type alias (with generics if present)
-            const fallback_type_alias = factory.createTypeAliasDeclaration(
-                undefined,
-                factory.createIdentifier(`${name}FallbackType`),
+            // This shows up as one of the options in %fallback, and is also available for those wishing to use types that are unrecognized to Sandstone
+            member_types.push(factory.createTypeAliasDeclaration(
+                [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+                `${name}FallbackType`,
                 has_generics ? generic_params : undefined,
                 result.type
-            )
-            member_types.push(fallback_type_alias)
+            ))
             fallback_type_name = factory.createTypeReferenceNode(
                 `${name}FallbackType`,
                 has_generics ? generic_names : undefined
             )
         }
 
-        // Store dispatcher properties in global map
-        const properties: DispatcherProperties = {
-            supports_unknown: has_unknown,
-            supports_none: has_none,
+        const has_none = '%none' in members
+
+        // Process %none to get the none type
+        if (has_none) {
+            let none_member = (members['%none'].data as DispatcherMember).typeDef!
+
+            const result = TypeHandlers[none_member.kind](none_member)(args)
+
+            // Collect imports from none type
+            if ('imports' in result && result.imports !== undefined) {
+                if (!has_imports) {
+                    has_imports = true
+                    imports.ordered.push(...result.imports.ordered)
+                    for (const [key, value] of result.imports.check) {
+                        imports.check.set(key, value)
+                    }
+                } else {
+                    merge_imports(imports, result.imports)
+                }
+            }
+
+            // Create the none type alias (with generics if present)
+            const none_type_alias = factory.createTypeAliasDeclaration(
+                undefined,
+                `${name}NoneType`,
+                has_generics ? generic_params : undefined,
+                result.type
+            )
+            member_types.push(none_type_alias)
         }
-        dispatcher_properties_map.set(name, properties)
+
+        // Store dispatcher properties in global map
+        dispatcher_properties_map.set(name, {
+            supports_none: has_none,
+        })
         dispatcher_registry_map.set(id, name)
 
         for (const [member_key, member] of Object.entries(members)) {
@@ -190,7 +204,8 @@ function dispatcher_symbol(
             let member_type = (member.data as DispatcherMember).typeDef!
 
             // Track reference paths to dispatcher id
-            if (member_type.kind === 'reference' && member_type.path !== undefined) {
+            if (member_type.kind === 'reference') {
+                Assert.ReferenceType(member_type)
                 reference_dispatcher_map.set(member_type.path, id)
             }
 
@@ -216,7 +231,7 @@ function dispatcher_symbol(
             // Create member type alias (with generics if present)
             const member_type_alias = factory.createTypeAliasDeclaration(
                 undefined,
-                factory.createIdentifier(member_type_name),
+                member_type_name,
                 has_generics ? generic_params : undefined,
                 result.type
             )
@@ -242,40 +257,17 @@ function dispatcher_symbol(
 
         // Create NameMap type
         // If %unknown is present, intersect with an index signature for arbitrary keys
-        let map_type_node: ts.TypeNode
-        if (has_unknown && fallback_type_name) {
-            const index_signature = factory.createIndexSignature(
-                undefined,
-                [
-                    factory.createParameterDeclaration(
-                        undefined,
-                        undefined,
-                        factory.createIdentifier('key'),
-                        factory.createToken(ts.SyntaxKind.QuestionToken),
-                        factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
-                    )
-                ],
-                fallback_type_name
-            )
-            map_type_node = factory.createIntersectionTypeNode([
-                factory.createTypeLiteralNode(map_properties),
-                factory.createTypeLiteralNode([index_signature])
-            ])
-        } else {
-            map_type_node = factory.createTypeLiteralNode(map_properties)
-        }
-
         const map_type = factory.createTypeAliasDeclaration(
             undefined,
-            factory.createIdentifier(`${name}Map`),
+            `${name}Map`,
             has_generics ? generic_params : undefined,
-            map_type_node
+            factory.createTypeLiteralNode(map_properties)
         )
 
         // Create NameKeys type (no generics needed - keys don't depend on type params)
         const keys_type = factory.createTypeAliasDeclaration(
             undefined,
-            factory.createIdentifier(`${name}Keys`),
+            `${name}Keys`,
             undefined,
             factory.createTypeOperatorNode(
                 ts.SyntaxKind.KeyOfKeyword,
@@ -292,55 +284,44 @@ function dispatcher_symbol(
             : member_type_refs
         const fallback_type = factory.createTypeAliasDeclaration(
             undefined,
-            factory.createIdentifier(`${name}Fallback`),
+            `${name}Fallback`,
             has_generics ? generic_params : undefined,
             factory.createParenthesizedType(factory.createUnionTypeNode(fallback_union_members))
-        )
-
-        // Create NameUnknown type (intersection of all members + fallback type if present)
-        const unknown_intersection_members = fallback_type_name
-            ? [...member_type_refs, fallback_type_name]
-            : member_type_refs
-        const unknown_type = factory.createTypeAliasDeclaration(
-            undefined,
-            factory.createIdentifier(`${name}Unknown`),
-            has_generics ? generic_params : undefined,
-            factory.createParenthesizedType(factory.createIntersectionTypeNode(unknown_intersection_members))
         )
 
         // Create the main Symbol type with CASE generic first, then dispatcher generics
         const case_type_param = factory.createTypeParameterDeclaration(
             undefined,
-            factory.createIdentifier('CASE'),
+            'CASE',
             factory.createUnionTypeNode([
-                factory.createLiteralTypeNode(factory.createStringLiteral('map', true)),
-                factory.createLiteralTypeNode(factory.createStringLiteral('keys', true)),
-                factory.createLiteralTypeNode(factory.createStringLiteral('%unknown', true)),
-                factory.createLiteralTypeNode(factory.createStringLiteral('%fallback', true)),
+                Bind.StringLiteral('map'),
+                Bind.StringLiteral('keys'),
+                Bind.StringLiteral('%fallback'),
+                Bind.StringLiteral('%none'),
             ]),
-            factory.createLiteralTypeNode(factory.createStringLiteral('map', true))
+            Bind.StringLiteral('map')
         )
 
         const symbol_type = factory.createTypeAliasDeclaration(
             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
-            factory.createIdentifier(`Symbol${name}`),
+            `Symbol${name}`,
             [case_type_param, ...generic_params],
             factory.createConditionalTypeNode(
                 factory.createTypeReferenceNode('CASE'),
-                factory.createLiteralTypeNode(factory.createStringLiteral('map', true)),
+                Bind.StringLiteral('map'),
                 factory.createTypeReferenceNode(`${name}Map`, has_generics ? generic_names : undefined),
                 factory.createConditionalTypeNode(
                     factory.createTypeReferenceNode('CASE'),
-                    factory.createLiteralTypeNode(factory.createStringLiteral('keys', true)),
+                    Bind.StringLiteral('keys'),
                     factory.createTypeReferenceNode(`${name}Keys`),
                     factory.createConditionalTypeNode(
                         factory.createTypeReferenceNode('CASE'),
-                        factory.createLiteralTypeNode(factory.createStringLiteral('%fallback', true)),
+                        Bind.StringLiteral('%fallback'),
                         factory.createTypeReferenceNode(`${name}Fallback`, has_generics ? generic_names : undefined),
                         factory.createConditionalTypeNode(
                             factory.createTypeReferenceNode('CASE'),
-                            factory.createLiteralTypeNode(factory.createStringLiteral('%unknown', true)),
-                            factory.createTypeReferenceNode(`${name}Unknown`, has_generics ? generic_names : undefined),
+                            Bind.StringLiteral('%none'),
+                            factory.createTypeReferenceNode(`${name}NoneType`, has_generics ? generic_names : undefined),
                             factory.createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
                         )
                     )
@@ -351,14 +332,12 @@ function dispatcher_symbol(
         return {
             type: symbol_type,
             members: [
-                ...member_types,
                 map_type,
                 keys_type,
                 fallback_type,
-                unknown_type,
+                ...member_types,
             ],
             ...(has_imports ? { imports } : {}),
-            properties,
         }
     }
 }

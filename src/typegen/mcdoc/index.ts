@@ -15,6 +15,7 @@ import {
 import {
     McdocDispatcher,
     McdocIndexed,
+    McdocTemplate,
 } from './complex'
 
 export type NonEmptyList<T> = T[] & { 0: T }
@@ -88,7 +89,7 @@ class TypeHandlersClass {
      * `minecraft:environment_attribute[[%key]][attribute_track]`
      *
      * Generates indexed access types like:
-     * `SymbolEnvironmentAttribute['map'][K]['attribute_track']`
+     * `SymbolEnvironmentAttribute[K]['attribute_track']`
      */
     static readonly indexed = McdocIndexed
     /**
@@ -139,10 +140,10 @@ class TypeHandlersClass {
     static readonly struct = McdocStruct as McdocStructType
     /**
      * A type alias with generic parameters.
-     * 
+     *
      * Is referenced with `concrete` types.
      */
-    static readonly template = McdocAny // TODO
+    static readonly template = McdocTemplate as McdocTemplateType
     /**
      * Used in a single place, CubicBezier. Lol.
      */
@@ -157,10 +158,10 @@ class TypeHandlersClass {
 export const TypeHandlers = TypeHandlersClass satisfies TypeHandlersMeta
 
 /**
- * Provides all possible TypeHandlerResult keys when exact kind is unknown.
+ * Used to broaden the `type` field in the `TypeHandlerResult` for top-level typegen handling.
  */
-export function getTypeHandler(kind: mcdoc.McdocType['kind']): TypeHandler {
-    return TypeHandlers[kind]
+export function get_type_handler(type: mcdoc.McdocType) {
+    return TypeHandlers[type.kind] as TypeHandler
 }
 
 // Explicit return types for handlers that are circular
@@ -204,6 +205,15 @@ type McdocUnionType = TypeHandler<{
 type McdocConcreteType = TypeHandler<{
     readonly child_dispatcher?: NonEmptyList<[parent_count: number, property: string]>
     readonly type: ts.TypeReferenceNode | ts.TypeNode
+    readonly imports?: {
+        readonly ordered: NonEmptyList<string>
+        readonly check: Map<string, number>
+    }
+}>
+
+type McdocTemplateType = TypeHandler<{
+    readonly child_dispatcher?: NonEmptyList<[parent_count: number, property: string]>
+    readonly type: ts.TypeNode
     readonly imports?: {
         readonly ordered: NonEmptyList<string>
         readonly check: Map<string, number>

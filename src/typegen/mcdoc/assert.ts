@@ -802,9 +802,16 @@ export class Assert {
             throw new Error(`Type is not a NumericType: ${type.kind}`)
         }
     }
-    static ConcreteType(type: mcdoc.McdocType): asserts type is mcdoc.ConcreteType {
+    static ConcreteType(type: mcdoc.McdocType): asserts type is (mcdoc.ConcreteType & { child: (ReferenceType | mcdoc.DispatcherType) }) {
         if (type.kind !== 'concrete') {
             throw new Error(`Type is not a ConcreteType: ${type.kind}`)
+        }
+        if (type.child.kind === 'reference') {
+            if (type.child.path === undefined) {
+                throw new Error(`ConcreteType child type of ReferenceType is missing a path: ${type}`)
+            }
+        } else if (type.child.kind !== 'dispatcher') {
+            throw new Error(`Concrete child type is invalid: ${type}`)
         }
     }
     static LiteralType(type: mcdoc.McdocType): asserts type is mcdoc.LiteralType {

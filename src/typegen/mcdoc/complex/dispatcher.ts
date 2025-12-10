@@ -18,6 +18,8 @@ export type DispatcherArgs = {
      * Example: `['attribute_track']` results in `SymbolName[K]['attribute_track']`
      */
     index_keys?: NonEmptyList<string>
+
+    generic_types?: ts.TypeNode[]
 }
 
 /**
@@ -49,6 +51,7 @@ const SimpleKeyIndex = JSON.stringify({
     }]
 })
 
+const SymbolMap = Bind.StringLiteral('map')
 const Fallback = Bind.StringLiteral('%fallback')
 
 /**
@@ -75,11 +78,10 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
     return (args: Record<string, unknown>) => {
         const dispatcher_args = parse_dispatcher_args(args)
 
+        const generics = dispatcher_args.generic_types === undefined ? [] : dispatcher_args.generic_types
+
         // Look up symbol name from registry
-        const symbol_name = dispatcher_registry_map.get(registry)
-        if (symbol_name === undefined) {
-            throw new Error(`[mcdoc_dispatcher] Unknown dispatcher registry: ${registry}`)
-        }
+        const symbol_name = dispatcher_registry_map.get(registry)!
 
         const symbol_import = `mcdoc.symbol::Symbol${symbol_name}`
 
@@ -91,7 +93,9 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
             child_dispatcher = [[0, indices[0].accessor[0]]]
             // Result: SymbolName[S]
             result_type = factory.createIndexedAccessTypeNode(
-                factory.createTypeReferenceNode(`Symbol${symbol_name}`),
+                factory.createTypeReferenceNode(`Symbol${symbol_name}`,
+                    [SymbolMap, ...generics]
+                ),
                 factory.createTypeReferenceNode('S')
             )
         } else if (indices.length === 1 && indices[0].kind === 'static') {
@@ -100,19 +104,19 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
                 // Result: SymbolName<'%fallback'>
                 result_type = factory.createTypeReferenceNode(
                     `Symbol${symbol_name}`,
-                    [Fallback]
+                    [Fallback, ...generics]
                 )
             } else {
                 // Result: SymbolName['static_member']
                 result_type = factory.createIndexedAccessTypeNode(
-                    factory.createTypeReferenceNode(`Symbol${symbol_name}`),
+                    factory.createTypeReferenceNode(`Symbol${symbol_name}`, dispatcher_args.generic_types),
                     Bind.StringLiteral(indices[0].value)
                 )
             }
         } else if (JSON.stringify(indices) === SimpleKeyIndex) {
             // Result: SymbolName[K]
             result_type = factory.createIndexedAccessTypeNode(
-                factory.createTypeReferenceNode(`Symbol${symbol_name}`),
+                factory.createTypeReferenceNode(`Symbol${symbol_name}`, dispatcher_args.generic_types),
                 factory.createTypeReferenceNode('K')
             )
             // Result: SymbolName[K]['static_index']
@@ -132,7 +136,7 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
             // Result: SymbolName<'%fallback'>
             result_type = factory.createTypeReferenceNode(
                 `Symbol${symbol_name}`,
-                [Fallback]
+                [Fallback, ...generics]
             )
         } else {
             throw new Error(`[mcdoc_dispatcher] Unsupported dispatcher: ${dispatcher}`)

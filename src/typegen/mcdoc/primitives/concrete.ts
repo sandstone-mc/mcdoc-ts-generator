@@ -10,53 +10,53 @@ const { factory } = ts
  * Handles `concrete` types which are type references with generic arguments.
  *
  * A concrete type has:
- * - `child`: The base type being referenced (always a `reference` type)
- * - `typeArgs`: The type arguments being passed to the template
+ * - `child`: The base type being referenced (always a `reference` or `dispatcher` type)
+ * - `typeArgs`: The generic arguments being passed to the template
  *
- * Example: `SomeTemplate<int, string>` would have child=reference to SomeTemplate,
- * typeArgs=[int, string]
+ * Example: `SomeTemplate<boolean, string>` would have child=reference to SomeTemplate, typeArgs=[boolean, string]
  */
 function mcdoc_concrete(type: mcdoc.McdocType) {
     Assert.ConcreteType(type)
 
-    const child = type.child
-    Assert.ReferenceType(child)
-
-    const type_args = type.typeArgs
-
     return (args: Record<string, unknown>) => {
         // Resolve each type argument
-        const resolved_args = [] as unknown as NonEmptyList<ts.TypeNode>
+        const generic_types = [] as unknown as NonEmptyList<ts.TypeNode>
         const imports = {
-            ordered: [child.path] as NonEmptyList<string>,
-            check: new Map<string, number>([[child.path, 0]]),
+            ordered: [] as unknown as NonEmptyList<string>,
+            check: new Map<string, number>(),
         } as const
 
         let child_dispatcher: NonEmptyList<[number, string]> | undefined
 
         // Process each type argument
-        for (const type_arg of type_args) {
-            const arg_result = TypeHandlers[type_arg.kind](type_arg)(args)
+        for (const generic of type.typeArgs) {
+            const generic_type = TypeHandlers[generic.kind](generic)(args)
 
-            if ('imports' in arg_result) {
-                merge_imports(imports, arg_result.imports)
+            if ('imports' in generic_type) {
+                merge_imports(imports, generic_type.imports)
             }
-            if ('child_dispatcher' in arg_result) {
+            if ('child_dispatcher' in generic_type) {
                 if (child_dispatcher === undefined) {
                     child_dispatcher = [] as unknown as typeof child_dispatcher
                 }
-                child_dispatcher!.push(...(arg_result.child_dispatcher as NonEmptyList<[number, string]>))
+                child_dispatcher!.push(...(generic_type.child_dispatcher as NonEmptyList<[number, string]>))
             }
-            resolved_args.push(arg_result.type)
+            generic_types.push(generic_type.type)
         }
 
-        const type_name = child.path.slice(child.path.lastIndexOf(':') + 1)
+        const child = TypeHandlers[type.child.kind](type.child)({ ...args, generic_types })
+
+        merge_imports(imports, child.imports!)
+
+        if ('child_dispatcher' in child) {
+            if (child_dispatcher === undefined) {
+                child_dispatcher = [] as unknown as typeof child_dispatcher
+            }
+            child_dispatcher!.push(...(child.child_dispatcher as NonEmptyList<[number, string]>))
+        }
 
         return {
-            type: factory.createTypeReferenceNode(
-                type_name,
-                resolved_args
-            ),
+            type: child.type,
             imports,
             ...(child_dispatcher !== undefined ? { child_dispatcher } : {}),
         } as const

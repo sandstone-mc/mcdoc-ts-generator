@@ -27,7 +27,7 @@ function mcdoc_enum(type: mcdoc.McdocType) {
 
     return (args: Record<string, unknown>) => {
         // The module path generator provides the name for enums
-        const [ named ] = args as [string]
+        const { name } = args as { name: string }
 
         const bind_value = enum_type.enumKind === 'string'
             ? (value: string | number) => Bind.StringLiteral(value as string)
@@ -43,7 +43,7 @@ function mcdoc_enum(type: mcdoc.McdocType) {
         return {
             type: factory.createEnumDeclaration(
                 undefined,
-                factory.createIdentifier(named),
+                factory.createIdentifier(name),
                 members,
             ),
         }
