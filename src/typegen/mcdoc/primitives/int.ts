@@ -145,14 +145,14 @@ export function whole_number_generic<TYPE extends string>(range: mcdoc.NumericRa
  * Lower value must actually be lower than the upper
  */
 export function integer_range_size(lower: number, upper: number) {
-	if (lower > upper) {
-		throw new Error()
-	}
-	if (upper < 0) {
-		return lower*-1 - upper*-1
-	}
-	if (lower < 0) {
-		return lower*-1 + upper
-	}
-	return upper - lower
+    if (lower > upper) {
+        throw new Error()
+    }
+    if (upper < 0) {
+        return lower*-1 - upper*-1
+    }
+    if (lower < 0) {
+        return lower*-1 + upper
+    }
+    return upper - lower
 }

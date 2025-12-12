@@ -1,7 +1,7 @@
 import * as mcdoc from '@spyglassmc/mcdoc'
 import type { NonEmptyList, TypeHandler } from '..'
 import { Assert } from '../assert'
-import { McdocDispatcher, type DispatcherArgs } from './dispatcher'
+import { McdocDispatcher } from './dispatcher'
 
 /**
  * Handles `indexed` types which access a specific property from a dispatcher type.
@@ -40,8 +40,7 @@ function mcdoc_indexed(type: mcdoc.McdocType) {
         // Extract static index values - these become the property access keys
         const index_keys = indices.map((index) => index.value) as NonEmptyList<string>
 
-        const dispatcher_args: DispatcherArgs = { index_keys }
-        return McdocDispatcher(type.child)({ ...dispatcher_args, ...args})
+        return McdocDispatcher(type.child)({ index_keys, ...args})
     }
 }
 

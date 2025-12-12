@@ -4,31 +4,18 @@ import * as mcdoc from '@spyglassmc/mcdoc'
 import { TypeHandlers, type NonEmptyList, type TypeHandler } from '..'
 import { Assert } from '../assert'
 import { add_import, merge_imports } from '../utils'
-import { NonEmptyString } from '../../static'
 import { pascal_case } from '../../../util'
+import { Bind } from '../bind'
 
 const { factory } = ts
 
 /**
- * Arguments that can are passed to the struct handler.
- */
-export type StructArgs = {
-    name: string,
-    spread?: true
-}
-
-/**
  * Validates and extracts struct args from the unknown TypeHandler args.
  */
-function parse_struct_args(args: Record<string, unknown>): StructArgs {
-    if (!('name' in args)) {
-        throw new Error(`[mcdoc_struct] struct name must be included in TypeHandler args, got ${args}`)
-    }
-
-    return {
-        name: args.name as string
-    }
-}
+function StructArgs(args: Record<string, unknown>): asserts args is {
+    name: string,
+    spread?: true
+} {}
 
 const FieldProperties = {
     optional: P.optional(P.boolean),
@@ -48,7 +35,13 @@ function mcdoc_struct(type: mcdoc.McdocType) {
     Assert.StructType(struct)
 
     return (args: Record<string, unknown>) => {
-        const { name, spread } = parse_struct_args(args)
+        StructArgs(args)
+
+        const { name } = args
+
+        const spread = args.spread ? true : false
+
+        delete args.spread
 
         let has_imports = false
         const imports = {
@@ -88,7 +81,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
 
             match(field)
                 .with({ kind: 'pair', key: P.string, ...FieldProperties }, (pair) => {
-                    const value = TypeHandlers[pair.type.kind](pair.type)({ name: `${name}${pascal_case(pair.key)}` })
+                    const value = TypeHandlers[pair.type.kind](pair.type)({ ...args, name: `${name}${pascal_case(pair.key)}` })
 
                     if ('imports' in value) {
                         has_imports = true
@@ -114,7 +107,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                 .with({ kind: 'pair' }, (pair) => {
                     Assert.StructKeyType(pair.key)
 
-                    const value = TypeHandlers[pair.type.kind](pair.type)({ name: `${name}IndexSignature` })
+                    const value = TypeHandlers[pair.type.kind](pair.type)({ ...args, name: `${name}IndexSignature` })
 
                     if ('imports' in value) {
                         has_imports = true
@@ -128,7 +121,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                     }
                     match(pair.key.kind)
                         .with('reference', 'concrete', (kind) => {
-                            const key = TypeHandlers[kind](pair.key)({})
+                            const key = TypeHandlers[kind](pair.key)(args)
 
                             if ('imports' in key) {
                                 has_imports = true
@@ -151,7 +144,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                                 Assert.StringType(pair.key)
                                 inherit.push(factory.createTypeReferenceNode('Record', [
                                     ((('lengthRange' in pair.key && 'min' in pair.key.lengthRange) ? pair.key.lengthRange.min : 0) >= 1 ? 
-                                        NonEmptyString
+                                        Bind.NonEmptyString
                                         : factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
                                     ),
                                     value.type
@@ -264,7 +257,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                 })
                 .with({ kind: 'spread' }, (_spread) => {
                     Assert.StructSpreadType(_spread.type)
-                    const spread = TypeHandlers[_spread.type.kind](_spread.type)({ spread: true })
+                    const spread = TypeHandlers[_spread.type.kind](_spread.type)({ spread: true, ...args })
 
                     if ('imports' in spread) {
                         has_imports = true
@@ -319,8 +312,10 @@ function mcdoc_struct(type: mcdoc.McdocType) {
 
         if (types.length === 1) {
             inner_type = types[0]
-        } else {
+        } else if (types.length > 1) {
             inner_type = factory.createParenthesizedType(factory.createIntersectionTypeNode(types))
+        } else {
+            inner_type = Bind.EmptyObject
         }
 
         if (indexed_access === undefined) {

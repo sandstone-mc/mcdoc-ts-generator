@@ -19,6 +19,38 @@ export class Bind {
         return factory.createLiteralTypeNode(factory.createStringLiteral(literal, true))
     }
 
+    // TODO: Implement this in LiteralUnion
+    /**
+     * Creates a template literal type that represents a non-empty string.
+     * ```ts
+     * type NonEmptyString = `${any}${string}` // <-- This type
+     * ```
+     */
+    static readonly NonEmptyString = factory.createTemplateLiteralType(
+        factory.createTemplateHead('', ''),
+        [
+            factory.createTemplateLiteralTypeSpan(
+                factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
+                factory.createTemplateMiddle('', '')
+            ),
+            factory.createTemplateLiteralTypeSpan(
+                factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                factory.createTemplateTail('', '')
+            )
+        ]
+    )
+
+    /**
+     * Creates a TypeScript type that represents an empty object.
+     * ```ts
+     * type EmptyObject = Record<string, never> // <-- This type
+     * ```
+     */
+    static readonly EmptyObject = factory.createTypeReferenceNode('Record', [
+        factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+        factory.createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
+    ])
+
     static BindImports(module_path: string, modules: string[]) {
         return factory.createImportDeclaration(
             undefined,

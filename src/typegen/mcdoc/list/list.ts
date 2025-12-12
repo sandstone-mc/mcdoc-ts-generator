@@ -52,7 +52,7 @@ function mcdoc_list(type: mcdoc.McdocType) {
             } as const
         } else {
             return {
-                type: factory.createTypeReferenceNode(NBTListType, [item.type]),
+                type: factory.createTypeReferenceNode('Array', [item.type]),
                 imports,
                 ...(child_dispatcher === undefined ? {} : { child_dispatcher }),
             } as const

@@ -20,6 +20,7 @@ function mcdoc_concrete(type: mcdoc.McdocType) {
 
     return (args: Record<string, unknown>) => {
         // Resolve each type argument
+        let has_imports = false
         const generic_types = [] as unknown as NonEmptyList<ts.TypeNode>
         const imports = {
             ordered: [] as unknown as NonEmptyList<string>,
@@ -33,6 +34,7 @@ function mcdoc_concrete(type: mcdoc.McdocType) {
             const generic_type = TypeHandlers[generic.kind](generic)(args)
 
             if ('imports' in generic_type) {
+                has_imports = true
                 merge_imports(imports, generic_type.imports)
             }
             if ('child_dispatcher' in generic_type) {
@@ -46,8 +48,10 @@ function mcdoc_concrete(type: mcdoc.McdocType) {
 
         const child = TypeHandlers[type.child.kind](type.child)({ ...args, generic_types })
 
-        merge_imports(imports, child.imports!)
-
+        if ('imports' in child) {
+            has_imports = true
+            merge_imports(imports, child.imports!)
+        }
         if ('child_dispatcher' in child) {
             if (child_dispatcher === undefined) {
                 child_dispatcher = [] as unknown as typeof child_dispatcher

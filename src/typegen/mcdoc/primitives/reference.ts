@@ -2,14 +2,15 @@ import ts from 'typescript'
 import * as mcdoc from '@spyglassmc/mcdoc'
 import type { NonEmptyList, TypeHandler } from '..'
 import { Assert } from '../assert'
-import type { DispatcherReferenceCounter } from '../../symbols/dispatcher'
+import type { DispatcherReferenceCounter } from '../dispatcher_symbol'
 
 const { factory } = ts
 
 function ReferenceArgs(args: Record<string, unknown>): asserts args is ({
+    dispatcher_symbol?: () => DispatcherReferenceCounter
     generic_types?: ts.TypeNode[]
     generics?: Set<string>
-    dispatcher_symbol?: () => DispatcherReferenceCounter
+    module_path?: string
 }) {}
 
 function mcdoc_reference(type: mcdoc.McdocType) {
@@ -21,9 +22,9 @@ function mcdoc_reference(type: mcdoc.McdocType) {
 
         const type_name_point = reference.path.lastIndexOf(':')
         const type_name = reference.path.slice(type_name_point + 1)
+        const base_path = reference.path.slice(0, type_name_point - 1)
 
         if ('dispatcher_symbol' in args) {
-            const base_path = reference.path.slice(0, type_name_point - 2)
             const dispatcher = args.dispatcher_symbol()
             const location_counts_index = dispatcher.locations.get(base_path)
 
@@ -35,15 +36,18 @@ function mcdoc_reference(type: mcdoc.McdocType) {
             }
         }
 
-        const imports = {
-            ordered: [reference.path] as NonEmptyList<string>,
-            check: new Map([[reference.path, 0]]) as Map<string, number>,
+        // Don't import modules that will end up in the same file
+        const imports = args.module_path === base_path ? undefined : {
+            imports: {
+                ordered: [reference.path] as NonEmptyList<string>,
+                check: new Map([[reference.path, 0]]) as Map<string, number>,
+            }
         } as const
 
         if ('generic_types' in args) {
             return {
                 type: factory.createTypeReferenceNode(type_name, args.generic_types),
-                imports,
+                ...(imports === undefined ? {} : imports)
             } as const
         }
         if ('generics' in args && args.generics.has(reference.path)) {
@@ -53,7 +57,7 @@ function mcdoc_reference(type: mcdoc.McdocType) {
         }
         return {
             type: factory.createTypeReferenceNode(type_name),
-            imports,
+            ...(imports === undefined ? {} : imports)
         } as const
     }
 }

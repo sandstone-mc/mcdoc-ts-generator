@@ -6,6 +6,8 @@ import { merge_imports } from '../utils'
 
 const { factory } = ts
 
+const Never = factory.createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
+
 function mcdoc_union(type: mcdoc.McdocType) {
     const union = type
     Assert.UnionType(union)
@@ -40,8 +42,12 @@ function mcdoc_union(type: mcdoc.McdocType) {
             members.push(value.type)
         }
 
+        if (members.length === 0) {
+            members.push(Never)
+        }
+
         return {
-            type: factory.createParenthesizedType(
+            type: members.length === 1 ? members[0] : factory.createParenthesizedType(
                 factory.createUnionTypeNode(members)
             ),
             ...(has_imports ? { imports } : {}),

@@ -2,15 +2,11 @@ import ts from 'typescript'
 import * as mcdoc from '@spyglassmc/mcdoc'
 import type { NonEmptyList, TypeHandler } from '..'
 import { Assert } from '../assert'
-import { dispatcher_registry_map, dispatcher_properties_map } from '../../symbols'
 import { Bind } from '../bind'
 
 const { factory } = ts
 
-/**
- * Arguments that can be passed to the dispatcher handler.
- */
-export type DispatcherArgs = {
+function DispatcherArgs(args: Record<string, unknown>): asserts args is {
     /**
      * Property keys to chain as indexed access types after the dispatcher access.
      * Used by the `indexed` type handler to access nested properties.
@@ -20,36 +16,16 @@ export type DispatcherArgs = {
     index_keys?: NonEmptyList<string>
 
     generic_types?: ts.TypeNode[]
-}
 
-/**
- * Validates and extracts dispatcher args from the unknown args.
- */
-function parse_dispatcher_args(args: Record<string, unknown>): DispatcherArgs {
-    const result: DispatcherArgs = {}
+    dispatcher_properties?: Map<string, { supports_none?: true }>
+} {}
 
-    if ('index_keys' in args) {
-        const index_keys = args.index_keys
-        if (!Array.isArray(index_keys)) {
-            throw new Error(`[mcdoc_dispatcher] index_keys must be an array`)
-        }
-        for (const key of index_keys) {
-            if (typeof key !== 'string') {
-                throw new Error(`[mcdoc_dispatcher] index_keys must contain only strings, got: ${typeof key}`)
-            }
-        }
-        result.index_keys = index_keys as NonEmptyList<string>
-    }
-
-    return result
-}
-
-const SimpleKeyIndex = JSON.stringify({
+const SimpleKeyIndex = JSON.stringify([{
     kind: 'dynamic',
     accessor: [{
         keyword: 'key'
     }]
-})
+}])
 
 const SymbolMap = Bind.StringLiteral('map')
 const Fallback = Bind.StringLiteral('%fallback')
@@ -65,9 +41,6 @@ const None = Bind.StringLiteral('%none')
  * The generated type references the dispatcher symbol map. When the index is static,
  * we can use the specific key type. When dynamic (e.g., `%key`), we use a type
  * parameter `K` to represent the key.
- *
- * Accepts optional `dispatcher_args` to chain additional property accesses:
- * - `index_keys`: Property names to access on the dispatcher result
  */
 function mcdoc_dispatcher(type: mcdoc.McdocType) {
     Assert.DispatcherType(type)
@@ -77,14 +50,14 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
     const indices = dispatcher.parallelIndices
 
     return (args: Record<string, unknown>) => {
-        const dispatcher_args = parse_dispatcher_args(args)
+        DispatcherArgs(args)
 
-        const generics = dispatcher_args.generic_types === undefined ? [] : dispatcher_args.generic_types
+        const generics = args.generic_types === undefined ? [] : args.generic_types
 
-        // Look up symbol name from registry
-        const symbol_name = dispatcher_registry_map.get(registry)!
+        // TODO
+        const symbol_name = 'ba'
 
-        const symbol_import = `mcdoc.symbol::Symbol${symbol_name}`
+        const symbol_import = `mcdoc.symbol::Symbolba`
 
         let result_type: ts.TypeNode
 
@@ -96,13 +69,12 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
             const indexed_type = factory.createIndexedAccessTypeNode(
                 factory.createTypeReferenceNode(
                     `Symbol${symbol_name}`,
-                    dispatcher_args.generic_types === undefined ? undefined : [SymbolMap, ...dispatcher_args.generic_types]
+                    args.generic_types === undefined ? undefined : [SymbolMap, ...args.generic_types]
                 ),
                 factory.createTypeReferenceNode('S')
             )
 
-            // TODO: Move the dispatcher_properties_map builder out of `dispatcher_symbol`, there is a race condition here
-            const properties = dispatcher_properties_map.get(symbol_name)
+            const properties = args.dispatcher_properties?.get(symbol_name)
             if (properties?.supports_none) {
                 // Result: S extends undefined ? SymbolName<'%none'> : SymbolName[S]
                 result_type = factory.createConditionalTypeNode(
@@ -131,7 +103,7 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
                 result_type = factory.createIndexedAccessTypeNode(
                     factory.createTypeReferenceNode(
                         `Symbol${symbol_name}`,
-                        dispatcher_args.generic_types === undefined ? undefined : [SymbolMap, ...dispatcher_args.generic_types]
+                        args.generic_types === undefined ? undefined : [SymbolMap, ...args.generic_types]
                     ),
                     Bind.StringLiteral(indices[0].value)
                 )
@@ -141,13 +113,13 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
             result_type = factory.createIndexedAccessTypeNode(
                 factory.createTypeReferenceNode(
                     `Symbol${symbol_name}`,
-                    dispatcher_args.generic_types === undefined ? undefined : [SymbolMap, ...dispatcher_args.generic_types]
+                    args.generic_types === undefined ? undefined : [SymbolMap, ...args.generic_types]
                 ),
                 factory.createTypeReferenceNode('K')
             )
             // Result: SymbolName[K]['static_index']
-            if (dispatcher_args.index_keys !== undefined) {
-                for (const key of dispatcher_args.index_keys) {
+            if (args.index_keys !== undefined) {
+                for (const key of args.index_keys) {
                     result_type = factory.createIndexedAccessTypeNode(
                         result_type,
                         Bind.StringLiteral(key)

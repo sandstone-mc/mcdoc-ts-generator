@@ -198,6 +198,8 @@ type ImplementedAttributes = {
         }
     },
     item_slots: undefined,
+    tag: undefined,
+    team: undefined,
     translation_key: undefined,
     translation_value: undefined,
     crafting_ingredient: (undefined | {
@@ -284,6 +286,7 @@ type ImplementedAttributes = {
         )
     },
     uuid: undefined,
+    url: undefined,
     random: undefined,
     divisible_by: {
         attributes: never,
@@ -310,6 +313,10 @@ type ImplementedAttributes = {
             }
         }
     },
+    /**
+     * This isn't correct, but ICBA
+     */
+    game_rule: undefined
     score_holder: undefined,
     vector: {
         attributes: never,
@@ -378,9 +385,13 @@ export class AssertKinds {
         'permutation',
         'texture_slot',
         'item_slots',
+        'tag',
+        'team',
         'translation_key',
         'translation_value',
         'crafting_ingredient',
+        'block_predicate',
+        'game_rule',
         'objective',
         'dispatcher_key',
         'regex_pattern',
@@ -392,6 +403,7 @@ export class AssertKinds {
         'nbt_path',
         'deprecated',
         'command',
+        'url',
         'uuid',
         'random',
         'divisible_by',
@@ -411,9 +423,9 @@ export class AssertKinds {
 
     static readonly ArrayKind = new Set(['byte_array', 'int_array', 'long_array'] as const)
 
-    static readonly StructKeyKind = new Set(['reference', 'concrete', 'string'] as const)
+    static readonly StructKeyKind = new Set(['reference', 'concrete', 'string', 'union'] as const)
 
-    static readonly StructSpreadKind = new Set(['reference', 'dispatcher', 'concrete', 'template'] as const)
+    static readonly StructSpreadKind = new Set(['reference', 'dispatcher', 'concrete', 'template', 'struct', 'union'] as const)
 
     static readonly NumericKind = new Set(['byte', 'double', 'float', 'int', 'long', 'short'])
 }
@@ -436,11 +448,11 @@ export class Assert {
                     const attribute_type = attribute.name as KindType<typeof AssertKinds.ImplementedAttributes>
 
                     match(attribute_type)
-                        .with('since', 'until', () => {
+                        .with('since', 'until', 'deprecated', () => {
                             if (attribute.value === undefined) {
                                 throw new Error()
                             }
-                            if (attribute.value.kind !== 'literal' || attribute.value.value.kind !== 'string' || !/\d+\.\d+\.\d+/.test(attribute.value.value.value)) {
+                            if (attribute.value.kind !== 'literal' || attribute.value.value.kind !== 'string' || !/^\d+\.\d+(?:\.\d+)?$/.test(attribute.value.value.value)) {
                                 throw new Error(`Versioned Attribute Type value is invalid ${attribute.value}`)
                             }
                         })
@@ -537,8 +549,8 @@ export class Assert {
                                         throw new Error()
                                     }
                                 } else if ('slash' in attribute.value.values) {
-                                    if (attribute.value.values.macro.kind === 'literal') {
-                                        if (!AssertKinds.CommandAttributeSlashKind.has(attribute.value.values.macro.value.value)) {
+                                    if (attribute.value.values.slash.kind === 'literal') {
+                                        if (!AssertKinds.CommandAttributeSlashKind.has(attribute.value.values.slash.value.value)) {
                                             throw new Error()
                                         }
                                     } else {
@@ -592,7 +604,7 @@ export class Assert {
                             if (attribute.value === undefined) {
                                 throw new Error()
                             }
-                            if (attribute.value.kind !== 'literal' || !/^[\w_]+:[\w_]+$/.test(`${attribute.value.value}`)) {
+                            if (attribute.value.kind !== 'literal' || !/^[\w_]+:[\w_]+$/.test(`${attribute.value.value.value}`)) {
                                 throw new Error()
                             }
                         })
@@ -641,16 +653,21 @@ export class Assert {
                                 throw new Error()
                             }
                         })
-                        .with('random', 'regex_pattern', 'time_pattern', 'canonical', 'deprecated', 'text_component', 'score_holder', 'objective', 'translation_key', 'translation_value', 'item_slots', 'entity', 'uuid', () => {
-                            if (attribute.value !== undefined) {
-                                throw new Error()
+                        .with('entity', (entity) => {
+                            // TODO
+                        })
+                        .with('random', 'regex_pattern', 'time_pattern', 'canonical', 'text_component', 'score_holder', 'objective', 'translation_key', 'translation_value', 'item_slots', 'uuid', 'url', 'team', 'game_rule', 'tag', 'block_predicate', (a) => {
+                            // these two are old attributes
+                            if (a !== 'translation_key' && a !== 'game_rule' && attribute.value !== undefined) {
+                                console.log(attribute)
+                                throw new Error('')
                             }
                         })
                         .with('texture_slot', () => {
                             if (attribute.value === undefined) {
                                 throw new Error()
                             }
-                            if (attribute.value.kind !== 'tree' || !('kind' in attribute.value.values) || attribute.value.values.kind.kind !== 'literal' || !AssertKinds.TextureSlotAttributeKind.has(attribute.value.values.kind.value)) {
+                            if (attribute.value.kind !== 'tree' || !('kind' in attribute.value.values) || attribute.value.values.kind.kind !== 'literal' || !AssertKinds.TextureSlotAttributeKind.has(attribute.value.values.kind.value.value)) {
                                 throw new Error()
                             }
                             if (Object.keys(attribute.value.values).length > 1) {
@@ -757,7 +774,7 @@ export class Assert {
             throw new Error(`Type is not a StructType: ${type.kind}`)
         }
     }
-    static StructKeyType(type: mcdoc.McdocType): asserts type is (ReferenceType | mcdoc.ConcreteType | mcdoc.StringType) {
+    static StructKeyType(type: mcdoc.McdocType): asserts type is (ReferenceType | mcdoc.ConcreteType | mcdoc.StringType | mcdoc.UnionType) {
         if (!AssertKinds.StructKeyKind.has(type.kind)) {
             throw new Error(`Struct field key must be a ReferenceType or StringType, got: ${type.kind}`)
         }
@@ -768,7 +785,7 @@ export class Assert {
             throw new Error(`Struct field key ReferenceType must have a path defined. ${type}`)
         }
     }
-    static StructSpreadType(type: mcdoc.McdocType): asserts type is (ReferenceType | mcdoc.DispatcherType | mcdoc.ConcreteType | mcdoc.TemplateType) {
+    static StructSpreadType(type: mcdoc.McdocType): asserts type is (ReferenceType | mcdoc.DispatcherType | mcdoc.ConcreteType | mcdoc.TemplateType | mcdoc.StructType | mcdoc.UnionType) {
         if (!AssertKinds.StructSpreadKind.has(type.kind)) {
             throw new Error(`Struct spread type must be a reference-alike, got: ${type.kind}`)
         }

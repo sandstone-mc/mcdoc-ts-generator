@@ -154,7 +154,7 @@ function mcdoc_string(type: mcdoc.McdocType) {
                 // TODO: Implement anonymous command in Sandstone
                 return (args: Record<string, unknown>) => ({ type: static_value.not_empty } as const)
             })
-            .with({ name: 'crafting_ingredient', value: P.optional(P.nullish) }, () => {
+            .with({ name: 'crafting_ingredient' }, () => {
                 // TODO: Implement CraftingShaped struct generic
                 return (args: Record<string, unknown>) => ({ type: static_value.not_empty } as const)
             })
@@ -255,6 +255,27 @@ function mcdoc_string(type: mcdoc.McdocType) {
                     }
                 } as const)
             })
+            .with({ name: 'tag' }, () => {
+                const Label = 'LabelClass'
+                return (args: Record<string, unknown>) => ({
+                    type: factory.createUnionTypeNode([
+                        static_value.not_empty,
+                        factory.createTypeReferenceNode(Label)
+                    ]),
+                    imports: {
+                        ordered: [`sandstone::${Label}`] as NonEmptyList<string>,
+                        check: new Map([[`sandstone::${Label}`, 0]])
+                    }
+                } as const)
+            })
+            .with({ name: 'team' }, () => {
+                // TODO: Implement team abstraction in Sandstone
+                return (args: Record<string, unknown>) => ({ type: static_value.not_empty })
+            })
+            .with({ name: 'text_component' }, () => {
+                // This has been phased out by mojang
+                return (args: Record<string, unknown>) => ({ type: static_value.not_empty })
+            })
             .with({ name: 'texture_slot' }, ({ value: { values: { kind: { value: { value } } } } }) => {
                 const Texture = 'TextureClass'
                 // TODO: Implement Model struct generic, this is `kind="value"` or `kind="reference"`
@@ -293,10 +314,13 @@ function mcdoc_string(type: mcdoc.McdocType) {
                 // TODO: Add translation value abstraction in Sandstone
                 return (args: Record<string, unknown>) => static_value.normal
             })
-            .with({ name: 'uuid' }, () => {
-                // mojang pls, literally just zombified piglin HurtBy
-                // gonna just implement this as a string because its so niche
-                return (args: Record<string, unknown>) => ({ type: static_value.not_empty } as const)
+            .with({ name: 'url' }, () => {
+                return (args: Record<string, unknown>) => ({
+                    type: factory.createUnionTypeNode([
+                        static_value.not_empty,
+                        factory.createTypeReferenceNode('URL')
+                    ]),
+                } as const)
             })
             .with({ name: 'vector' }, ({ value: { values } }) => {
                 const Coordinates = 'Coordinates'
@@ -308,7 +332,12 @@ function mcdoc_string(type: mcdoc.McdocType) {
                     }
                 } as const)
             })
+            .with({ name: P.union('game_rule', 'uuid', 'block_predicate') }, () => {
+                // old
+                return (args: Record<string, unknown>) => ({ type: static_value.not_empty } as const)
+            })
             .otherwise(() => {
+                console.log(attribute?.name)
                 throw new Error(`[mcdoc_string] Unsupported string attribute: ${attribute}`)
             })
     }
