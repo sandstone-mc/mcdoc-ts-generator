@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(npx -p typescript tsc --noEmit)",
-      "Bash(bun tsc:*)"
+      "Bash(bun tsc:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

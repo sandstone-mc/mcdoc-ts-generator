@@ -23,8 +23,6 @@ bun tsc --noEmit
 
 ## Architecture
 
-> **Note:** For current work, focus only on `src/typegen/mcdoc/` and `src/typegen/symbols/`. Other files should be ignored for now.
-
 ### Entry Point
 `src/index.ts` - Orchestrates the generation process:
 1. Fetches vanilla-mcdoc symbols from Spyglass API

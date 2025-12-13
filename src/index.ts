@@ -19,6 +19,7 @@ import { fetchWithCache } from './util/fetch'
 import { TypesGenerator } from './typegen'
 import { compile_types } from './typegen/compile'
 import { handle_imports } from './typegen/import'
+import { export_registry, export_dispatcher } from './typegen/export'
 
 const cache_root = join(dirname(fileURLToPath(import.meta.url)), 'cache')
 
@@ -235,6 +236,34 @@ for await (const [symbol_path, { exports, imports }] of resolved_symbols.entries
     const code = await compile_types([
         ...handle_imports(imports),
         ... exports
+    ])
+
+    await Bun.write(`${join(...file)}.ts`, code)
+}
+
+// Generate Registry type export
+const registryExport = export_registry(resolved_registries)
+{
+    const file = registryExport.symbol_path.split('::').slice(1)
+    file.unshift('types')
+
+    const code = await compile_types([
+        ...handle_imports(registryExport.imports),
+        ...registryExport.exports
+    ])
+
+    await Bun.write(`${join(...file)}.ts`, code)
+}
+
+// Generate Dispatcher type export
+const dispatcherExport = export_dispatcher(resolved_dispatchers)
+{
+    const file = dispatcherExport.symbol_path.split('::').slice(1)
+    file.unshift('types')
+
+    const code = await compile_types([
+        ...handle_imports(dispatcherExport.imports),
+        ...dispatcherExport.exports
     ])
 
     await Bun.write(`${join(...file)}.ts`, code)

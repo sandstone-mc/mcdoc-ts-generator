@@ -5,6 +5,7 @@ import { Assert } from '../assert'
 import type { DispatcherReferenceCounter } from '../dispatcher_symbol'
 import type { SymbolMap } from '@spyglassmc/core'
 import { enum_docs } from '../multi/enum'
+import { add } from '../../../util'
 
 const { factory } = ts
 
@@ -42,10 +43,8 @@ function mcdoc_reference(type: mcdoc.McdocType) {
 
         // Don't import modules that will end up in the same file
         const imports = args.module_path === base_path ? undefined : {
-            imports: {
-                ordered: [reference.path] as NonEmptyList<string>,
-                check: new Map([[reference.path, 0]]) as Map<string, number>,
-            }
+            ordered: [reference.path] as NonEmptyList<string>,
+            check: new Map([[reference.path, 0]]) as Map<string, number>,
         } as const
 
         let docs: NonEmptyList<(string | [string])> | undefined
@@ -123,20 +122,18 @@ function mcdoc_reference(type: mcdoc.McdocType) {
         if ('generic_types' in args) {
             return {
                 type: factory.createTypeReferenceNode(type_name, args.generic_types),
-                ...(imports === undefined ? {} : imports),
-                ...(docs === undefined ? {} : { docs })
+                ...add({imports, child_dispatcher, docs})
             } as const
         }
         if ('generics' in args && args.generics.has(reference.path)) {
             return {
                 type: factory.createTypeReferenceNode(type_name),
-                ...(docs === undefined ? {} : { docs })
+                ...add({docs})
             } as const
         }
         return {
             type: id_wrap(factory.createTypeReferenceNode(type_name)),
-            ...(imports === undefined ? {} : imports),
-            ...(docs === undefined ? {} : { docs })
+            ...add({imports, child_dispatcher, docs})
         } as const
     }
 }

@@ -1,8 +1,9 @@
 import ts from 'typescript'
 import * as mcdoc from '@spyglassmc/mcdoc'
-import { TypeHandlers, type NonEmptyList, type TypeHandler } from '..'
+import { TypeHandlers, type NonEmptyList, type TypeHandler, type TypeHandlerResult } from '..'
 import { Assert } from '../assert'
 import { merge_imports } from '../utils'
+import { add } from '../../../util'
 
 const { factory } = ts
 
@@ -20,12 +21,8 @@ function mcdoc_concrete(type: mcdoc.McdocType) {
 
     return (args: Record<string, unknown>) => {
         // Resolve each type argument
-        let has_imports = false
         const generic_types = [] as unknown as NonEmptyList<ts.TypeNode>
-        const imports = {
-            ordered: [] as unknown as NonEmptyList<string>,
-            check: new Map<string, number>(),
-        } as const
+        let imports = undefined as unknown as TypeHandlerResult['imports']
 
         let child_dispatcher: NonEmptyList<[number, string]> | undefined
 
@@ -34,7 +31,6 @@ function mcdoc_concrete(type: mcdoc.McdocType) {
             const generic_type = TypeHandlers[generic.kind](generic)(args)
 
             if ('imports' in generic_type) {
-                has_imports = true
                 merge_imports(imports, generic_type.imports)
             }
             if ('child_dispatcher' in generic_type) {
@@ -49,7 +45,6 @@ function mcdoc_concrete(type: mcdoc.McdocType) {
         const child = TypeHandlers[type.child.kind](type.child)({ ...args, generic_types })
 
         if ('imports' in child) {
-            has_imports = true
             merge_imports(imports, child.imports!)
         }
         if ('child_dispatcher' in child) {
@@ -61,8 +56,7 @@ function mcdoc_concrete(type: mcdoc.McdocType) {
 
         return {
             type: child.type,
-            imports,
-            ...(child_dispatcher !== undefined ? { child_dispatcher } : {}),
+            ...add({imports, child_dispatcher})
         } as const
     }
 }

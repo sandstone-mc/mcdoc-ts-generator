@@ -3,6 +3,7 @@ import { match, P } from 'ts-pattern'
 import * as mcdoc from '@spyglassmc/mcdoc'
 import type { NonEmptyList, TypeHandler } from '..'
 import { Assert } from '../assert'
+import { Bind } from '../bind'
 
 const { factory } = ts
 
@@ -144,19 +145,21 @@ function mcdoc_string(type: mcdoc.McdocType) {
                     if ('empty' in id_attr.values) {}
                     if ('prefix' in id_attr.values) {}
                 }
-                // TODO: this is using the old symbol naming/import system
-                const registry_name = registry_id.replace(/\//g, '_').toUpperCase() + 'S'
-                const import_path = `mcdoc.Symbol::${registry_name}`
+                // Import the central Registry type and index by registry ID
+                const registry_import = `mcdoc.registry::Registry`
 
                 const LiteralUnion = 'LiteralUnion'
 
                 return (args: Record<string, unknown>) => ({
                     type: factory.createTypeReferenceNode(LiteralUnion, [
-                        factory.createTypeReferenceNode(registry_name)
+                        factory.createIndexedAccessTypeNode(
+                            factory.createTypeReferenceNode('Registry'),
+                            Bind.StringLiteral(registry_id)
+                        )
                     ]),
                     imports: {
-                        ordered: [import_path, `sandstone::${LiteralUnion}`] as NonEmptyList<string>,
-                        check: new Map([[import_path, 0], [`sandstone::${LiteralUnion}`, 1]])
+                        ordered: [registry_import, `sandstone::${LiteralUnion}`] as NonEmptyList<string>,
+                        check: new Map([[registry_import, 0], [`sandstone::${LiteralUnion}`, 1]])
                     }
                 } as const)
             }).narrow()

@@ -1,10 +1,10 @@
 import ts from 'typescript'
 import { match, P } from 'ts-pattern'
 import * as mcdoc from '@spyglassmc/mcdoc'
-import { TypeHandlers, type NonEmptyList, type TypeHandler } from '..'
+import { TypeHandlers, type NonEmptyList, type TypeHandler, type TypeHandlerResult } from '..'
 import { Assert } from '../assert'
 import { add_import, merge_imports } from '../utils'
-import { pascal_case } from '../../../util'
+import { add, pascal_case } from '../../../util'
 import { Bind } from '../bind'
 
 const { factory } = ts
@@ -46,11 +46,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
         delete args.spread
         args.root_type = false
 
-        let has_imports = false
-        const imports = {
-            ordered: [] as unknown as NonEmptyList<string>,
-            check: new Map<string, number>(),
-        } as const
+        let imports = undefined as unknown as TypeHandlerResult['imports']
 
         const pair_indices: Record<string, number> = {}
         const pairs: ts.PropertySignature[] = []
@@ -87,7 +83,6 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                     const value = TypeHandlers[pair.type.kind](pair.type)({ ...args, name: `${name}${pascal_case(pair.key)}` })
 
                     if ('imports' in value) {
-                        has_imports = true
                         merge_imports(imports, value.imports)
                     }
                     if ('child_dispatcher' in value) {
@@ -128,7 +123,6 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                     const value = TypeHandlers[pair.type.kind](pair.type)({ ...args, name: `${name}IndexSignature` })
 
                     if ('imports' in value) {
-                        has_imports = true
                         merge_imports(imports, value.imports)
                     }
                     if ('child_dispatcher' in value) {
@@ -142,7 +136,6 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                             const key = TypeHandlers[kind](pair.key)(args)
 
                             if ('imports' in key) {
-                                has_imports = true
                                 merge_imports(imports, key.imports)
                             }
                             inherit.push(factory.createParenthesizedType(factory.createMappedTypeNode(
@@ -187,13 +180,11 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                                         } else {
                                             registry_id = id_attr.values.registry.value.value
                                         }
-                                        // TODO: this is using the old symbol naming/import system
-                                        const registry_name = registry_id.replace(/\//g, '_').toUpperCase() + 'S'
-                                        const import_path = `mcdoc.Symbol::${registry_name}`
+                                        // Import the central Registry type and index by registry ID
+                                        const registry_import = `mcdoc.registry::Registry`
 
-                                        has_imports = true
-                                        if (!imports.check.has(import_path)) {
-                                            add_import(imports, import_path)
+                                        if (imports === undefined || !imports.check.has(registry_import)) {
+                                            add_import(imports, registry_import)
                                         }
 
                                         // TODO: Handle #[id()] key arguments; path, exclude, and prefix="!"
@@ -202,7 +193,10 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                                             factory.createTypeParameterDeclaration(
                                                 undefined,
                                                 'K',
-                                                factory.createTypeReferenceNode(registry_name)
+                                                factory.createIndexedAccessTypeNode(
+                                                    factory.createTypeReferenceNode('Registry'),
+                                                    Bind.StringLiteral(registry_id)
+                                                )
                                             ),
                                             undefined,
                                             factory.createToken(ts.SyntaxKind.QuestionToken),
@@ -278,7 +272,6 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                     const spread = TypeHandlers[_spread.type.kind](_spread.type)({ spread: true, ...args })
 
                     if ('imports' in spread) {
-                        has_imports = true
                         merge_imports(imports, spread.imports)
                     }
                     if ('child_dispatcher' in spread) {
@@ -356,8 +349,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
         if (indexed_access === undefined) {
             return {
                 type: template(inner_type),
-                ...(has_imports ? { imports } : {}),
-                ...(child_dispatcher === undefined ? {} : { child_dispatcher }),
+                ...add({imports, child_dispatcher}),
             }
         } else {
             return {
@@ -376,8 +368,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                     ),
                     indexed_access_type!
                 ))),
-                ...(has_imports ? { imports } : {}),
-                ...(child_dispatcher === undefined ? {} : { child_dispatcher }),
+                ...add({imports, child_dispatcher}),
             }
         }
     }

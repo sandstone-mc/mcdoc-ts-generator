@@ -1,8 +1,9 @@
 import ts from 'typescript'
 import * as mcdoc from '@spyglassmc/mcdoc'
-import { TypeHandlers, type NonEmptyList, type TypeHandler } from '..'
+import { TypeHandlers, type NonEmptyList, type TypeHandler, type TypeHandlerResult } from '..'
 import { Assert } from '../assert'
 import { merge_imports } from '../utils'
+import { add } from '../../../util'
 
 const { factory } = ts
 
@@ -55,11 +56,9 @@ function mcdoc_template(type: mcdoc.McdocType) {
     return (args: Record<string, unknown>) => {
         const { name } = parse_template_args(args)
 
-        let has_imports = false
-        const imports = {
-            ordered: [] as unknown as NonEmptyList<string>,
-            check: new Map<string, number>(),
-        } as const
+        let imports = undefined as unknown as TypeHandlerResult['imports']
+
+        let child_dispatcher: NonEmptyList<[parent_count: number, property: string]> | undefined
 
         const generic_paths = new Set<string>()
         const generics: ts.TypeParameterDeclaration[] = []
@@ -80,8 +79,11 @@ function mcdoc_template(type: mcdoc.McdocType) {
         })
 
         if ('imports' in child_result) {
-            has_imports = true
             merge_imports(imports, child_result.imports)
+        }
+
+        if ('child_dispatcher' in child_result) {
+            child_dispatcher = child_result.child_dispatcher
         }
 
         // Create the type alias with type parameters
@@ -94,11 +96,7 @@ function mcdoc_template(type: mcdoc.McdocType) {
 
         return {
             type: type_alias as unknown as ts.TypeNode,
-            ...(has_imports ? { imports } : {}),
-            ...('child_dispatcher' in child_result && child_result.child_dispatcher !== undefined
-                ? { child_dispatcher: child_result.child_dispatcher }
-                : {}
-            ),
+            ...add({imports, child_dispatcher}),
         } as const
     }
 }

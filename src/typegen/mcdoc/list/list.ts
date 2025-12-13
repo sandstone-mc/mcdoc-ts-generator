@@ -5,6 +5,7 @@ import { Assert } from '../assert'
 import { Bind } from '../bind'
 import { integer_range_size } from '../primitives/int'
 import { add_import } from '../utils'
+import { add } from '../../../util'
 
 const { factory } = ts
 
@@ -49,13 +50,13 @@ function mcdoc_list(type: mcdoc.McdocType) {
                 ]),
                 imports,
                 docs,
-                ...(child_dispatcher === undefined ? {} : { child_dispatcher }),
+                ...add({child_dispatcher}),
             } as const
         } else {
             return {
                 type: factory.createTypeReferenceNode('Array', [item.type]),
                 imports,
-                ...(child_dispatcher === undefined ? {} : { child_dispatcher }),
+                ...add({child_dispatcher}),
             } as const
         }
     }

@@ -3,6 +3,7 @@ import * as mcdoc from '@spyglassmc/mcdoc'
 import type { NonEmptyList, TypeHandler } from '..'
 import { Assert } from '../assert'
 import { Bind } from '../bind'
+import { add } from '../../../util'
 
 const { factory } = ts
 
@@ -11,7 +12,7 @@ function DispatcherArgs(args: Record<string, unknown>): asserts args is {
      * Property keys to chain as indexed access types after the dispatcher access.
      * Used by the `indexed` type handler to access nested properties.
      *
-     * Example: `['attribute_track']` results in `SymbolName[K]['attribute_track']`
+     * Example: `['attribute_track']` results in `Dispatcher['registry'][K]['attribute_track']`
      */
     index_keys?: NonEmptyList<string>
 
@@ -27,7 +28,6 @@ const SimpleKeyIndex = JSON.stringify([{
     }]
 }])
 
-const SymbolMap = Bind.StringLiteral('map')
 const Fallback = Bind.StringLiteral('%fallback')
 const None = Bind.StringLiteral('%none')
 
@@ -35,12 +35,13 @@ const None = Bind.StringLiteral('%none')
  * Handles `dispatcher` types which reference a dispatcher symbol map.
  *
  * A dispatcher type has:
- * - `registry`: The dispatcher identifier (e.g., `minecraft:block`)
+ * - `registry`: The dispatcher identifier (e.g., `minecraft:entity_effect`)
  * - `parallelIndices`: How to look up into the dispatcher (static or dynamic)
  *
- * The generated type references the dispatcher symbol map. When the index is static,
- * we can use the specific key type. When dynamic (e.g., `%key`), we use a type
- * parameter `K` to represent the key.
+ * The generated type references the central Dispatcher type with indexed access:
+ * - Static index: `Dispatcher['minecraft:entity_effect']['specific_key']`
+ * - Dynamic index: `Dispatcher['minecraft:entity_effect'][K]`
+ * - Fallback: `Dispatcher['minecraft:entity_effect']['%fallback']`
  */
 function mcdoc_dispatcher(type: mcdoc.McdocType) {
     Assert.DispatcherType(type)
@@ -52,72 +53,66 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
     return (args: Record<string, unknown>) => {
         DispatcherArgs(args)
 
-        const generics = args.generic_types === undefined ? [] : args.generic_types
-
-        // TODO
-        const symbol_name = 'ba'
-
-        const symbol_import = `mcdoc.symbol::Symbolba`
+        // Import the central Dispatcher type
+        const dispatcher_import = `mcdoc.dispatcher::Dispatcher`
 
         let result_type: ts.TypeNode
 
         let child_dispatcher: NonEmptyList<[parent_count: number, property: string]> | undefined
 
+        // Base type: Dispatcher['minecraft:entity_effect'] (indexed access into Dispatcher)
+        const base_dispatcher_type = factory.createIndexedAccessTypeNode(
+            factory.createTypeReferenceNode('Dispatcher'),
+            Bind.StringLiteral(registry)
+        )
+
         if (indices.length === 1 && indices[0].kind === 'dynamic' && typeof indices[0].accessor.at(-1) === 'string') {
             child_dispatcher = [[indices[0].accessor.length - 1, indices[0].accessor.at(-1) as string]]
 
+            // Result: Dispatcher['registry'][S]
             const indexed_type = factory.createIndexedAccessTypeNode(
-                factory.createTypeReferenceNode(
-                    `Symbol${symbol_name}`,
-                    args.generic_types === undefined ? undefined : generics
-                ),
+                base_dispatcher_type,
                 factory.createTypeReferenceNode('S')
             )
 
-            const properties = args.dispatcher_properties?.get(symbol_name)
+            const properties = args.dispatcher_properties?.get(registry)
             if (properties?.supports_none) {
-                // Result: S extends undefined ? SymbolName<'%none'> : SymbolName[S]
+                // Result: S extends undefined ? Dispatcher['registry']['%none'] : Dispatcher['registry'][S]
                 result_type = factory.createConditionalTypeNode(
                     factory.createTypeReferenceNode('S'),
                     factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword),
-                    factory.createTypeReferenceNode(
-                        `Symbol${symbol_name}`,
-                        [...generics, None]
+                    factory.createIndexedAccessTypeNode(
+                        base_dispatcher_type,
+                        None
                     ),
                     indexed_type
                 )
             } else {
-                // Result: SymbolName[S]
+                // Result: Dispatcher['registry'][S]
                 result_type = indexed_type
             }
         } else if (indices.length === 1 && indices[0].kind === 'static') {
             if (indices[0].value === '%fallback') {
                 // Intentional fallback
-                // Result: SymbolName<'%fallback'>
-                result_type = factory.createTypeReferenceNode(
-                    `Symbol${symbol_name}`,
-                    [...generics, Fallback]
+                // Result: Dispatcher['registry']['%fallback']
+                result_type = factory.createIndexedAccessTypeNode(
+                    base_dispatcher_type,
+                    Fallback
                 )
             } else {
-                // Result: SymbolName['static_member']
+                // Result: Dispatcher['registry']['static_member']
                 result_type = factory.createIndexedAccessTypeNode(
-                    factory.createTypeReferenceNode(
-                        `Symbol${symbol_name}`,
-                        args.generic_types
-                    ),
+                    base_dispatcher_type,
                     Bind.StringLiteral(indices[0].value)
                 )
             }
         } else if (JSON.stringify(indices) === SimpleKeyIndex) {
-            // Result: SymbolName[K]
+            // Result: Dispatcher['registry'][K]
             result_type = factory.createIndexedAccessTypeNode(
-                factory.createTypeReferenceNode(
-                    `Symbol${symbol_name}`,
-                    args.generic_types
-                ),
+                base_dispatcher_type,
                 factory.createTypeReferenceNode('K')
             )
-            // Result: SymbolName[K]['static_index']
+            // Result: Dispatcher['registry'][K]['static_index']
             if (args.index_keys !== undefined) {
                 for (const key of args.index_keys) {
                     result_type = factory.createIndexedAccessTypeNode(
@@ -133,10 +128,10 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
         return {
             type: result_type,
             imports: {
-                ordered: [symbol_import] as NonEmptyList<string>,
-                check: new Map([[symbol_import, 0]]),
+                ordered: [dispatcher_import] as NonEmptyList<string>,
+                check: new Map([[dispatcher_import, 0]]),
             },
-            ...(child_dispatcher === undefined ? {} : { child_dispatcher })
+            ...add({child_dispatcher})
         } as const
     }
 }

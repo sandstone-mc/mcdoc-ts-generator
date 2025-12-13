@@ -1,5 +1,3 @@
-import ts from 'typescript'
-
 export function errorMessage(e: unknown): string {
     if (e instanceof Error) return e.message
     return `${e}`
@@ -9,7 +7,7 @@ export function errorMessage(e: unknown): string {
 export const join = (...paths: string[]) => paths.join('/')
 
 export function pascal_case(name: string) {
-    const words = name.split('_')
+    const words = name.split(/\/|_/)
     return words
         .map((word) => word[0].toUpperCase() + word.slice(1))
         .join('')
@@ -30,19 +28,55 @@ export function pluralize(name: string) {
     return name + 's'
 }
 
+// --- 1. Utilities to convert Union to Tuple (Standard TS Magic) ---
+type UnionToIntersection<U> = 
+  (U extends any ? (k: U) => void : never) extends ((k: infer I) => void) ? I : never;
+
+type LastOf<T> = 
+  UnionToIntersection<T extends any ? () => T : never> extends () => (infer R) ? R : never;
+
+type Push<T extends any[], V> = [...T, V];
+
+// Recursively moves items from Union T to a Tuple
+type UnionToTuple<T, L = LastOf<T>, N = [T] extends [never] ? true : false> = 
+  true extends N ? [] : Push<UnionToTuple<Exclude<T, L>>, L>;
+
+
+// --- 2. The PowerSet Logic (Linear Recursion) ---
+// We iterate over the tuple of keys. For every key, we double the result:
+// (Current Results) | (Current Results + New Key)
+type PowerSet<T, Keys extends any[] = UnionToTuple<keyof T>> = 
+    Keys extends [infer Head, ...infer Rest]
+    ? PowerSet<T, Rest> | (
+        Head extends keyof T 
+        ? { [K in Head]: NonNullable<T[K]> } & PowerSet<T, Rest> 
+        : never
+      )
+    : Record<string, never>; // Base case: Empty object
+
+// --- 3. Prettify Helper ---
+// Merges intersections ({a:1} & {b:2}) into clean objects ({a:1, b:2})
+// and distributes over the union to make tooltips readable.
+type Prettify<T> = {
+  [K in keyof T]: T[K]
+} & {};
+
 /**
- * Helper to add a key-value pair to an object if the value is not undefined.
- * 
- * Unfortunately TypeScript doesn't properly support empty object types, even with this attempted workaround, we still get `{ (key): (value) | undefined }` instead of `{ (key): (value) } | Record<string, never>`.
+ * Helper to add key-value pairs to an object if the values are not undefined.
  *
- * @returns An object with the key-value pair if the value is not undefined, otherwise an empty object.
+ * @returns An object with the key-value pairs if the values are not undefined, otherwise an empty object.
  */
-export function add<K extends string, V extends NonNullable<any>>(key: K, value: V): {[P in K]: V}
-export function add<K extends string, V extends undefined>(key: K, value: V): Record<string, never>
-export function add(key: string, value: any) {
-    if (value === undefined) {
-        return {}
-    } else {
-        return { [key]: value }
+export function add<O extends Record<string, any>>(obj: O): Prettify<PowerSet<O>> {
+    const filtered = {}
+
+    for (const key of Object.keys(obj)) {
+        const value = obj[key]
+        if (value !== undefined) {
+            // @ts-ignore
+            filtered[key] = value
+        }
     }
+
+    // @ts-ignore
+    return filtered
 }

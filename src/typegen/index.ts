@@ -1,7 +1,7 @@
 import { AllCategories, type SymbolMap, type SymbolUtil } from '@spyglassmc/core'
 import * as mcdoc from '@spyglassmc/mcdoc'
 import ts from 'typescript'
-import { pascal_case, pluralize } from '../util'
+import { add, pascal_case, pluralize } from '../util'
 import { get_type_handler, type TypeHandlerResult } from './mcdoc'
 import { add_import, merge_imports, Set, type NonEmptyList } from './mcdoc/utils'
 import { Bind } from './mcdoc/bind'
@@ -26,7 +26,7 @@ type ResolvedRegistry = {
 
 type ResolvedDispatcher = {
     symbol_path: string,
-    type: ts.TypeReference
+    type: ts.TypeReferenceNode
 }
 
 export class TypesGenerator {
@@ -187,7 +187,7 @@ export class TypesGenerator {
                 continue
             }
             const [ namespace, _name ] = id.split(':')
-            const name = pascal_case(_name)
+            const name = pascal_case(`${namespace === 'mcdoc' ? 'mcdoc_' : ''}${_name}`)
 
             // Once/if the dispatcher symbol map gets declaration paths we can switch to that instead of `references`
             const { types, imports, references } = DispatcherSymbol(id, name, members, this.dispatcher_properties, module_map)
@@ -209,6 +209,13 @@ export class TypesGenerator {
                 return `java::_dispatcher::${_name}`
             })()
 
+            // Store dispatcher reference for the Dispatcher export type
+            const dispatcher_type_name = `Symbol${name}`
+            this.resolved_dispatchers.set(id, {
+                symbol_path,
+                type: factory.createTypeReferenceNode(dispatcher_type_name)
+            })
+
             if (in_module && this.resolved_symbols.has(symbol_path)) {
                 const mod = this.resolved_symbols.get(symbol_path)!
 
@@ -222,7 +229,7 @@ export class TypesGenerator {
                             check: new Map<string, number>(),
                         } as const
                     }
-                    // Once/if the dispatcher symbol map gets declaration paths we can use `merge_imports` 
+                    // Once/if the dispatcher symbol map gets declaration paths we can use `merge_imports`
                     for (const path of imports.ordered) {
                         if (!mod.paths.has(path) && !mod.imports!.check.has(path)) {
                             add_import(mod.imports!, path)
@@ -233,7 +240,7 @@ export class TypesGenerator {
                 this.resolved_symbols.set(symbol_path, {
                     exports: types,
                     paths: new Set(),
-                    ...(imports === undefined ? {} : { imports })
+                    ...add({imports})
                 })
             }
         }

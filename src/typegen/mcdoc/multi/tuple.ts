@@ -1,8 +1,9 @@
 import ts from 'typescript'
 import * as mcdoc from '@spyglassmc/mcdoc'
-import { TypeHandlers, type NonEmptyList, type TypeHandler } from '..'
+import { TypeHandlers, type NonEmptyList, type TypeHandler, type TypeHandlerResult } from '..'
 import { Assert } from '../assert'
 import { merge_imports } from '../utils'
+import { add } from '../../../util'
 
 const { factory } = ts
 
@@ -12,11 +13,7 @@ function mcdoc_tuple(type: mcdoc.McdocType) {
 
     return (args: Record<string, unknown>) => {
         args.root_type = false
-        let has_imports = false
-        const imports = {
-            ordered: [] as unknown as NonEmptyList<string>,
-            check: new Map<string, number>(),
-        } as const
+        let imports = undefined as unknown as TypeHandlerResult['imports']
 
         const members: ts.TypeNode[] = []
 
@@ -34,7 +31,6 @@ function mcdoc_tuple(type: mcdoc.McdocType) {
             const value = TypeHandlers[item.kind](item)(args)
 
             if ('imports' in value) {
-                has_imports = true
                 merge_imports(imports, value.imports)
             }
             if ('child_dispatcher' in value) {
@@ -67,14 +63,12 @@ function mcdoc_tuple(type: mcdoc.McdocType) {
                         ...(i !== (member_docs.length - 1) ? [ '', '*or*', '' ] : [])
                     ]
                 }
-            }) : []
-        ) as unknown as NonEmptyList<string | [string]>
+            }) : undefined
+        ) as unknown as undefined | NonEmptyList<string | [string]>
 
         return {
             type: factory.createTupleTypeNode(members),
-            ...(has_imports ? { imports } : {}),
-            ...(child_dispatcher !== undefined ? { child_dispatcher } : {}),
-            ...(has_docs ? { docs } : {}),
+            ...add({imports, child_dispatcher, docs}),
         } as const
     }
 }

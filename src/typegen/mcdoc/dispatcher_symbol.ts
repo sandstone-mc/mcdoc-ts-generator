@@ -1,10 +1,10 @@
 import ts from 'typescript'
 import type { SymbolMap } from '@spyglassmc/core'
 import * as mcdoc from '@spyglassmc/mcdoc'
-import { get_type_handler, type NonEmptyList } from '.'
+import { get_type_handler, type NonEmptyList, type TypeHandlerResult } from '.'
 import { merge_imports } from './utils'
 import { Bind } from './bind'
-import { pascal_case } from '../../util'
+import { add, pascal_case } from '../../util'
 
 const { factory } = ts
 
@@ -65,11 +65,7 @@ export function dispatcher_symbol(
     dispatcher_properties: Map<string, { supports_none?: true }>,
     module_map: SymbolMap,
 ): DispatcherSymbolResult {
-    let has_imports = false
-    const imports = {
-        ordered: [] as unknown as NonEmptyList<string>,
-        check: new Map<string, number>(),
-    } as const
+    let imports = undefined as unknown as TypeHandlerResult['imports']
     let has_references = false
 
     const member_types: ts.TypeAliasDeclaration[] = []
@@ -127,15 +123,7 @@ export function dispatcher_symbol(
 
         // Collect imports from fallback type
         if ('imports' in result) {
-            if (!has_imports) {
-                has_imports = true
-                imports.ordered.push(...result.imports.ordered)
-                for (const [key, value] of result.imports.check) {
-                    imports.check.set(key, value)
-                }
-            } else {
-                merge_imports(imports, result.imports)
-            }
+            merge_imports(imports, result.imports)
         }
 
         fallback_type_name = factory.createTypeReferenceNode(
@@ -172,15 +160,7 @@ export function dispatcher_symbol(
 
         // Collect imports from none type
         if ('imports' in result) {
-            if (!has_imports) {
-                has_imports = true
-                imports.ordered.push(...result.imports.ordered)
-                for (const [key, value] of result.imports.check) {
-                    imports.check.set(key, value)
-                }
-            } else {
-                merge_imports(imports, result.imports)
-            }
+            merge_imports(imports, result.imports)
         }
 
         dispatcher_properties.set(id, {
@@ -221,15 +201,7 @@ export function dispatcher_symbol(
 
         // Collect imports
         if ('imports' in result) {
-            if (!has_imports) {
-                has_imports = true
-                imports.ordered.push(...result.imports.ordered)
-                for (const [key, value] of result.imports.check) {
-                    imports.check.set(key, value)
-                }
-            } else {
-                merge_imports(imports, result.imports)
-            }
+            merge_imports(imports, result.imports)
         }
 
         // Once/if the dispatcher symbol map gets declaration paths we can add these directly to the modules they belong in
@@ -346,7 +318,7 @@ export function dispatcher_symbol(
             ...member_types,
             symbol_type,
         ],
-        ...(has_imports ? { imports } : {}),
+        ...add({imports}),
         ...(has_references ? { references: dispatcher_references.get(id)! } : {} ),
     }
 }

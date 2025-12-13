@@ -2,7 +2,13 @@ import type { TypeHandlerResult } from '.'
 
 export type NonEmptyList<T> = T[] & { 0: T }
 
-export function add_import(imports: NonNullable<TypeHandlerResult['imports']>, add_import: string) {
+export function add_import(imports: TypeHandlerResult['imports'], add_import: string) {
+    if (imports === undefined) {
+        imports = {
+            ordered: [] as unknown as NonEmptyList<string>,
+            check: new Map<string, number>()
+        } as const
+    }
     if (imports.ordered.length === 1) {
         // If there's only one import, skip the binary search.
         const existingImport = imports.ordered[0]
@@ -39,9 +45,15 @@ export function add_import(imports: NonNullable<TypeHandlerResult['imports']>, a
 }
 
 export function merge_imports(
-    imports: NonNullable<TypeHandlerResult['imports']>,
+    imports: TypeHandlerResult['imports'],
     new_imports: NonNullable<TypeHandlerResult['imports']>,
 ) {
+    if (imports === undefined) {
+        imports = {
+            ordered: [] as unknown as NonEmptyList<string>,
+            check: new Map<string, number>()
+        } as const
+    }
     for (const import_path of new_imports.ordered) {
         if (!imports.check.has(import_path)) {
             add_import(imports, import_path)
