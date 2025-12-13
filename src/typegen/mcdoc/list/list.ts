@@ -1,10 +1,10 @@
 import ts from 'typescript'
 import * as mcdoc from '@spyglassmc/mcdoc'
-import { TypeHandlers, type NonEmptyList, type TypeHandler } from '..'
+import { TypeHandlers, type NonEmptyList, type TypeHandler, type TypeHandlerResult } from '..'
 import { Assert } from '../assert'
 import { Bind } from '../bind'
 import { integer_range_size } from '../primitives/int'
-import { add_import } from '../utils'
+import { add_import, merge_imports } from '../utils'
 import { add } from '../../../util'
 
 const { factory } = ts
@@ -21,15 +21,7 @@ function mcdoc_list(type: mcdoc.McdocType) {
         args.root_type = false
         const item = TypeHandlers[list.item.kind](list.item)(args)
 
-        const imports = 'imports' in item ? {
-            ordered: item.imports.ordered,
-            check: item.imports.check,
-        } : {
-            ordered: [NBTListImport] as NonEmptyList<string>,
-            check: new Map<string, number>([[NBTListImport, 0]]),
-        } as const
-
-        add_import(imports, NBTListImport)
+        let imports: TypeHandlerResult['imports'] = 'imports' in item ? item.imports : undefined
 
         const child_dispatcher = 'child_dispatcher' in item ? ((item.child_dispatcher as NonEmptyList<[number, string]>).map(([parent_count, property]) => {
             if (parent_count === 0) {
@@ -41,20 +33,20 @@ function mcdoc_list(type: mcdoc.McdocType) {
         if (list.lengthRange) {
             const { generic, docs } = length_range_generic(list.lengthRange, 'List')
 
+            imports = add_import(imports, NBTListImport)
+
             return {
                 type: factory.createTypeReferenceNode(NBTListType, [
                     item.type,
                     factory.createTypeLiteralNode(generic),
                 ]),
-                imports,
                 docs,
-                ...add({child_dispatcher}),
+                ...add({imports, child_dispatcher}),
             } as const
         } else {
             return {
                 type: factory.createTypeReferenceNode('Array', [item.type]),
-                imports,
-                ...add({child_dispatcher}),
+                ...add({imports, child_dispatcher}),
             } as const
         }
     }

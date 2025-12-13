@@ -54,7 +54,7 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
         DispatcherArgs(args)
 
         // Import the central Dispatcher type
-        const dispatcher_import = `mcdoc.dispatcher::Dispatcher`
+        const dispatcher_import = `::java::dispatcher::Dispatcher`
 
         let result_type: ts.TypeNode
 

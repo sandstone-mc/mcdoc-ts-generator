@@ -31,7 +31,7 @@ function mcdoc_concrete(type: mcdoc.McdocType) {
             const generic_type = TypeHandlers[generic.kind](generic)(args)
 
             if ('imports' in generic_type) {
-                merge_imports(imports, generic_type.imports)
+                imports = merge_imports(imports, generic_type.imports)
             }
             if ('child_dispatcher' in generic_type) {
                 if (child_dispatcher === undefined) {
@@ -45,7 +45,7 @@ function mcdoc_concrete(type: mcdoc.McdocType) {
         const child = TypeHandlers[type.child.kind](type.child)({ ...args, generic_types })
 
         if ('imports' in child) {
-            merge_imports(imports, child.imports!)
+            imports = merge_imports(imports, child.imports!)
         }
         if ('child_dispatcher' in child) {
             if (child_dispatcher === undefined) {

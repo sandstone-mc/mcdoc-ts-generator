@@ -32,7 +32,7 @@ function mcdoc_union(type: mcdoc.McdocType) {
             const value = TypeHandlers[member.kind](member)(args)
 
             if ('imports' in value) {
-                merge_imports(imports, value.imports)
+                imports = merge_imports(imports, value.imports)
             }
             if ('child_dispatcher' in value) {
                 if (child_dispatcher === undefined) {

@@ -83,7 +83,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                     const value = TypeHandlers[pair.type.kind](pair.type)({ ...args, name: `${name}${pascal_case(pair.key)}` })
 
                     if ('imports' in value) {
-                        merge_imports(imports, value.imports)
+                        imports = merge_imports(imports, value.imports)
                     }
                     if ('child_dispatcher' in value) {
                         if (child_dispatcher === undefined) {
@@ -125,7 +125,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                     const value = TypeHandlers[pair.type.kind](pair.type)({ ...args, name: `${name}IndexSignature` })
 
                     if ('imports' in value) {
-                        merge_imports(imports, value.imports)
+                        imports = merge_imports(imports, value.imports)
                     }
                     if ('child_dispatcher' in value) {
                         if (child_dispatcher === undefined) {
@@ -138,7 +138,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                             const key = TypeHandlers[kind](pair.key)(args)
 
                             if ('imports' in key) {
-                                merge_imports(imports, key.imports)
+                                imports = merge_imports(imports, key.imports)
                             }
                             inherit.push(factory.createParenthesizedType(factory.createMappedTypeNode(
                                 undefined,
@@ -185,7 +185,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                                         // Import the central Registry type and index by registry ID
                                         const registry_import = `java::_registry::Registry`
 
-                                        add_import(imports, registry_import)
+                                        imports = add_import(imports, registry_import)
 
                                         // TODO: Handle #[id()] key arguments; path, exclude, and prefix="!"
                                         inherit.push(factory.createParenthesizedType(factory.createMappedTypeNode(
@@ -207,8 +207,8 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                                     .with({ name: 'item_slots' }, () => {
                                         const ITEM_SLOTS = 'ITEM_SLOTS'
                                         const LiteralUnion = 'LiteralUnion'
-                                        add_import(imports, `sandstone::arguments::${ITEM_SLOTS}`)
-                                        add_import(imports, `sandstone::${LiteralUnion}`)
+                                        imports = add_import(imports, `sandstone::arguments::${ITEM_SLOTS}`)
+                                        imports = add_import(imports, `sandstone::${LiteralUnion}`)
 
                                         inherit.push(factory.createTypeReferenceNode('Record', [
                                             factory.createTypeReferenceNode(LiteralUnion, [
@@ -219,7 +219,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                                     })
                                     .with({ name: 'objective' }, () => {
                                         const Objective = 'ObjectiveClass'
-                                        add_import(imports, `sandstone::${Objective}`)
+                                        imports = add_import(imports, `sandstone::${Objective}`)
 
                                         inherit.push(factory.createTypeReferenceNode('Record', [
                                             factory.createUnionTypeNode([
@@ -246,7 +246,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                                     .with({ name: 'crafting_ingredient' }, () => {
                                         // TODO: Implement CraftingShaped struct generic, this is `definition=true`
                                         const CRAFTING_INGREDIENT = 'CRAFTING_INGREDIENT'
-                                        add_import(imports, `sandstone::arguments::${CRAFTING_INGREDIENT}`) // 'A' | 'B' | 'C' ...
+                                        imports = add_import(imports, `sandstone::arguments::${CRAFTING_INGREDIENT}`) // 'A' | 'B' | 'C' ...
 
                                         inherit.push(factory.createTypeReferenceNode('Record', [
                                                 factory.createTypeReferenceNode(CRAFTING_INGREDIENT),
@@ -272,7 +272,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                     const spread = TypeHandlers[_spread.type.kind](_spread.type)({ spread: true, ...args })
 
                     if ('imports' in spread) {
-                        merge_imports(imports, spread.imports)
+                        imports = merge_imports(imports, spread.imports)
                     }
                     if ('child_dispatcher' in spread) {
                         if (child_dispatcher === undefined) {

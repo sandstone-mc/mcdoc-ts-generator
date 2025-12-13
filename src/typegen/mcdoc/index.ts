@@ -67,7 +67,7 @@ class TypeHandlersClass {
      */
     static readonly concrete = McdocConcrete as McdocConcreteType
     /**
-     * `mcdoc.symbol['namespace:...']...`
+     * `Dispatcher['namespace:...']...`
      *
      * With no generic defaults to `map`. Can include a generic parameter for special cases.
      * - `map`: The full symbol map.

@@ -79,7 +79,7 @@ function mcdoc_template(type: mcdoc.McdocType) {
         })
 
         if ('imports' in child_result) {
-            merge_imports(imports, child_result.imports)
+            imports = merge_imports(imports, child_result.imports)
         }
 
         if ('child_dispatcher' in child_result) {

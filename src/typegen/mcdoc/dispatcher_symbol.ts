@@ -123,7 +123,7 @@ export function dispatcher_symbol(
 
         // Collect imports from fallback type
         if ('imports' in result) {
-            merge_imports(imports, result.imports)
+            imports = merge_imports(imports, result.imports)
         }
 
         fallback_type_name = factory.createTypeReferenceNode(
@@ -160,7 +160,7 @@ export function dispatcher_symbol(
 
         // Collect imports from none type
         if ('imports' in result) {
-            merge_imports(imports, result.imports)
+            imports = merge_imports(imports, result.imports)
         }
 
         dispatcher_properties.set(id, {
@@ -201,7 +201,7 @@ export function dispatcher_symbol(
 
         // Collect imports
         if ('imports' in result) {
-            merge_imports(imports, result.imports)
+            imports = merge_imports(imports, result.imports)
         }
 
         // Once/if the dispatcher symbol map gets declaration paths we can add these directly to the modules they belong in

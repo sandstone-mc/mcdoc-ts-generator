@@ -45,7 +45,7 @@ export class TypesGenerator {
         console.log('registries')
         this.resolve_registry_symbols(symbols)
         const registry_exports = export_registry(this.resolved_registries)
-        this.resolved_symbols.set('mcdoc::registry', registry_exports)
+        this.resolved_symbols.set('::java::registry', registry_exports)
 
         const dispatchers = symbols.getVisibleSymbols('mcdoc/dispatcher')
 
@@ -161,12 +161,8 @@ export class TypesGenerator {
                     mod.paths.add(_path)
 
                     if ('imports' in resolved_member) {
-                        if ('imports' in mod) {
-                            merge_imports(mod.imports, resolved_member.imports)
-                        } else {
-                            // @ts-ignore
-                            mod.imports = resolved_member.imports
-                        }
+                        // @ts-ignore
+                        mod.imports = merge_imports(mod.imports, resolved_member.imports)
                     }
                     return mod
                 })()
@@ -227,17 +223,11 @@ export class TypesGenerator {
                 mod.exports.push(...types)
 
                 if (imports !== undefined) {
-                    if (!('imports' in mod)) {
-                        // @ts-ignore
-                        mod.imports = {
-                            ordered: [] as unknown as NonEmptyList<string>,
-                            check: new Map<string, number>(),
-                        } as const
-                    }
                     // Once/if the dispatcher symbol map gets declaration paths we can use `merge_imports`
                     for (const path of imports.ordered) {
                         if (!mod.paths.has(path)) {
-                            add_import(mod.imports!, path)
+                            // @ts-ignore
+                            mod.imports = add_import(mod.imports, path)
                         }
                     }
                 }

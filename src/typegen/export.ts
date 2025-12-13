@@ -33,7 +33,7 @@ export function export_registry(resolved_registries: Map<string, ResolvedRegistr
 
     for (const [registry_name, { symbol_path, registry }] of resolved_registries) {
         // Add import for the registry symbol
-        add_import(imports, symbol_path)
+        imports = add_import(imports, symbol_path)
 
         // Create: 'minecraft:block': typeof BLOCKS extends Set<infer T> ? T : never
         const registry_id = registry_name.includes(':') ? registry_name : `minecraft:${registry_name}`
@@ -90,7 +90,7 @@ export function export_dispatcher(resolved_dispatchers: Map<string, ResolvedDisp
 
     for (const [dispatcher_id, { symbol_path, type }] of resolved_dispatchers) {
         // Add import for the dispatcher symbol
-        add_import(imports, symbol_path)
+        imports = add_import(imports, symbol_path)
 
         // Create: 'minecraft:entity_effect': EntityEffectDispatcher
         properties.push(factory.createPropertySignature(
