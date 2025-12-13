@@ -6,6 +6,7 @@ import { get_type_handler, type TypeHandlerResult } from './mcdoc'
 import { add_import, merge_imports, Set, type NonEmptyList } from './mcdoc/utils'
 import { Bind } from './mcdoc/bind'
 import { DispatcherSymbol } from './mcdoc/dispatcher_symbol'
+import { mcdoc_raw } from '..'
 
 /**
  * Help: https://ts-ast-viewer.com/
@@ -52,10 +53,11 @@ export class TypesGenerator {
         }
 
         console.log('modules')
-        this.resolve_module_symbols(symbols.getVisibleSymbols('mcdoc'))
+        const module_map = symbols.getVisibleSymbols('mcdoc')
+        this.resolve_module_symbols(module_map)
 
         console.log('dispatchers')
-        this.resolve_dispatcher_symbols(dispatchers)
+        this.resolve_dispatcher_symbols(dispatchers, module_map)
     }
 
     private resolve_registry_symbols(registries: SymbolUtil) {
@@ -111,11 +113,23 @@ export class TypesGenerator {
         }
     }
 
-    private resolve_module_symbols(module_members: SymbolMap) {
-        for (const _path of Object.keys(module_members)) {
-            const { data } = module_members[_path]
+    private resolve_module_symbols(module_map: SymbolMap) {
+        for (const _path of Object.keys(module_map)) {
+            const { data } = module_map[_path]
 
-            if (!_path.endsWith('>') && data !== null && typeof data === 'object' && 'typeDef' in data) {
+            if (_path.endsWith('>')) {
+                continue
+            }
+            const references = {
+                regex: mcdoc_raw.matchAll(new RegExp(_path, 'g'))
+            } as { regex?: RegExpStringIterator<RegExpExecArray> }
+
+            if ([...references.regex!.take(2)].length === 1) {
+                continue
+            }
+            delete references.regex
+
+            if (data !== null && typeof data === 'object' && 'typeDef' in data) {
                 const type = data.typeDef as mcdoc.McdocType
                 const path = _path.split('::')
                 if (typeof path === 'string') {
@@ -126,8 +140,10 @@ export class TypesGenerator {
 
                 const resolved_member = get_type_handler(type)(type)({
                     dispatcher_properties: this.dispatcher_properties,
+                    root_type: true,
                     name,
                     module_path,
+                    module_map,
                 })
 
                 const module = (() => {
@@ -153,10 +169,10 @@ export class TypesGenerator {
                     return mod
                 })()
 
-                if (type.kind === 'enum' || type.kind === 'template') {
-                    module.exports.push(resolved_member.type as (ts.EnumDeclaration | ts.TypeAliasDeclaration))
+                if (ts.isTypeAliasDeclaration(resolved_member.type)) {
+                    module.exports.push(resolved_member.type)
                 } else {
-                    module.exports.push(Bind.BindDoc(factory.createTypeAliasDeclaration(
+                    module.exports.push(Bind.Doc(factory.createTypeAliasDeclaration(
                         [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
                         name,
                         undefined,
@@ -167,7 +183,7 @@ export class TypesGenerator {
         }
     }
 
-    private resolve_dispatcher_symbols(dispatchers: SymbolMap) {
+    private resolve_dispatcher_symbols(dispatchers: SymbolMap, module_map: SymbolMap) {
         for (const id of Object.keys(dispatchers)) {
             const { members } = dispatchers[id]
             if (members === undefined) {
@@ -177,7 +193,7 @@ export class TypesGenerator {
             const name = pascal_case(_name)
 
             // Once/if the dispatcher symbol map gets declaration paths we can switch to that instead of `references`
-            const { types, imports, references } = DispatcherSymbol(id, name, members, this.dispatcher_properties)
+            const { types, imports, references } = DispatcherSymbol(id, name, members, this.dispatcher_properties, module_map)
 
             let in_module = false
 

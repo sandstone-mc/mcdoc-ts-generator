@@ -58,6 +58,8 @@ function registerAttributes(meta: MetaRegistry, release: ReleaseVersion) {
     )
 }
 
+// Yes this is cursed
+export let mcdoc_raw = ''
 const vanillaMcdocUrl = 'https://api.spyglassmc.com/vanilla-mcdoc/symbols'
 
 export interface VanillaMcdocSymbols {
@@ -67,7 +69,9 @@ export interface VanillaMcdocSymbols {
 }
 export async function fetchVanillaMcdoc(): Promise<VanillaMcdocSymbols> {
     try {
-        return await (await fetchWithCache(vanillaMcdocUrl)).json() as VanillaMcdocSymbols
+        const buffer = await fetchWithCache(vanillaMcdocUrl)
+        mcdoc_raw = await buffer.text()
+        return JSON.parse(mcdoc_raw) as VanillaMcdocSymbols
     } catch (e) {
         throw new Error(`Error occurred while fetching vanilla-mcdoc: ${errorMessage(e)}`)
     }

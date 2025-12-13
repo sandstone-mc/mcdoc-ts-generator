@@ -3,7 +3,6 @@ import { match, P } from 'ts-pattern'
 import * as mcdoc from '@spyglassmc/mcdoc'
 import type { NonEmptyList, TypeHandler } from '..'
 import { Assert } from '../assert'
-import { Bind } from '../bind'
 
 const { factory } = ts
 
@@ -14,70 +13,88 @@ const static_value = {
         type: StringKeyword
     },
     not_empty: factory.createTemplateLiteralType(
-        factory.createTemplateHead('', ''),
+        factory.createTemplateHead(''),
         [
             factory.createTemplateLiteralTypeSpan(
                 factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
-                factory.createTemplateMiddle('', '')
+                factory.createTemplateMiddle('')
             ),
             factory.createTemplateLiteralTypeSpan(
                 StringKeyword,
-                factory.createTemplateTail('', '')
+                factory.createTemplateTail('')
             )
         ]
     ),
     namespaced: {
         type: factory.createTemplateLiteralType(
-            factory.createTemplateHead('', ''),
+            factory.createTemplateHead(''),
             [
                 factory.createTemplateLiteralTypeSpan(
                     StringKeyword,
-                    factory.createTemplateMiddle(':', ':')
+                    factory.createTemplateMiddle(':')
                 ),
                 factory.createTemplateLiteralTypeSpan(
                     StringKeyword,
-                    factory.createTemplateTail('', '')
+                    factory.createTemplateTail('')
                 )
             ]
         )
     },
     hash: {
         type: factory.createTemplateLiteralType(
-            factory.createTemplateHead('#', '#'),
+            factory.createTemplateHead('#'),
             [factory.createTemplateLiteralTypeSpan(
                 factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                factory.createTemplateTail('', '')
+                factory.createTemplateTail('')
             )]
         )
     },
     number: {
         type: factory.createTemplateLiteralType(
-            factory.createTemplateHead('', ''),
+            factory.createTemplateHead(''),
             [factory.createTemplateLiteralTypeSpan(
                 factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
-                factory.createTemplateTail('', '')
+                factory.createTemplateTail('')
             )]
         )
     },
     time: {
-        type: factory.createTemplateLiteralType(
-            factory.createTemplateHead('', ''),
-            [
-                factory.createTemplateLiteralTypeSpan(
-                    factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
-                    factory.createTemplateMiddle('', '')
-                ),
-                factory.createTemplateLiteralTypeSpan(
-                    factory.createUnionTypeNode([
-                        Bind.StringLiteral('d'),
-                        Bind.StringLiteral('s'),
-                        Bind.StringLiteral('t'),
-                        Bind.StringLiteral('')
-                    ]),
-                    factory.createTemplateTail('', '')
-                )
-            ]
-        )
+        type: factory.createParenthesizedType(factory.createUnionTypeNode([
+            factory.createTemplateLiteralType(
+                factory.createTemplateHead(''),
+                [
+                    factory.createTemplateLiteralTypeSpan(
+                        factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
+                        factory.createTemplateMiddle('-')
+                    ),
+                    factory.createTemplateLiteralTypeSpan(
+                        factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
+                        factory.createTemplateMiddle('-')
+                    ),
+                    factory.createTemplateLiteralTypeSpan(
+                        factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
+                        factory.createTemplateTail('')
+                    )
+                ]
+            ),
+            factory.createTemplateLiteralType(
+                factory.createTemplateHead(''),
+                [
+                    factory.createTemplateLiteralTypeSpan(
+                        factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
+                        factory.createTemplateMiddle(':')
+                    ),
+                    factory.createTemplateLiteralTypeSpan(
+                        factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
+                        factory.createTemplateMiddle(':')
+                    ),
+                    factory.createTemplateLiteralTypeSpan(
+                        factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
+                        factory.createTemplateTail('')
+                    )
+                ]
+            )
+        ]))
     }
 } as const
 
@@ -219,6 +236,12 @@ function mcdoc_string(type: mcdoc.McdocType) {
                         ordered: [`sandstone::${DataPoint}`] as NonEmptyList<string>,
                         check: new Map([[`sandstone::${DataPoint}`, 0]])
                     }
+                } as const)
+            })
+            .with({ name: 'match_regex' }, ({ value: { value: { value } } }) => {
+                return (args: Record<string, unknown>) => ({
+                    type: static_value.not_empty,
+                    docs: [`Must match regex of ${value}`] as NonEmptyList<string>
                 } as const)
             })
             .with({ name: 'objective' }, () => {

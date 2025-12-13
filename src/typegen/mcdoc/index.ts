@@ -21,7 +21,7 @@ import {
 export type NonEmptyList<T> = T[] & { 0: T }
 
 export type TypeHandlerResult = {
-    readonly type: ts.TypeNode | ts.EnumDeclaration | ts.TypeAliasDeclaration,
+    readonly type: ts.TypeNode | ts.TypeAliasDeclaration,
     readonly imports?: {
         /**
          * Cannot include duplicates, but uses a list to preserve order.
@@ -77,10 +77,7 @@ class TypeHandlersClass {
      */
     static readonly dispatcher = McdocDispatcher
     static readonly double = McdocDouble
-    /**
-     * This uses a type hack because `enum` is never a value, it's only ever a base module type.
-     */
-    static readonly enum = McdocEnum as unknown as typeof McdocAny
+    static readonly enum = McdocEnum
     static readonly float = McdocFloat
     /**
      * Indexes into a dispatcher type to access a specific property.
@@ -185,21 +182,23 @@ type McdocStructType = TypeHandler<{
 }>
 
 type McdocTupleType = TypeHandler<{
-    readonly child_dispatcher?: NonEmptyList<[parent_count: number, property: string]>
-    readonly type: ts.TupleTypeNode
+    readonly docs?: NonEmptyList<string | [string]>;
+    readonly child_dispatcher?: NonEmptyList<[parent_count: number, property: string]>;
     readonly imports?: {
-        readonly ordered: NonEmptyList<string>
-        readonly check: Map<string, number>
-    }
+        readonly ordered: NonEmptyList<string>;
+        readonly check: Map<string, number>;
+    };
+    readonly type: ts.TupleTypeNode;
 }>
 
 type McdocUnionType = TypeHandler<{
-    readonly child_dispatcher?: NonEmptyList<[parent_count: number, property: string]>
-    readonly type: ts.ParenthesizedTypeNode
+    readonly docs?: NonEmptyList<string | [string]>;
+    readonly child_dispatcher?: NonEmptyList<[number, string]>;
     readonly imports?: {
-        readonly ordered: NonEmptyList<string>
-        readonly check: Map<string, number>
-    }
+        readonly ordered: NonEmptyList<string>;
+        readonly check: Map<string, number>;
+    };
+    readonly type: ts.TypeNode;
 }>
 
 type McdocConcreteType = TypeHandler<{

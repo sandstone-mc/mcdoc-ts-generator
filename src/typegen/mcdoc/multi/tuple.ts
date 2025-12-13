@@ -11,6 +11,7 @@ function mcdoc_tuple(type: mcdoc.McdocType) {
     Assert.TupleType(tuple)
 
     return (args: Record<string, unknown>) => {
+        args.root_type = false
         let has_imports = false
         const imports = {
             ordered: [] as unknown as NonEmptyList<string>,
@@ -18,6 +19,10 @@ function mcdoc_tuple(type: mcdoc.McdocType) {
         } as const
 
         const members: ts.TypeNode[] = []
+
+        let has_docs = false
+        
+        const member_docs = [] as unknown as NonEmptyList<false | NonEmptyList<string | [string]>>
 
         let child_dispatcher: NonEmptyList<[parent_count: number, property: string]> | undefined
 
@@ -43,13 +48,33 @@ function mcdoc_tuple(type: mcdoc.McdocType) {
                     return [parent_count - 1, property]
                 }) as NonEmptyList<[number, string]>))
             }
+            if ('docs' in value) {
+                has_docs = true
+                member_docs.push(value.docs)
+            } else {
+                member_docs.push(false)
+            }
             members.push(value.type)
         }
+
+        const docs = (
+            has_docs ? member_docs.flatMap((doc, i) => {
+                if (members.length === 1 && doc !== false) {
+                    return [doc]
+                } else {
+                    return [
+                        ...(doc === false ? [ `*item ${i}*` ] : [doc]),
+                        ...(i !== (member_docs.length - 1) ? [ '', '*or*', '' ] : [])
+                    ]
+                }
+            }) : []
+        ) as unknown as NonEmptyList<string | [string]>
 
         return {
             type: factory.createTupleTypeNode(members),
             ...(has_imports ? { imports } : {}),
             ...(child_dispatcher !== undefined ? { child_dispatcher } : {}),
+            ...(has_docs ? { docs } : {}),
         } as const
     }
 }

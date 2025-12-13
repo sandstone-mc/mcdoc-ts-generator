@@ -256,6 +256,15 @@ type ImplementedAttributes = {
     }),
     nbt: (undefined | mcdoc.DispatcherType | ReferenceType),
     nbt_path: (undefined | mcdoc.DispatcherType),
+    match_regex: {
+        attributes: never,
+        kind: 'literal',
+        value: {
+            attributes: never,
+            kind: 'string',
+            value: string
+        }
+    },
     deprecated: undefined,
     command: {
         attributes: never,
@@ -401,6 +410,7 @@ export class AssertKinds {
         'criterion',
         'nbt',
         'nbt_path',
+        'match_regex',
         'deprecated',
         'command',
         'url',
@@ -640,6 +650,17 @@ export class Assert {
                         .with('nbt_path', () => {
                             if (attribute.value !== undefined && attribute.value.kind !== 'dispatcher') {
                                 throw new Error()
+                            }
+                        })
+                        .with('match_regex', () => {
+                            if (attribute.value === undefined || attribute.value.kind !== 'literal' || attribute.value.value.kind !== 'string') {
+                                throw new Error()
+                            } else {
+                                try {
+                                    new RegExp(attribute.value.value.value)
+                                } catch (e) {
+                                    throw new Error()
+                                }
                             }
                         })
                         .with('permutation', () => {

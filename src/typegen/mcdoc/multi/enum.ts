@@ -2,50 +2,45 @@ import ts from 'typescript'
 import * as mcdoc from '@spyglassmc/mcdoc'
 import type { TypeHandler } from '..'
 import { Assert } from '../assert'
+import { Bind } from '../bind'
 
 const { factory } = ts
 
-// `enum` exists at runtime because people still use vanilla JS, so we need dedicated binders.
-const Bind = {
-    NumericLiteral(literal: number) {
-        if (Math.sign(literal) === -1) {
-            return factory.createPrefixUnaryExpression(
-                ts.SyntaxKind.MinusToken,
-                factory.createNumericLiteral(Math.abs(literal))
-            )
+export function enum_docs(enum_type: mcdoc.EnumType) {
+    const docs = ['']
+
+    for (const member of enum_type.values) {
+        const id_value = `${member.identifier}(\`${member.value}\`)`
+        if (member.desc) {
+            const member_doc = Bind.DocPart(member.desc)
+
+            if (member_doc.length > 1) {
+                docs.push(` - ${id_value}:`)
+                docs.push(...member_doc.map((doc) => `   ${doc}`))
+            } else {
+                docs.push(` - ${id_value}: ${member_doc[0]}`)
+            }
+        } else {
+            docs.push(` - ${id_value}`)
         }
-        return factory.createNumericLiteral(literal)
-    },
-    StringLiteral(literal: string) {
-        return factory.createStringLiteral(literal, true)
     }
-} as const
+
+    return docs
+}
 
 function mcdoc_enum(type: mcdoc.McdocType) {
     const enum_type = type
     Assert.EnumType(enum_type)
 
     return (args: Record<string, unknown>) => {
-        // The module path generator provides the name for enums
-        const { name } = args as { name: string }
-
-        const bind_value = enum_type.enumKind === 'string'
+        const bind_value = (() => enum_type.enumKind === 'string'
             ? (value: string | number) => Bind.StringLiteral(value as string)
-            : (value: number | string) => Bind.NumericLiteral(value as number)
+            : (value: number | string) => Bind.NumericLiteral(value as number))()
 
-        const members = enum_type.values.map((member) =>
-            factory.createEnumMember(
-                factory.createIdentifier(member.identifier),
-                bind_value(member.value),
-            )
-        )
+        const members: ts.LiteralTypeNode[] = enum_type.values.map(({ value }) => bind_value(value))
 
         return {
-            type: factory.createEnumDeclaration(
-                undefined,
-                factory.createIdentifier(name),
-                members,
-            ),
+            type: factory.createParenthesizedType(factory.createUnionTypeNode(members)),
         }
     }
 }

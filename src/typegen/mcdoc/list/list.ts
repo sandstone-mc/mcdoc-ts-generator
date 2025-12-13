@@ -17,6 +17,7 @@ function mcdoc_list(type: mcdoc.McdocType) {
     Assert.ListType(list)
 
     return (args: Record<string, unknown>) => {
+        args.root_type = false
         const item = TypeHandlers[list.item.kind](list.item)(args)
 
         const imports = 'imports' in item ? {

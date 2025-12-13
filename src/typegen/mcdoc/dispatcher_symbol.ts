@@ -45,12 +45,12 @@ type DispatcherMember = { typeDef: mcdoc.McdocType }
  * type NameMap<T> = { 'a': NameMemberA<T>, 'b': NameMemberB<T> }
  * type NameKeys = keyof NameMap<unknown>
  * type NameFallback<T> = NameMemberA<T> | NameMemberB<T> | NameFallbackType<T>
- * export type SymbolName<CASE extends ('map' | 'keys' | '%fallback' | '%none') = 'map', T> = ...
+ * export type SymbolName<T, CASE extends ('map' | 'keys' | '%fallback' | '%none') = 'map'> = ...
  * ```
  *
  * Generic parameters (e.g., `<T>`) are only present if the dispatcher members are template types.
  * When present, generics are extracted from the first member and propagated to all type aliases.
- * CASE always comes before any dispatcher generics in the main Symbol type.
+ * CASE always comes after any dispatcher generics in the main Symbol type because required type generics must proceed optional ones.
  *
  * Special keys in dispatcher members:
  * - `%unknown`: Defines fallback type for arbitrary string keys not in the map, doesn't actually work because of TypeScript limitations
@@ -62,9 +62,9 @@ export function dispatcher_symbol(
     id: string,
     name: string,
     members: SymbolMap,
-    dispatcher_properties: Map<string, { supports_none?: true }>
+    dispatcher_properties: Map<string, { supports_none?: true }>,
+    module_map: SymbolMap,
 ): DispatcherSymbolResult {
-
     let has_imports = false
     const imports = {
         ordered: [] as unknown as NonEmptyList<string>,
@@ -72,7 +72,7 @@ export function dispatcher_symbol(
     } as const
     let has_references = false
 
-    const member_types: (ts.TypeAliasDeclaration | ts.EnumDeclaration)[] = []
+    const member_types: ts.TypeAliasDeclaration[] = []
     const map_properties: ts.PropertySignature[] = []
     const member_type_refs: ts.TypeReferenceNode[] = []
 
@@ -118,9 +118,11 @@ export function dispatcher_symbol(
         const unknown_type_name = `${name}FallbackType`
 
         const result = get_type_handler(unknown_member)(unknown_member)({
+            root_type: true,
             name: unknown_type_name,
             dispatcher_symbol: add_reference,
-            dispatcher_properties
+            dispatcher_properties,
+            module_map,
         })
 
         // Collect imports from fallback type
@@ -140,8 +142,8 @@ export function dispatcher_symbol(
             unknown_type_name,
             has_generics ? generic_names : undefined
         )
-        if (unknown_member.kind === 'enum' || unknown_member.kind === 'template') {
-            member_types.push(result.type as (ts.EnumDeclaration | ts.TypeAliasDeclaration))
+        if (ts.isTypeAliasDeclaration(result.type)) {
+            member_types.push(result.type)
         } else {
             member_types.push(factory.createTypeAliasDeclaration(
                 undefined,
@@ -161,9 +163,11 @@ export function dispatcher_symbol(
         const none_type_name = `${name}NoneType`
 
         const result = get_type_handler(none_member)(none_member)({
+            root_type: true,
             name: none_type_name,
             dispatcher_symbol: add_reference,
-            dispatcher_properties
+            dispatcher_properties,
+            module_map,
         })
 
         // Collect imports from none type
@@ -183,8 +187,8 @@ export function dispatcher_symbol(
             supports_none: true,
         })
 
-        if (none_member.kind === 'enum' || none_member.kind === 'template') {
-            member_types.push(result.type as (ts.EnumDeclaration | ts.TypeAliasDeclaration))
+        if (ts.isTypeAliasDeclaration(result.type)) {
+            member_types.push(result.type)
         } else {
             member_types.push(factory.createTypeAliasDeclaration(
                 undefined,
@@ -208,9 +212,11 @@ export function dispatcher_symbol(
 
         // Resolve the member type using the mcdoc type handlers
         const result = get_type_handler(member_type)(member_type)({
+            root_type: true,
             name: member_type_name,
             dispatcher_symbol: add_reference,
-            dispatcher_properties
+            dispatcher_properties,
+            module_map,
         })
 
         // Collect imports
@@ -229,8 +235,8 @@ export function dispatcher_symbol(
         // Once/if the dispatcher symbol map gets declaration paths we can add these directly to the modules they belong in
 
         // Create member type alias (with generics if present)
-        if (member_type.kind === 'enum' || member_type.kind === 'template') {
-            member_types.push(result.type as (ts.EnumDeclaration | ts.TypeAliasDeclaration))
+        if (ts.isTypeAliasDeclaration(result.type)) {
+            member_types.push(result.type)
         } else {
             member_types.push(factory.createTypeAliasDeclaration(
                 undefined,
@@ -293,7 +299,7 @@ export function dispatcher_symbol(
     )
 
     // Create the main Symbol type with CASE generic first, then dispatcher generics
-    const case_type_param = factory.createTypeParameterDeclaration(
+    generic_params.push(factory.createTypeParameterDeclaration(
         undefined,
         'CASE',
         factory.createUnionTypeNode([
@@ -303,12 +309,12 @@ export function dispatcher_symbol(
             Bind.StringLiteral('%none'),
         ]),
         Bind.StringLiteral('map')
-    )
+    ))
 
     const symbol_type = factory.createTypeAliasDeclaration(
         [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
         `Symbol${name}`,
-        [case_type_param, ...generic_params],
+        generic_params,
         factory.createConditionalTypeNode(
             factory.createTypeReferenceNode('CASE'),
             Bind.StringLiteral('map'),

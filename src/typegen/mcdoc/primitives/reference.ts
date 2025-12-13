@@ -3,6 +3,8 @@ import * as mcdoc from '@spyglassmc/mcdoc'
 import type { NonEmptyList, TypeHandler } from '..'
 import { Assert } from '../assert'
 import type { DispatcherReferenceCounter } from '../dispatcher_symbol'
+import type { SymbolMap } from '@spyglassmc/core'
+import { enum_docs } from '../multi/enum'
 
 const { factory } = ts
 
@@ -11,6 +13,8 @@ function ReferenceArgs(args: Record<string, unknown>): asserts args is ({
     generic_types?: ts.TypeNode[]
     generics?: Set<string>
     module_path?: string
+    module_map: SymbolMap
+    spread?: true
 }) {}
 
 function mcdoc_reference(type: mcdoc.McdocType) {
@@ -44,20 +48,95 @@ function mcdoc_reference(type: mcdoc.McdocType) {
             }
         } as const
 
+        let docs: NonEmptyList<(string | [string])> | undefined
+
+        let child_dispatcher: [[0, string]] | undefined
+
+        let id_wrap = (ref: ts.TypeReferenceNode) => ref as (ts.TypeReferenceNode | ts.ParenthesizedTypeNode)
+
+        const peek = args.module_map[reference.path]?.data
+
+        if (peek !== undefined && peek !== null && typeof peek === 'object' && 'typeDef' in peek) {
+            const referenced_type = peek.typeDef as mcdoc.McdocType
+
+            if (referenced_type.kind === 'enum') {
+                docs = enum_docs(referenced_type) as NonEmptyList<string>
+
+                if ('desc' in referenced_type && typeof referenced_type.desc === 'string') {
+                    docs.push('', [referenced_type.desc])
+                }
+                if ('attributes' in type) {
+                    Assert.Attributes(type.attributes, true)
+
+                    if (type.attributes[0].name === 'id' && type.attributes[0].value === undefined) {
+                        id_wrap = (ref: ts.TypeReferenceNode) => {
+                            const id_ref = factory.createParenthesizedType(factory.createUnionTypeNode([
+                                ref,
+                                factory.createTemplateLiteralType(
+                                    factory.createTemplateHead('minecraft:', 'minecraft:'),
+                                    [factory.createTemplateLiteralTypeSpan(
+                                        ref,
+                                        factory.createTemplateTail('')
+                                    )]
+                                )
+                            ]))
+                            // lol
+                            Object.assign(id_ref, {
+                                '--mcdoc_id_ref': {
+                                    ref,
+                                    alt: factory.createParenthesizedType(factory.createUnionTypeNode([
+                                        factory.createTypeReferenceNode('S'),
+                                        factory.createTemplateLiteralType(
+                                            factory.createTemplateHead('minecraft:', 'minecraft:'),
+                                            [factory.createTemplateLiteralTypeSpan(
+                                                factory.createTypeReferenceNode('S'),
+                                                factory.createTemplateTail('')
+                                            )]
+                                        )
+                                    ]))
+                                }
+                            })
+
+                            return id_ref
+                        }
+                    }
+                }
+            } else if (referenced_type.kind === 'struct' && args.spread) {
+                // extremely funny
+                const generic_field = (referenced_type.fields.find(
+                    (f) => f.type.kind === 'dispatcher' 
+                    && f.type.parallelIndices[0].kind === 'dynamic' 
+                    && typeof f.type.parallelIndices[0].accessor[0] === 'string' 
+                    && ((key: string) => referenced_type.fields.findIndex((_f) => _f.kind === 'pair' && _f.key === key))(f.type.parallelIndices[0].accessor[0]) === -1
+                ) as undefined | (mcdoc.StructFieldNode & { type: { kind: 'dispatcher', parallelIndices: [ { kind: 'dynamic', accessor: [string] } ] } }))?.type.parallelIndices[0].accessor[0]
+
+                if (generic_field !== undefined) {
+                    child_dispatcher = [[0, generic_field]]
+
+                    args.generic_types = [factory.createTypeReferenceNode('S')]
+                }
+            } else if ('desc' in referenced_type && typeof referenced_type.desc === 'string') {
+                docs = [[referenced_type.desc]]
+            }
+        }
+
         if ('generic_types' in args) {
             return {
                 type: factory.createTypeReferenceNode(type_name, args.generic_types),
-                ...(imports === undefined ? {} : imports)
+                ...(imports === undefined ? {} : imports),
+                ...(docs === undefined ? {} : { docs })
             } as const
         }
         if ('generics' in args && args.generics.has(reference.path)) {
             return {
-                type: factory.createTypeReferenceNode(type_name)
+                type: factory.createTypeReferenceNode(type_name),
+                ...(docs === undefined ? {} : { docs })
             } as const
         }
         return {
-            type: factory.createTypeReferenceNode(type_name),
-            ...(imports === undefined ? {} : imports)
+            type: id_wrap(factory.createTypeReferenceNode(type_name)),
+            ...(imports === undefined ? {} : imports),
+            ...(docs === undefined ? {} : { docs })
         } as const
     }
 }

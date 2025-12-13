@@ -27,15 +27,15 @@ export class Bind {
      * ```
      */
     static readonly NonEmptyString = factory.createTemplateLiteralType(
-        factory.createTemplateHead('', ''),
+        factory.createTemplateHead(''),
         [
             factory.createTemplateLiteralTypeSpan(
                 factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
-                factory.createTemplateMiddle('', '')
+                factory.createTemplateMiddle('')
             ),
             factory.createTemplateLiteralTypeSpan(
                 factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                factory.createTemplateTail('', '')
+                factory.createTemplateTail('')
             )
         ]
     )
@@ -51,7 +51,7 @@ export class Bind {
         factory.createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
     ])
 
-    static BindImports(module_path: string, modules: string[]) {
+    static Imports(module_path: string, modules: string[]) {
         return factory.createImportDeclaration(
             undefined,
             factory.createImportClause(
@@ -65,10 +65,14 @@ export class Bind {
         )
     }
 
+    static DocPart(doc: string) {
+        return doc.trim().replaceAll('\n\n\n\n ', '@@bad@@').replaceAll('\n\n', '\n').replaceAll('@@bad@@', '\n\n').split('\n')
+    }
+
     /**
      * https://stackoverflow.com/questions/67575784/typescript-ast-factory-how-to-use-comments
      */
-    static BindDoc<N extends ts.Node>(node: N, docs?: NonEmptyList<string | [string]>): N {
+    static Doc<N extends ts.Node>(node: N, docs?: NonEmptyList<string | [string]>): N {
         let doc: string = '*'
         if (docs === undefined) {
             return node
@@ -76,13 +80,17 @@ export class Bind {
         for (const _doc of docs) {
             if (Array.isArray(_doc)) {
                 // y e s
-                const sanitized = _doc[0].trim().replaceAll('\n\n\n\n ', '@@bad@@').replaceAll('\n\n', '\n').replaceAll('@@bad@@', '\n\n').split('\n')
-                for (const __doc of sanitized) {
-                    if (__doc === '') {
-                        doc += '\n *'
-                    } else {
-                        doc += `\n * ${__doc}`
+                try {
+                    const sanitized = _doc[0].trim().replaceAll('\n\n\n\n ', '@@bad@@').replaceAll('\n\n', '\n').replaceAll('@@bad@@', '\n\n').split('\n')
+                    for (const __doc of sanitized) {
+                        if (__doc === '') {
+                            doc += '\n *'
+                        } else {
+                            doc += `\n * ${__doc}`
+                        }
                     }
+                } catch (e) {
+                    console.log(node, docs)
                 }
             } else {
                 if (_doc === '') {

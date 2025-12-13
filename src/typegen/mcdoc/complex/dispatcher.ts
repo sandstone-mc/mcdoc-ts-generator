@@ -63,13 +63,13 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
 
         let child_dispatcher: NonEmptyList<[parent_count: number, property: string]> | undefined
 
-        if (indices.length === 1 && indices[0].kind === 'dynamic' && indices[0].accessor.length === 1 && typeof indices[0].accessor[0] === 'string') {
-            child_dispatcher = [[0, indices[0].accessor[0]]]
+        if (indices.length === 1 && indices[0].kind === 'dynamic' && typeof indices[0].accessor.at(-1) === 'string') {
+            child_dispatcher = [[indices[0].accessor.length - 1, indices[0].accessor.at(-1) as string]]
 
             const indexed_type = factory.createIndexedAccessTypeNode(
                 factory.createTypeReferenceNode(
                     `Symbol${symbol_name}`,
-                    args.generic_types === undefined ? undefined : [SymbolMap, ...args.generic_types]
+                    args.generic_types === undefined ? undefined : generics
                 ),
                 factory.createTypeReferenceNode('S')
             )
@@ -82,7 +82,7 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
                     factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword),
                     factory.createTypeReferenceNode(
                         `Symbol${symbol_name}`,
-                        [None, ...generics]
+                        [...generics, None]
                     ),
                     indexed_type
                 )
@@ -96,14 +96,14 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
                 // Result: SymbolName<'%fallback'>
                 result_type = factory.createTypeReferenceNode(
                     `Symbol${symbol_name}`,
-                    [Fallback, ...generics]
+                    [...generics, Fallback]
                 )
             } else {
                 // Result: SymbolName['static_member']
                 result_type = factory.createIndexedAccessTypeNode(
                     factory.createTypeReferenceNode(
                         `Symbol${symbol_name}`,
-                        args.generic_types === undefined ? undefined : [SymbolMap, ...args.generic_types]
+                        args.generic_types
                     ),
                     Bind.StringLiteral(indices[0].value)
                 )
@@ -113,7 +113,7 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
             result_type = factory.createIndexedAccessTypeNode(
                 factory.createTypeReferenceNode(
                     `Symbol${symbol_name}`,
-                    args.generic_types === undefined ? undefined : [SymbolMap, ...args.generic_types]
+                    args.generic_types
                 ),
                 factory.createTypeReferenceNode('K')
             )
@@ -126,16 +126,6 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
                     )
                 }
             }
-        } else if (indices.length === 1 && indices[0].kind === 'dynamic' && indices[0].accessor.length > 1 && typeof indices[0].accessor.at(-1) === 'string') {
-            child_dispatcher = [[
-                indices[0].accessor.length - 1,
-                indices[0].accessor.at(-1) as string
-            ]]
-            // Result: SymbolName<'%fallback'>
-            result_type = factory.createTypeReferenceNode(
-                `Symbol${symbol_name}`,
-                [Fallback, ...generics]
-            )
         } else {
             throw new Error(`[mcdoc_dispatcher] Unsupported dispatcher: ${dispatcher}`)
         }

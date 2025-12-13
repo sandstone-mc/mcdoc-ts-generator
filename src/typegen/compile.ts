@@ -14,6 +14,10 @@ export async function compile_types(nodes: ts.Node[]) {
 
     const printed = printer.printList(ts.ListFormat.MultiLine, ts.factory.createNodeArray(nodes), resultFile)
 
+    return printed
+    
+    // TODO: Use something other than Biome, probably eslint
+
     const executable = os.platform() === 'win32' ? join('node_modules/.bin/biome.exe') : 'node_modules/@biomejs/biome/bin/biome'
 
     const shell = Bun.spawn({

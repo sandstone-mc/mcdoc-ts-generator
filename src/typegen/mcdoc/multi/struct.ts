@@ -13,6 +13,7 @@ const { factory } = ts
  * Validates and extracts struct args from the unknown TypeHandler args.
  */
 function StructArgs(args: Record<string, unknown>): asserts args is {
+    root_type: boolean,
     name: string,
     spread?: true
 } {}
@@ -40,8 +41,10 @@ function mcdoc_struct(type: mcdoc.McdocType) {
         const { name } = args
 
         const spread = args.spread ? true : false
+        const root_type = args.root_type ? true : false
 
         delete args.spread
+        args.root_type = false
 
         let has_imports = false
         const imports = {
@@ -93,14 +96,29 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                         }
                         child_dispatcher!.push(...(value.child_dispatcher as NonEmptyList<[number, string]>))
                     }
+                    let has_docs = false
+                    const field_docs = [] as unknown as NonEmptyList<string | [string]>
+
+                    if ('desc' in pair && typeof pair.desc === 'string') {
+                        has_docs = true
+                        field_docs.push([pair.desc])
+                    }
+
+                    if ('docs' in value) {
+                        if (has_docs) {
+                            field_docs.push('')
+                        }
+                        has_docs = true
+                        field_docs.push('Value:', ...value.docs)
+                    }
 
                     pair_indices[pair.key] = pairs.length
-                    pairs.push(factory.createPropertySignature(
+                    pairs.push(Bind.Doc(factory.createPropertySignature(
                         undefined,
                         pair.key,
                         pair.optional ? factory.createToken(ts.SyntaxKind.QuestionToken) : undefined,
                         value.type,
-                    ))
+                    ), has_docs ? field_docs : undefined))
 
                     pair_inserted = true
                 }).narrow()
@@ -277,25 +295,44 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                 })
         }
 
+        let inner_type: ts.TypeLiteralNode | ts.ParenthesizedTypeNode | StructIntersection | ts.TypeReferenceNode
+
         let indexed_access: string | undefined
         let indexed_access_type: ts.TypeNode | undefined
+        let template = (type_node: typeof inner_type) => (type_node as ts.TypeAliasDeclaration | typeof inner_type)
 
-        if (child_dispatcher !== undefined && spread === undefined) {
+        if (child_dispatcher !== undefined && spread === false) {
             const new_list = child_dispatcher.flatMap(([parent_count, property]) => {
                 if (parent_count === 0) {
                     indexed_access = property
                     const generic_prop = pair_indices[indexed_access]
 
                     if (generic_prop === undefined) {
+                        return []
                         throw new Error(`[mcdoc_struct] Received an invalid dynamic dispatcher trying to access '${property}'`)
                     }
 
                     indexed_access_type = pairs[generic_prop].type
 
-                    // AFAIK this isn't a getter
-                    // @ts-ignore
-                    pairs[generic_prop].type = factory.createTypeReferenceNode('S')
+                    // yes this is cursed
+                    if ('--mcdoc_id_ref' in indexed_access_type!) {
+                        const id_ref = indexed_access_type['--mcdoc_id_ref'] as { ref: ts.TypeReferenceNode, alt: ts.ParenthesizedTypeNode }
+                        // @ts-ignore
+                        pairs[generic_prop].type = id_ref.alt
+                        indexed_access_type = id_ref.ref
+                    } else {
+                        // @ts-ignore
+                        pairs[generic_prop].type = factory.createTypeReferenceNode('S')
+                    }
                     return []
+                }
+                if (root_type) {
+                    template = (type_node: typeof inner_type) => factory.createTypeAliasDeclaration(
+                        [factory.createToken(ts.SyntaxKind.ExportKeyword)],
+                        args.name,
+                        [factory.createTypeParameterDeclaration(undefined, 'S')],
+                        type_node
+                    )
                 }
                 return [[parent_count - 1, property]]
             })
@@ -307,8 +344,6 @@ function mcdoc_struct(type: mcdoc.McdocType) {
             types.push(factory.createTypeLiteralNode(pairs))
         }
         types.push(...merge)
-        
-        let inner_type: ts.TypeLiteralNode | ts.ParenthesizedTypeNode | StructIntersection
 
         if (types.length === 1) {
             inner_type = types[0]
@@ -320,13 +355,13 @@ function mcdoc_struct(type: mcdoc.McdocType) {
 
         if (indexed_access === undefined) {
             return {
-                type: inner_type!,
+                type: template(inner_type),
                 ...(has_imports ? { imports } : {}),
                 ...(child_dispatcher === undefined ? {} : { child_dispatcher }),
             }
         } else {
             return {
-                type: factory.createParenthesizedType(factory.createIndexedAccessTypeNode(
+                type: template(factory.createParenthesizedType(factory.createIndexedAccessTypeNode(
                     factory.createMappedTypeNode(
                         undefined,
                         factory.createTypeParameterDeclaration(
@@ -336,11 +371,11 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                         ),
                         undefined,
                         undefined,
-                        inner_type!,
+                        inner_type,
                         undefined
                     ),
                     indexed_access_type!
-                )),
+                ))),
                 ...(has_imports ? { imports } : {}),
                 ...(child_dispatcher === undefined ? {} : { child_dispatcher }),
             }

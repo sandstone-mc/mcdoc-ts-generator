@@ -73,9 +73,10 @@ function mcdoc_template(type: mcdoc.McdocType) {
         }
 
         // Process the child type
-        const child_result = TypeHandlers[child.kind](child)({ 
+        const child_result = TypeHandlers[child.kind](child)({
+            ...args,
+            root_type: false, 
             generics: generic_paths,
-            ...args
         })
 
         if ('imports' in child_result) {
