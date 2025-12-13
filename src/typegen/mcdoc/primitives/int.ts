@@ -136,7 +136,7 @@ export function whole_number_generic<TYPE extends string>(range: mcdoc.NumericRa
         imports: {
             ordered: [`sandstone::${type}`] as NonEmptyList<string>,
             check: new Map([[`sandstone::${type}`, 0]]) as Map<string, number>,
-        } as const,
+        },
     } as const
 }
 

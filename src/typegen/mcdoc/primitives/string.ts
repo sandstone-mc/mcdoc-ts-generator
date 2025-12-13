@@ -294,11 +294,11 @@ function mcdoc_string(type: mcdoc.McdocType) {
             })
             .with({ name: 'team' }, () => {
                 // TODO: Implement team abstraction in Sandstone
-                return (args: Record<string, unknown>) => ({ type: static_value.not_empty })
+                return (args: Record<string, unknown>) => ({ type: static_value.not_empty } as const)
             })
             .with({ name: 'text_component' }, () => {
                 // This has been phased out by mojang
-                return (args: Record<string, unknown>) => ({ type: static_value.not_empty })
+                return (args: Record<string, unknown>) => ({ type: static_value.not_empty } as const)
             })
             .with({ name: 'texture_slot' }, ({ value: { values: { kind: { value: { value } } } } }) => {
                 const Texture = 'TextureClass'

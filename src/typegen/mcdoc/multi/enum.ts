@@ -41,7 +41,7 @@ function mcdoc_enum(type: mcdoc.McdocType) {
 
         return {
             type: factory.createParenthesizedType(factory.createUnionTypeNode(members)),
-        }
+        } as const
     }
 }
 

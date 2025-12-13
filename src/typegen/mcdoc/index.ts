@@ -169,7 +169,7 @@ type McdocListType = TypeHandler<{
         readonly ordered: NonEmptyList<string>
         readonly check: Map<string, number>
     }
-    readonly docs?: NonEmptyList<string>
+    readonly docs?: NonEmptyList<string | [string]>
 }>
 
 type McdocStructType = TypeHandler<{
@@ -179,29 +179,31 @@ type McdocStructType = TypeHandler<{
         readonly ordered: NonEmptyList<string>
         readonly check: Map<string, number>
     }
+    readonly docs?: NonEmptyList<string | [string]>
 }>
 
 type McdocTupleType = TypeHandler<{
-    readonly docs?: NonEmptyList<string | [string]>;
-    readonly child_dispatcher?: NonEmptyList<[parent_count: number, property: string]>;
+    readonly docs?: NonEmptyList<string | [string]>
+    readonly child_dispatcher?: NonEmptyList<[parent_count: number, property: string]>
     readonly imports?: {
-        readonly ordered: NonEmptyList<string>;
-        readonly check: Map<string, number>;
-    };
-    readonly type: ts.TupleTypeNode;
+        readonly ordered: NonEmptyList<string>
+        readonly check: Map<string, number>
+    }
+    readonly type: ts.TupleTypeNode
 }>
 
 type McdocUnionType = TypeHandler<{
-    readonly docs?: NonEmptyList<string | [string]>;
-    readonly child_dispatcher?: NonEmptyList<[number, string]>;
+    readonly docs?: NonEmptyList<string | [string]>
+    readonly child_dispatcher?: NonEmptyList<[number, string]>
     readonly imports?: {
-        readonly ordered: NonEmptyList<string>;
-        readonly check: Map<string, number>;
-    };
-    readonly type: ts.TypeNode;
+        readonly ordered: NonEmptyList<string>
+        readonly check: Map<string, number>
+    }
+    readonly type: ts.TypeNode
 }>
 
 type McdocConcreteType = TypeHandler<{
+    readonly docs?: NonEmptyList<string | [string]>
     readonly child_dispatcher?: NonEmptyList<[parent_count: number, property: string]>
     readonly type: ts.TypeReferenceNode | ts.TypeNode
     readonly imports?: {
@@ -217,4 +219,5 @@ type McdocTemplateType = TypeHandler<{
         readonly ordered: NonEmptyList<string>
         readonly check: Map<string, number>
     }
+    readonly docs: never
 }>

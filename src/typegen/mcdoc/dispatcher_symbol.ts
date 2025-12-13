@@ -320,7 +320,7 @@ export function dispatcher_symbol(
         ],
         ...add({imports}),
         ...(has_references ? { references: dispatcher_references.get(id)! } : {} ),
-    }
+    } as const
 }
 
 export const DispatcherSymbol = dispatcher_symbol

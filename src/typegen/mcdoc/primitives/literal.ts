@@ -37,7 +37,7 @@ function mcdoc_literal(type: mcdoc.McdocType) {
                     ordered: [`sandstone::${type}`] as NonEmptyList<string>,
                     check: new Map([[`sandstone::${type}`, 0]]) as Map<string, number>,
                 },
-            }
+            } as const
         }).narrow() // I have no idea why this `narrow` is only actually needed here and not after `float`
         .with({ kind: 'double' }, { kind: 'int'}, (num) => ({
             type: Bind.NumericLiteral(num.value),
@@ -53,7 +53,7 @@ function mcdoc_literal(type: mcdoc.McdocType) {
                     ordered: [`sandstone::${type}`] as NonEmptyList<string>,
                     check: new Map([[`sandstone::${type}`, 0]]) as Map<string, number>,
                 },
-            }
+            } as const
         })
         .with({ kind: 'long'}, (long) => {
             const type = 'NBTLong'
@@ -66,7 +66,7 @@ function mcdoc_literal(type: mcdoc.McdocType) {
                     ordered: [`sandstone::${type}`] as NonEmptyList<string>,
                     check: new Map([[`sandstone::${type}`, 0]]) as Map<string, number>,
                 },
-            }
+            } as const
         })
         .with({ kind: 'short' }, (short) => {
             const type = 'NBTShort'
@@ -79,7 +79,7 @@ function mcdoc_literal(type: mcdoc.McdocType) {
                     ordered: [`sandstone::${type}`] as NonEmptyList<string>,
                     check: new Map([[`sandstone::${type}`, 0]]) as Map<string, number>,
                 },
-            }
+            } as const
         })
         .with({ kind: 'string' }, (string) => ({
             type: Bind.StringLiteral(string.value),

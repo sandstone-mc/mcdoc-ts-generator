@@ -91,20 +91,22 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                         }
                         child_dispatcher!.push(...(value.child_dispatcher as NonEmptyList<[number, string]>))
                     }
-                    let has_docs = false
-                    const field_docs = [] as unknown as NonEmptyList<string | [string]>
+                    let field_docs = undefined as undefined | NonEmptyList<string | [string]>
 
                     if ('desc' in pair && typeof pair.desc === 'string') {
-                        has_docs = true
-                        field_docs.push([pair.desc])
+                        if (field_docs === undefined) {
+                            field_docs = [[pair.desc]]
+                        } else {
+                            field_docs.push([pair.desc])
+                        }
                     }
 
                     if ('docs' in value) {
-                        if (has_docs) {
-                            field_docs.push('')
+                        if (field_docs === undefined) {
+                            field_docs = ['', 'Value:', ...value.docs]
+                        } else {
+                            field_docs.push('Value:', ...value.docs)
                         }
-                        has_docs = true
-                        field_docs.push('Value:', ...value.docs)
                     }
 
                     pair_indices[pair.key] = pairs.length
@@ -113,7 +115,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                         pair.key,
                         pair.optional ? factory.createToken(ts.SyntaxKind.QuestionToken) : undefined,
                         value.type,
-                    ), has_docs ? field_docs : undefined))
+                    ), field_docs))
 
                     pair_inserted = true
                 }).narrow()
@@ -350,7 +352,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
             return {
                 type: template(inner_type),
                 ...add({imports, child_dispatcher}),
-            }
+            } as const
         } else {
             return {
                 type: template(factory.createParenthesizedType(factory.createIndexedAccessTypeNode(
@@ -369,7 +371,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                     indexed_access_type!
                 ))),
                 ...add({imports, child_dispatcher}),
-            }
+            } as const
         }
     }
 }

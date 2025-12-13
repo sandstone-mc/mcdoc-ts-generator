@@ -46,6 +46,7 @@ function mcdoc_tuple(type: mcdoc.McdocType) {
             }
             if ('docs' in value) {
                 has_docs = true
+                const docs: NonEmptyList<string | [string]> = value.docs
                 member_docs.push(value.docs)
             } else {
                 member_docs.push(false)

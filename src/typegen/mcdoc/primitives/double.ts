@@ -184,6 +184,6 @@ export function non_integral_generic<TYPE extends string, JS_NUMBER_ALLOWED exte
         imports: {
             ordered: [`sandstone::${type}`] as NonEmptyList<string>,
             check: new Map([[`sandstone::${type}`, 0]]) as Map<string, number>,
-        } as const,
+        },
     } as const
 }
