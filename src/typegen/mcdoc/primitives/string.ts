@@ -130,9 +130,7 @@ function mcdoc_string(type: mcdoc.McdocType) {
                 const id_attr = value
 
                 let registry_id: string
-                if (id_attr === undefined) {
-                    throw new Error()
-                }
+
                 if (id_attr.kind === 'literal') {
                     registry_id = id_attr.value.value
                 } else {

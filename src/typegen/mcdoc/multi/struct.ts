@@ -180,7 +180,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
 
                                         let registry_id: string
                                         if (id_attr === undefined) {
-                                            throw new Error()
+                                            throw new Error(`[mcdoc_struct] #[id] on a struct key is currently not handled`)
                                         }
                                         if (id_attr.kind === 'literal') {
                                             registry_id = id_attr.value.value

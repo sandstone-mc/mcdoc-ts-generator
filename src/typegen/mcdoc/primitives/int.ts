@@ -146,7 +146,8 @@ export function whole_number_generic<TYPE extends string>(range: mcdoc.NumericRa
  */
 export function integer_range_size(lower: number, upper: number) {
     if (lower > upper) {
-        throw new Error()
+        // @author Claude - lower bound must not exceed upper bound
+        throw new Error(`[mcdoc_int] Invalid integer range: lower bound (${lower}) must be <= upper bound (${upper})`)
     }
     if (upper < 0) {
         return lower*-1 - upper*-1

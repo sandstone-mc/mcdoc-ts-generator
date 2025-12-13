@@ -132,9 +132,6 @@ export class TypesGenerator {
             if (data !== null && typeof data === 'object' && 'typeDef' in data) {
                 const type = data.typeDef as mcdoc.McdocType
                 const path = _path.split('::')
-                if (typeof path === 'string') {
-                    throw new Error('wtf')
-                }
                 const name = path.at(-1)!
                 const module_path = path.slice(0, -1).join('::')
 
