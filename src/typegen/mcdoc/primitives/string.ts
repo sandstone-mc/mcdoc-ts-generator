@@ -146,7 +146,7 @@ function mcdoc_string(type: mcdoc.McdocType) {
                     if ('prefix' in id_attr.values) {}
                 }
                 // Import the central Registry type and index by registry ID
-                const registry_import = `java::_registry::Registry`
+                const registry_import = `::java::_registry::Registry`
 
                 const LiteralUnion = 'LiteralUnion'
 

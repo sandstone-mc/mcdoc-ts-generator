@@ -76,7 +76,7 @@ export class TypesGenerator {
             if (registry.length === 0) continue
 
             const type_name = pluralize(registry_name.split('/').join('_')).toUpperCase()
-            const symbol_path = `java::_registry::${registry_name}`
+            const symbol_path = `::java::_registry::${type_name.toLowerCase()}`
 
             this.resolved_symbols.set(
                 symbol_path,
@@ -104,7 +104,7 @@ export class TypesGenerator {
                                     )]
                                 )
                             )],
-                            ts.NodeFlags.Const | ts.NodeFlags.Constant | ts.NodeFlags.Constant
+                            ts.NodeFlags.Const
                         )
                     )],
                     paths: new Set()
@@ -197,7 +197,7 @@ export class TypesGenerator {
 
             const symbol_path = (() => {
                 if (namespace === 'mcdoc') {
-                    return `java::_builtin::${_name}`
+                    return `::java::_builtin::${_name}`
                 }
                 if (references !== undefined) {
                     const sorted = references.location_counts.sort((a, b) => b[1] - a[1])
@@ -207,7 +207,7 @@ export class TypesGenerator {
                         return sorted[0][0]
                     }
                 }
-                return `java::_dispatcher::${_name}`
+                return `::java::_dispatcher::${_name}`
             })()
 
             // Store dispatcher reference for the Dispatcher export type

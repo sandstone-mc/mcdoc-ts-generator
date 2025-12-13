@@ -41,6 +41,8 @@ export function handle_imports(imports?: { readonly ordered: NonEmptyList<string
             throw new Error(`[mcdoc_import] Unsupported import location "${path[0]}" in "${import_path}"`)
         }
 
+        // TODO: Add handling for the non-type import of `Set` from `sandstone`
+
         const existing = grouped.get(file)
         if (existing) {
             existing.push(type_name)

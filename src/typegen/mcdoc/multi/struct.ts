@@ -183,7 +183,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                                             registry_id = id_attr.values.registry.value.value
                                         }
                                         // Import the central Registry type and index by registry ID
-                                        const registry_import = `java::_registry::Registry`
+                                        const registry_import = `::java::_registry::Registry`
 
                                         imports = add_import(imports, registry_import)
 

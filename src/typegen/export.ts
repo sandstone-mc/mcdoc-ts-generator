@@ -1,6 +1,6 @@
 import ts from 'typescript'
 import { add_import, type NonEmptyList } from './mcdoc/utils'
-import { add } from '../util'
+import { add, pluralize } from '../util'
 
 const { factory } = ts
 
@@ -33,7 +33,7 @@ export function export_registry(resolved_registries: Map<string, ResolvedRegistr
 
     for (const [registry_name, { symbol_path, registry }] of resolved_registries) {
         // Add import for the registry symbol
-        imports = add_import(imports, symbol_path)
+        imports = add_import(imports, `${symbol_path}::${pluralize(registry_name.split('/').join('_')).toUpperCase()}`)
 
         // Create: 'minecraft:block': typeof BLOCKS extends Set<infer T> ? T : never
         const registry_id = registry_name.includes(':') ? registry_name : `minecraft:${registry_name}`
