@@ -1,5 +1,6 @@
 import ts from 'typescript'
-import type { NonEmptyList } from './mcdoc/utils'
+import { add_import, type NonEmptyList } from './mcdoc/utils'
+import { add } from '../util'
 
 const { factory } = ts
 
@@ -25,22 +26,14 @@ type ResolvedDispatcher = {
  * ```
  */
 export function export_registry(resolved_registries: Map<string, ResolvedRegistry>) {
-    const symbol_path = 'mcdoc::registry'
-
-    const imports: { ordered: NonEmptyList<string>, check: Map<string, number> } = {
-        ordered: [] as unknown as NonEmptyList<string>,
-        check: new Map()
-    }
+    let imports: undefined | { readonly ordered: NonEmptyList<string>, readonly check: Map<string, number> }
 
     // Build property signatures for each registry
     const properties: ts.TypeElement[] = []
 
-    for (const [registry_name, { symbol_path: reg_symbol_path, registry }] of resolved_registries) {
+    for (const [registry_name, { symbol_path, registry }] of resolved_registries) {
         // Add import for the registry symbol
-        if (!imports.check.has(reg_symbol_path)) {
-            imports.ordered.push(reg_symbol_path)
-            imports.check.set(reg_symbol_path, imports.ordered.length - 1)
-        }
+        add_import(imports, symbol_path)
 
         // Create: 'minecraft:block': typeof BLOCKS extends Set<infer T> ? T : never
         const registry_id = registry_name.includes(':') ? registry_name : `minecraft:${registry_name}`
@@ -72,11 +65,10 @@ export function export_registry(resolved_registries: Map<string, ResolvedRegistr
     )
 
     return {
-        symbol_path,
-        exports: [registry_type],
-        imports: imports.ordered.length > 0 ? imports : undefined,
-        paths: new Set<string>()
-    }
+        exports: [registry_type] as ts.TypeAliasDeclaration[],
+        paths: new Set<string>(),
+        ...add({imports})
+    } as const
 }
 
 /**
@@ -91,22 +83,14 @@ export function export_registry(resolved_registries: Map<string, ResolvedRegistr
  * ```
  */
 export function export_dispatcher(resolved_dispatchers: Map<string, ResolvedDispatcher>) {
-    const symbol_path = 'mcdoc::dispatcher'
-
-    const imports: { ordered: NonEmptyList<string>, check: Map<string, number> } = {
-        ordered: [] as unknown as NonEmptyList<string>,
-        check: new Map()
-    }
+    let imports: undefined | { readonly ordered: NonEmptyList<string>, readonly check: Map<string, number> }
 
     // Build property signatures for each dispatcher
     const properties: ts.TypeElement[] = []
 
-    for (const [dispatcher_id, { symbol_path: disp_symbol_path, type }] of resolved_dispatchers) {
+    for (const [dispatcher_id, { symbol_path, type }] of resolved_dispatchers) {
         // Add import for the dispatcher symbol
-        if (!imports.check.has(disp_symbol_path)) {
-            imports.ordered.push(disp_symbol_path)
-            imports.check.set(disp_symbol_path, imports.ordered.length - 1)
-        }
+        add_import(imports, symbol_path)
 
         // Create: 'minecraft:entity_effect': EntityEffectDispatcher
         properties.push(factory.createPropertySignature(
@@ -126,9 +110,8 @@ export function export_dispatcher(resolved_dispatchers: Map<string, ResolvedDisp
     )
 
     return {
-        symbol_path,
-        exports: [dispatcher_type],
-        imports: imports.ordered.length > 0 ? imports : undefined,
-        paths: new Set<string>()
-    }
+        exports: [dispatcher_type] as ts.TypeAliasDeclaration[],
+        paths: new Set<string>(),
+        ...add({imports})
+    } as const
 }

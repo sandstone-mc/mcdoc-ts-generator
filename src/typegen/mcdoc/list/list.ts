@@ -29,9 +29,7 @@ function mcdoc_list(type: mcdoc.McdocType) {
             check: new Map<string, number>([[NBTListImport, 0]]),
         } as const
 
-        if ('imports' in item ? !imports.check.has(NBTListImport) : true) {
-            add_import(imports, NBTListImport)
-        }
+        add_import(imports, NBTListImport)
 
         const child_dispatcher = 'child_dispatcher' in item ? ((item.child_dispatcher as NonEmptyList<[number, string]>).map(([parent_count, property]) => {
             if (parent_count === 0) {

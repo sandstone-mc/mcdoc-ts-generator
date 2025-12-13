@@ -51,20 +51,6 @@ export class Bind {
         factory.createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
     ])
 
-    static Imports(module_path: string, modules: string[]) {
-        return factory.createImportDeclaration(
-            undefined,
-            factory.createImportClause(
-                true,
-                undefined,
-                factory.createNamedImports(
-                    modules.map((name) => factory.createImportSpecifier(false, undefined, factory.createIdentifier(name)))
-                )
-            ),
-            factory.createStringLiteral(module_path, true)
-        )
-    }
-
     static DocPart(doc: string) {
         return doc.trim().replaceAll('\n\n\n\n ', '@@bad@@').replaceAll('\n\n', '\n').replaceAll('@@bad@@', '\n\n').split('\n')
     }

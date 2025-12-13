@@ -228,42 +228,17 @@ TypeGen.resolve_types(service.project.symbols)
 const { resolved_registries, resolved_dispatchers, resolved_symbols } = TypeGen
 
 for await (const [symbol_path, { exports, imports }] of resolved_symbols.entries()) {
-    const file = symbol_path.split('::').slice(1)
+    const parts = symbol_path.split('::')
+    if (parts[0] === '') {
+        parts.shift()
+    }
+    const file = parts.slice(1)
 
-    // TODO: modify file more
     file.unshift('types')
 
     const code = await compile_types([
         ...handle_imports(imports),
-        ... exports
-    ])
-
-    await Bun.write(`${join(...file)}.ts`, code)
-}
-
-// Generate Registry type export
-const registryExport = export_registry(resolved_registries)
-{
-    const file = registryExport.symbol_path.split('::').slice(1)
-    file.unshift('types')
-
-    const code = await compile_types([
-        ...handle_imports(registryExport.imports),
-        ...registryExport.exports
-    ])
-
-    await Bun.write(`${join(...file)}.ts`, code)
-}
-
-// Generate Dispatcher type export
-const dispatcherExport = export_dispatcher(resolved_dispatchers)
-{
-    const file = dispatcherExport.symbol_path.split('::').slice(1)
-    file.unshift('types')
-
-    const code = await compile_types([
-        ...handle_imports(dispatcherExport.imports),
-        ...dispatcherExport.exports
+        ...exports
     ])
 
     await Bun.write(`${join(...file)}.ts`, code)

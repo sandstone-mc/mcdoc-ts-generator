@@ -7,6 +7,7 @@ import { add_import, merge_imports, Set, type NonEmptyList } from './mcdoc/utils
 import { Bind } from './mcdoc/bind'
 import { DispatcherSymbol } from './mcdoc/dispatcher_symbol'
 import { mcdoc_raw } from '..'
+import { export_dispatcher, export_registry } from './export'
 
 /**
  * Help: https://ts-ast-viewer.com/
@@ -43,6 +44,8 @@ export class TypesGenerator {
     resolve_types(symbols: SymbolUtil) {
         console.log('registries')
         this.resolve_registry_symbols(symbols)
+        const registry_exports = export_registry(this.resolved_registries)
+        this.resolved_symbols.set('mcdoc::registry', registry_exports)
 
         const dispatchers = symbols.getVisibleSymbols('mcdoc/dispatcher')
 
@@ -58,6 +61,8 @@ export class TypesGenerator {
 
         console.log('dispatchers')
         this.resolve_dispatcher_symbols(dispatchers, module_map)
+        const dispatcher_exports = export_dispatcher(this.resolved_dispatchers)
+        this.resolved_symbols.set('mcdoc::dispatcher', dispatcher_exports)
     }
 
     private resolve_registry_symbols(registries: SymbolUtil) {
@@ -231,7 +236,7 @@ export class TypesGenerator {
                     }
                     // Once/if the dispatcher symbol map gets declaration paths we can use `merge_imports`
                     for (const path of imports.ordered) {
-                        if (!mod.paths.has(path) && !mod.imports!.check.has(path)) {
+                        if (!mod.paths.has(path)) {
                             add_import(mod.imports!, path)
                         }
                     }

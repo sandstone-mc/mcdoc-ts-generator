@@ -4,10 +4,13 @@ export type NonEmptyList<T> = T[] & { 0: T }
 
 export function add_import(imports: TypeHandlerResult['imports'], add_import: string) {
     if (imports === undefined) {
-        imports = {
-            ordered: [] as unknown as NonEmptyList<string>,
-            check: new Map<string, number>()
+        return {
+            ordered: [add_import] as NonEmptyList<string>,
+            check: new Map<string, number>([[add_import, 0]])
         } as const
+    }
+    if (imports.check.has(add_import)) {
+        return
     }
     if (imports.ordered.length === 1) {
         // If there's only one import, skip the binary search.
