@@ -56,24 +56,27 @@ const eslint = new ESLint({
     ],
 })
 
-export async function compile_types(nodes: ts.Node[], filePath = 'code.ts') {
+export async function compile_types(nodes: ts.Node[], file = 'code.ts') {
     const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed, omitTrailingSemicolon: true })
-    const resultFile = ts.createSourceFile(
-        filePath,
-        '',
-        ts.ScriptTarget.Latest,
-        false,
-        ts.ScriptKind.TS
+
+    const printed = printer.printList(
+        ts.ListFormat.MultiLine,
+        ts.factory.createNodeArray(nodes),
+        ts.createSourceFile(
+            file,
+            '',
+            ts.ScriptTarget.Latest,
+            false,
+            ts.ScriptKind.TS
+        )
     )
 
-    const printed = printer.printList(ts.ListFormat.MultiLine, ts.factory.createNodeArray(nodes), resultFile)
-
-    const results = await eslint.lintText(printed, { filePath })
+    const results = await eslint.lintText(printed, { filePath: file })
 
     if (results.length > 0) {
         const result = results[0]
         if (result.errorCount > 0 && !result.output) {
-            console.log(`[ESLint] ${filePath}: ${result.errorCount} errors`)
+            console.log(`[ESLint] ${file}: ${result.errorCount} errors`)
             console.log('[ESLint] Sample messages:', result.messages.slice(0, 3))
         }
         if (result.output) {

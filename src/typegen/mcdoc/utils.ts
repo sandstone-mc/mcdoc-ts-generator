@@ -14,11 +14,11 @@ export function add_import(imports: TypeHandlerResult['imports'], add_import: st
     }
     if (imports.ordered.length === 1) {
         // If there's only one import, skip the binary search.
-        const existingImport = imports.ordered[0]
-        if (add_import.localeCompare(existingImport) < 0) {
+        const existing_import = imports.ordered[0]
+        if (add_import.localeCompare(existing_import) < 0) {
             imports.ordered.unshift(add_import)
             imports.check.set(add_import, 0)
-            imports.check.set(existingImport, 1)
+            imports.check.set(existing_import, 1)
         } else {
             imports.ordered.push(add_import)
             imports.check.set(add_import, 1)
@@ -31,8 +31,8 @@ export function add_import(imports: TypeHandlerResult['imports'], add_import: st
     let right = imports.ordered.length
     while (left < right) {
         const mid = Math.floor((left + right) / 2)
-        const midPath = imports.ordered[mid]
-        if (add_import.localeCompare(midPath) < 0) {
+        const mid_path = imports.ordered[mid]
+        if (add_import.localeCompare(mid_path) < 0) {
             right = mid
         } else {
             left = mid + 1

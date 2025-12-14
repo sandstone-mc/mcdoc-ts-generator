@@ -111,11 +111,11 @@ Always use braces for if statements, even for single-line bodies:
 ```ts
 // Preferred
 if (condition) {
-    doSomething()
+    do_something()
 }
 
 // Avoid
-if (condition) doSomething()
+if (condition) do_something()
 ```
 
 ### TypeScript AST Generation
