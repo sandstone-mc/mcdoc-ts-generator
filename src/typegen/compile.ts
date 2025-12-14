@@ -1,11 +1,65 @@
 import ts from 'typescript'
-import os from 'os'
-import { join } from '../util'
+import { ESLint } from 'eslint'
+import stylistic from '@stylistic/eslint-plugin'
+import wrap from '@seahax/eslint-plugin-wrap'
+import tsparser from '@typescript-eslint/parser'
 
-export async function compile_types(nodes: ts.Node[]) {
-    const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed, omitTrailingSemicolon: true });
+const eslint = new ESLint({
+    fix: true,
+    overrideConfigFile: true,
+    overrideConfig: [
+        wrap.config({
+            maxLen: 120,
+            tabWidth: 4,
+            autoFix: true,
+            severity: 'warn',
+        }),
+        {
+            files: ['**/*.ts'],
+            languageOptions: {
+                parser: tsparser,
+                parserOptions: {
+                    ecmaVersion: 'latest',
+                    sourceType: 'module',
+                },
+            },
+            plugins: {
+                '@stylistic': stylistic,
+            },
+            rules: {
+                '@stylistic/indent': ['error', 4],
+                '@stylistic/quotes': ['error', 'single'],
+                '@stylistic/semi': ['error', 'never'],
+                '@stylistic/member-delimiter-style': ['error', {
+                    multiline: { delimiter: 'none' },
+                    singleline: { delimiter: 'comma', requireLast: false },
+                }],
+                '@stylistic/comma-dangle': ['error', 'always-multiline'],
+                '@stylistic/object-curly-spacing': ['error', 'always'],
+                '@stylistic/array-bracket-spacing': ['error', 'never'],
+                '@stylistic/block-spacing': ['error', 'always'],
+                '@stylistic/brace-style': ['error', '1tbs', { allowSingleLine: true }],
+                '@stylistic/key-spacing': ['error', { beforeColon: false, afterColon: true }],
+                '@stylistic/keyword-spacing': ['error', { before: true, after: true }],
+                '@stylistic/space-before-blocks': ['error', 'always'],
+                '@stylistic/space-infix-ops': 'error',
+                '@stylistic/eol-last': ['error', 'always'],
+                '@stylistic/no-trailing-spaces': 'error',
+                '@stylistic/no-multiple-empty-lines': ['error', { max: 1 }],
+                '@stylistic/padding-line-between-statements': ['error',
+                    { blankLine: 'always', prev: 'export', next: 'export' },
+                    { blankLine: 'always', prev: 'import', next: '*' },
+                    { blankLine: 'never', prev: 'import', next: 'import' },
+                ],
+            },
+        },
+    ],
+})
+
+export async function compile_types(nodes: ts.Node[], filePath = 'code.ts') {
+    const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed, omitTrailingSemicolon: true })
     const resultFile = ts.createSourceFile(
-        'code.ts',
+        filePath,
         '',
         ts.ScriptTarget.Latest,
         false,
@@ -14,67 +68,18 @@ export async function compile_types(nodes: ts.Node[]) {
 
     const printed = printer.printList(ts.ListFormat.MultiLine, ts.factory.createNodeArray(nodes), resultFile)
 
-    return printed
-    
-    // TODO: Use something other than Biome, probably eslint
+    const results = await eslint.lintText(printed, { filePath })
 
-    const executable = os.platform() === 'win32' ? join('node_modules/.bin/biome.exe') : 'node_modules/@biomejs/biome/bin/biome'
-
-    const shell = Bun.spawn({
-        cmd: [executable, 'format', '--verbose', '--format-with-errors=true', '--max-diagnostics=none', '--stdin-file-path=code.ts'],
-        stdout: 'pipe',
-        //windowsHide: true,
-        //windowsVerbatimArguments: true,
-        stdin: 'pipe',
-        stderr: 'pipe'
-    })
-
-    shell.stdin.write(printed)
-
-    shell.stdin.end()
-
-    const stdout = shell.stdout.getReader()
-
-    const decoder = new TextDecoder()
-
-    let formatted = ''
-
-    async function* read(reader: ReadableStreamDefaultReader<Uint8Array<ArrayBufferLike>>) {
-        let done = false
-
-        while (!done) {
-            const chunk = await reader.read()
-
-            if (chunk.done) {
-                done = true
-            } else {
-                yield decoder.decode(chunk.value, { stream: true })
-            }
+    if (results.length > 0) {
+        const result = results[0]
+        if (result.errorCount > 0 && !result.output) {
+            console.log(`[ESLint] ${filePath}: ${result.errorCount} errors`)
+            console.log('[ESLint] Sample messages:', result.messages.slice(0, 3))
+        }
+        if (result.output) {
+            return result.output
         }
     }
 
-    for await (const chunk of read(stdout)) {
-        formatted += chunk
-    }
-
-    let errors = ''
-
-    const stderr = shell.stderr.getReader()
-
-    for await (const chunk of read(stderr)) {
-        errors += chunk
-    }
-
-    await shell.exited
-
-    if (errors !== '') {
-        console.log('Errors during formatting:')
-        console.log('printed: ', printed)
-        console.log('formatted: ', formatted)
-        console.log('errors: ', errors)
-
-        return printed
-    }
-
-    return formatted
+    return printed
 }

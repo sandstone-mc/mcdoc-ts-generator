@@ -144,9 +144,10 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                                 undefined,
                                 factory.createTypeParameterDeclaration(
                                     undefined,
-                                    factory.createIdentifier('K')
+                                    factory.createIdentifier('K'),
+                                    key.type
                                 ),
-                                key.type,
+                                undefined,
                                 factory.createToken(ts.SyntaxKind.QuestionToken),
                                 value.type, // TODO K is assumed, McdocConcrete will know to use it from the passed pair.key
                                 undefined
@@ -297,14 +298,22 @@ function mcdoc_struct(type: mcdoc.McdocType) {
         if (child_dispatcher !== undefined && spread === false) {
             const new_list = child_dispatcher.flatMap(([parent_count, property]) => {
                 if (parent_count === 0) {
-                    indexed_access = property
-                    const generic_prop = pair_indices[indexed_access]
+                    const generic_prop = pair_indices[property]
 
                     if (generic_prop === undefined) {
-                        return []
+                        if (root_type) {
+                            template = (type_node: typeof inner_type) => factory.createTypeAliasDeclaration(
+                                [factory.createToken(ts.SyntaxKind.ExportKeyword)],
+                                args.name,
+                                [factory.createTypeParameterDeclaration(undefined, 'S')],
+                                type_node
+                            )
+                            return []
+                        }
                         throw new Error(`[mcdoc_struct] Received an invalid dynamic dispatcher trying to access '${property}'`)
                     }
 
+                    indexed_access = property
                     indexed_access_type = pairs[generic_prop].type
 
                     // yes this is cursed

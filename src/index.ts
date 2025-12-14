@@ -236,12 +236,14 @@ for await (const [symbol_path, { exports, imports }] of resolved_symbols.entries
 
     file.unshift('types')
 
+    const outPath = `${join(...file)}.ts`
+
     const code = await compile_types([
         ...handle_imports(imports),
         ...exports
-    ])
+    ], outPath)
 
-    await Bun.write(`${join(...file)}.ts`, code)
+    await Bun.write(outPath, code)
 }
 
 await Bun.write(join(generated_path, 'tsconfig.json'), JSON.stringify({

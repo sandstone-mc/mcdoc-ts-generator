@@ -215,7 +215,7 @@ export class TypesGenerator {
             // Store dispatcher reference for the Dispatcher export type
             const dispatcher_type_name = `Symbol${name}`
             this.resolved_dispatchers.set(id, {
-                symbol_path,
+                symbol_path: `${symbol_path}::Symbol${name}`,
                 type: factory.createTypeReferenceNode(dispatcher_type_name)
             })
 
