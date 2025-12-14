@@ -1,18 +1,9 @@
 import ts from 'typescript'
 import { add_import, type NonEmptyList } from './mcdoc/utils'
-import { add, pluralize } from '../util'
+import { add } from '../util'
+import type { ResolvedDispatcher, ResolvedRegistry } from '.'
 
 const { factory } = ts
-
-type ResolvedRegistry = {
-    symbol_path: string,
-    registry: ts.Identifier
-}
-
-type ResolvedDispatcher = {
-    symbol_path: string,
-    type: ts.TypeNode
-}
 
 /**
  * Generates a `Registry` type that maps registry IDs to their element types.
@@ -31,9 +22,9 @@ export function export_registry(resolved_registries: Map<string, ResolvedRegistr
     // Build property signatures for each registry
     const properties: ts.TypeElement[] = []
 
-    for (const [registry_name, { symbol_path, registry }] of resolved_registries) {
+    for (const [registry_name, { symbol_path, registry, constant_name }] of resolved_registries) {
         // Add import for the registry symbol
-        imports = add_import(imports, `${symbol_path}::${pluralize(registry_name.split('/').join('_')).toUpperCase()}`)
+        imports = add_import(imports, `${symbol_path}::${constant_name}`)
 
         // Create: 'minecraft:block': typeof BLOCKS extends Set<infer T> ? T : never
         const registry_id = registry_name.includes(':') ? registry_name : `minecraft:${registry_name}`

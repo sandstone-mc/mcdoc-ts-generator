@@ -14,18 +14,19 @@ import { export_dispatcher, export_registry } from './export'
  */
 const { factory } = ts
 
-type ResolvedSymbol = {
+export type ResolvedSymbol = {
     readonly paths: Set<string>
     readonly imports?: NonNullable<TypeHandlerResult['imports']>
     readonly exports: (ts.TypeAliasDeclaration | ts.EnumDeclaration | ts.VariableStatement)[]
 }
 
-type ResolvedRegistry = {
+export type ResolvedRegistry = {
     symbol_path: string,
-    registry: ts.Identifier
+    registry: ts.Identifier,
+    constant_name: string
 }
 
-type ResolvedDispatcher = {
+export type ResolvedDispatcher = {
     symbol_path: string,
     type: ts.TypeReferenceNode
 }
@@ -114,6 +115,7 @@ export class TypesGenerator {
             this.resolved_registries.set(registry_name, {
                 registry: factory.createIdentifier(type_name),
                 symbol_path,
+                constant_name: type_name,
             })
         }
     }
