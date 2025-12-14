@@ -6,6 +6,9 @@ import { merge_imports } from './utils'
 import { Bind } from './bind'
 import { add, pascal_case } from '../../util'
 
+// TODO: Handle naming collision when a dispatcher is named the same as a generated type (e.g., "EnvironmentAttributeMap")
+// This causes issues because we generate `${name}Map` which collides with the actual symbol name.
+
 const { factory } = ts
 
 export type DispatcherReferenceCounter = {

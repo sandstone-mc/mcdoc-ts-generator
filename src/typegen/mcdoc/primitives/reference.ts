@@ -7,6 +7,8 @@ import type { SymbolMap } from '@spyglassmc/core'
 import { enum_docs } from '../multi/enum'
 import { add } from '../../../util'
 
+// TODO: Some references are missing imports (e.g., EquipmentSlot)
+
 const { factory } = ts
 
 function ReferenceArgs(args: Record<string, unknown>): asserts args is ({

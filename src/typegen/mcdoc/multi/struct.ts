@@ -305,7 +305,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                             template = (type_node: typeof inner_type) => factory.createTypeAliasDeclaration(
                                 [factory.createToken(ts.SyntaxKind.ExportKeyword)],
                                 args.name,
-                                [factory.createTypeParameterDeclaration(undefined, 'S')],
+                                [factory.createTypeParameterDeclaration(undefined, 'S', undefined, factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword))],
                                 type_node
                             )
                             return []
@@ -332,7 +332,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                     template = (type_node: typeof inner_type) => factory.createTypeAliasDeclaration(
                         [factory.createToken(ts.SyntaxKind.ExportKeyword)],
                         args.name,
-                        [factory.createTypeParameterDeclaration(undefined, 'S')],
+                        [factory.createTypeParameterDeclaration(undefined, 'S', undefined, factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword))],
                         type_node
                     )
                 }

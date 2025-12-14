@@ -9,6 +9,8 @@ import { DispatcherSymbol } from './mcdoc/dispatcher_symbol'
 import { mcdoc_raw } from '..'
 import { export_dispatcher, export_registry } from './export'
 
+// TODO: Investigate duplicate identifier issue (e.g., EvokerFangs appears twice in world/entity/boat.ts)
+
 /**
  * Help: https://ts-ast-viewer.com/
  */
