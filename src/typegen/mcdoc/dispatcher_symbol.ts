@@ -6,9 +6,6 @@ import { merge_imports } from './utils'
 import { Bind } from './bind'
 import { add, pascal_case } from '../../util'
 
-// TODO: Handle naming collision when a dispatcher is named the same as a generated type (e.g., "EnvironmentAttributeMap")
-// This causes issues because we generate `${name}Map` which collides with the actual symbol name.
-
 const { factory } = ts
 
 export type DispatcherReferenceCounter = {
@@ -243,7 +240,7 @@ export function dispatcher_symbol(
     // If %unknown is present, intersect with an index signature for arbitrary keys
     const map_type = factory.createTypeAliasDeclaration(
         undefined,
-        `${name}Map`,
+        `${name}DispatcherMap`,
         has_generics ? generic_params : undefined,
         factory.createTypeLiteralNode(map_properties)
     )
@@ -256,7 +253,7 @@ export function dispatcher_symbol(
         factory.createTypeOperatorNode(
             ts.SyntaxKind.KeyOfKeyword,
             factory.createTypeReferenceNode(
-                `${name}Map`,
+                `${name}DispatcherMap`,
                 has_generics ? generic_names.map(() => factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)) : undefined
             )
         )
@@ -293,7 +290,7 @@ export function dispatcher_symbol(
         factory.createConditionalTypeNode(
             factory.createTypeReferenceNode('CASE'),
             Bind.StringLiteral('map'),
-            factory.createTypeReferenceNode(`${name}Map`, has_generics ? generic_names : undefined),
+            factory.createTypeReferenceNode(`${name}DispatcherMap`, has_generics ? generic_names : undefined),
             factory.createConditionalTypeNode(
                 factory.createTypeReferenceNode('CASE'),
                 Bind.StringLiteral('keys'),

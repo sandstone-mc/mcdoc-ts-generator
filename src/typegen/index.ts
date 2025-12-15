@@ -9,8 +9,6 @@ import { DispatcherSymbol } from './mcdoc/dispatcher_symbol'
 import { mcdoc_raw } from '..'
 import { export_dispatcher, export_registry } from './export'
 
-// TODO: Investigate duplicate identifier issue (e.g., EvokerFangs appears twice in world/entity/boat.ts)
-
 /**
  * Help: https://ts-ast-viewer.com/
  */
@@ -126,14 +124,17 @@ export class TypesGenerator {
         for (const _path of Object.keys(module_map)) {
             const { data } = module_map[_path]
 
+            // These are unnamed nested structs that really shouldn't be in the symbol table at all
             if (_path.endsWith('>')) {
                 continue
             }
+            // If a full symbol path only shows up in the AST once, it is always a duplicate of a nested struct which is unreached by any of our exported types. The reason these exist in the AST is as a hack for locales.
             const references = {
                 regex: mcdoc_raw.matchAll(new RegExp(_path, 'g'))
             } as { regex?: RegExpStringIterator<RegExpExecArray> }
 
             if ([...references.regex!.take(2)].length === 1) {
+                delete references.regex
                 continue
             }
             delete references.regex

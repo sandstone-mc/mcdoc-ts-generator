@@ -149,7 +149,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                                 ),
                                 undefined,
                                 factory.createToken(ts.SyntaxKind.QuestionToken),
-                                value.type, // TODO K is assumed, McdocConcrete will know to use it from the passed pair.key
+                                value.type,
                                 undefined
                             )))
                         })

@@ -3,11 +3,11 @@ import type { NonEmptyList } from './mcdoc/utils'
 
 const { factory } = ts
 
-function BindImports(module_path: string, modules: string[]) {
+function BindImports(module_path: string, modules: string[], is_type_only = true) {
     return factory.createImportDeclaration(
         undefined,
         factory.createImportClause(
-            true,
+            is_type_only,
             undefined,
             factory.createNamedImports(
                 modules.map((name) => factory.createImportSpecifier(false, undefined, factory.createIdentifier(name)))
@@ -24,24 +24,21 @@ export function handle_imports(imports?: { readonly ordered: NonEmptyList<string
 
     for (const import_path of imports.ordered) {
         const parts = import_path.split('::')
-        if (parts[0] === '') parts.shift()
         const type_name = parts.at(-1)!
         const path = parts.slice(0, -1)
 
         let file: string
         if (path.length === 0) {
             throw new Error(`[mcdoc_import] Import path has no module prefix: "${import_path}"`)
-        } else if (path[0] === 'java') {
+        } else if (path[1] === 'java') {
             // java::* → sandstone/generated/*
-            file = `sandstone/generated/${path.slice(1).join('/')}`
+            file = `sandstone/generated/${path.slice(2).join('/')}`
         } else if (path[0] === 'sandstone') {
             // sandstone::* → sandstone/*
             file = path.join('/')
         } else {
             throw new Error(`[mcdoc_import] Unsupported import location "${path[0]}" in "${import_path}"`)
         }
-
-        // TODO: Add handling for the non-type import of `Set` from `sandstone`
 
         const existing = grouped.get(file)
         if (existing) {
@@ -54,6 +51,17 @@ export function handle_imports(imports?: { readonly ordered: NonEmptyList<string
     // Create import declarations
     const declarations: ts.ImportDeclaration[] = []
     for (const [file, names] of grouped) {
+        // Handle non-type import of `Set` from `sandstone`
+        if (file === 'sandstone') {
+            const set_index = names.indexOf('Set')
+            if (set_index !== -1) {
+                names.splice(set_index, 1)
+                declarations.push(BindImports(file, ['Set'], false))
+            }
+            if (names.length === 0) {
+                continue
+            }
+        }
         declarations.push(BindImports(file, names))
     }
 
