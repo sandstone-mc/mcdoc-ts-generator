@@ -41,9 +41,52 @@ export class Bind {
     )
 
     /**
+     * Creates a mapped type with optional properties.
+     *
+     * The key type is always wrapped in `Extract<KeyType, string>` for safety.
+     *
+     * @param key_type - The type to iterate over (will be wrapped in Extract)
+     * @param value_type - The type of each property value
+     * @param options.key_name - The name of the type parameter (default `'Key'`)
+     * @param options.parenthesized - Whether to wrap the result in parentheses (default `true`)
+     * @returns A mapped type node: `({ [Key in Extract<KeyType, string>]?: ValueType })`
+     *
+     * @example
+     * ```ts
+     * // Default usage:
+     * Bind.MappedType(keyType, valueType)
+     * // Produces: ({ [Key in Extract<KeyType, string>]?: ValueType })
+     *
+     * // Custom key name, no parentheses:
+     * Bind.MappedType(keyType, valueType, { key_name: 'S', parenthesized: false })
+     * // Produces: { [S in Extract<KeyType, string>]?: ValueType }
+     * ```
+     */
+    static MappedType(key_type: ts.TypeNode, value_type: ts.TypeNode, options?: { key_name?: string, parenthesized?: boolean }) {
+        const { key_name = 'Key', parenthesized = true } = options ?? {}
+        const constraint_type = factory.createTypeReferenceNode('Extract', [
+            key_type,
+            factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
+        ])
+        const mapped_type = factory.createMappedTypeNode(
+            undefined,
+            factory.createTypeParameterDeclaration(
+                undefined,
+                key_name,
+                constraint_type
+            ),
+            undefined,
+            factory.createToken(ts.SyntaxKind.QuestionToken),
+            value_type,
+            undefined
+        )
+        return parenthesized ? factory.createParenthesizedType(mapped_type) : mapped_type
+    }
+
+    /**
      * Creates a TypeScript type that represents an empty object.
      * ```ts
-     * type EmptyObject = Record<string, never> // <-- This type
+     * type EmptyObject = Record<string, never>
      * ```
      */
     static readonly EmptyObject = factory.createTypeReferenceNode('Record', [

@@ -140,29 +140,18 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                             if ('imports' in key) {
                                 imports = merge_imports(imports, key.imports)
                             }
-                            inherit.push(factory.createParenthesizedType(factory.createMappedTypeNode(
-                                undefined,
-                                factory.createTypeParameterDeclaration(
-                                    undefined,
-                                    factory.createIdentifier('K'),
-                                    key.type
-                                ),
-                                undefined,
-                                factory.createToken(ts.SyntaxKind.QuestionToken),
-                                value.type,
-                                undefined
-                            )))
+                            inherit.push(Bind.MappedType(key.type, value.type))
                         })
                         .with('string', () => {
                             if (pair.key.attributes === undefined) {
                                 Assert.StringType(pair.key)
-                                inherit.push(factory.createTypeReferenceNode('Record', [
-                                    ((('lengthRange' in pair.key && 'min' in pair.key.lengthRange) ? pair.key.lengthRange.min : 0) >= 1 ? 
+                                inherit.push(Bind.MappedType(
+                                    ((('lengthRange' in pair.key && 'min' in pair.key.lengthRange) ? pair.key.lengthRange.min : 0) >= 1 ?
                                         Bind.NonEmptyString
                                         : factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
                                     ),
                                     value.type
-                                ]))
+                                ))
                             } else {
                                 Assert.Attributes(pair.key.attributes, true)
 
@@ -189,21 +178,13 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                                         imports = add_import(imports, registry_import)
 
                                         // TODO: Handle #[id()] key arguments; path, exclude, and prefix="!"
-                                        inherit.push(factory.createParenthesizedType(factory.createMappedTypeNode(
-                                            undefined,
-                                            factory.createTypeParameterDeclaration(
-                                                undefined,
-                                                'K',
-                                                factory.createIndexedAccessTypeNode(
-                                                    factory.createTypeReferenceNode('Registry'),
-                                                    Bind.StringLiteral(registry_id)
-                                                )
+                                        inherit.push(Bind.MappedType(
+                                            factory.createIndexedAccessTypeNode(
+                                                factory.createTypeReferenceNode('Registry'),
+                                                Bind.StringLiteral(registry_id)
                                             ),
-                                            undefined,
-                                            factory.createToken(ts.SyntaxKind.QuestionToken),
-                                            value.type, // K is assumed
-                                            undefined
-                                        )))
+                                            value.type
+                                        ))
                                     })
                                     .with({ name: 'item_slots' }, () => {
                                         const ITEM_SLOTS = 'ITEM_SLOTS'
@@ -211,55 +192,55 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                                         imports = add_import(imports, `sandstone::arguments::${ITEM_SLOTS}`)
                                         imports = add_import(imports, `sandstone::${LiteralUnion}`)
 
-                                        inherit.push(factory.createTypeReferenceNode('Record', [
+                                        inherit.push(Bind.MappedType(
                                             factory.createTypeReferenceNode(LiteralUnion, [
                                                 factory.createTypeReferenceNode(ITEM_SLOTS)
                                             ]),
                                             value.type
-                                        ]))
+                                        ))
                                     })
                                     .with({ name: 'objective' }, () => {
                                         const Objective = 'ObjectiveClass'
                                         imports = add_import(imports, `sandstone::${Objective}`)
 
-                                        inherit.push(factory.createTypeReferenceNode('Record', [
+                                        inherit.push(Bind.MappedType(
                                             factory.createUnionTypeNode([
                                                 factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
                                                 factory.createTypeReferenceNode(Objective)
                                             ]),
                                             value.type
-                                        ]))
+                                        ))
                                     })
                                     .with({ name: 'texture_slot' }, () => {
                                         // TODO: Implement Model struct generic, this is `kind="definition"`
-                                        inherit.push(factory.createTypeReferenceNode('Record', [
+                                        inherit.push(Bind.MappedType(
                                             factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
                                             value.type
-                                        ]))
+                                        ))
                                     })
                                     .with({ name: 'criterion' }, () => {
                                         // TODO: Implement Advancement struct generic, this is `definition=true`
-                                        inherit.push(factory.createTypeReferenceNode('Record', [
+                                        inherit.push(Bind.MappedType(
                                             factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
                                             value.type
-                                        ]))
+                                        ))
                                     })
                                     .with({ name: 'crafting_ingredient' }, () => {
                                         // TODO: Implement CraftingShaped struct generic, this is `definition=true`
                                         const CRAFTING_INGREDIENT = 'CRAFTING_INGREDIENT'
                                         imports = add_import(imports, `sandstone::arguments::${CRAFTING_INGREDIENT}`) // 'A' | 'B' | 'C' ...
 
-                                        inherit.push(factory.createTypeReferenceNode('Record', [
-                                                factory.createTypeReferenceNode(CRAFTING_INGREDIENT),
-                                                value.type
-                                            ]))
+                                        inherit.push(Bind.MappedType(
+                                            factory.createTypeReferenceNode(CRAFTING_INGREDIENT),
+                                            value.type
+                                        ))
                                     })
                                     .with({ name: P.union('dispatcher_key', 'translation_key', 'permutation') }, () => {
                                         // Permutation will be implemented as an abstracted mode of the Atlas class
-                                        inherit.push(factory.createTypeReferenceNode('Record', [
+                                        inherit.push(Bind.MappedType(
                                             factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
                                             value.type
-                                        ]))
+                                        ))
                                     })
                                     .otherwise(() => {
                                         throw new Error(`[mcdoc_struct] Unsupported dynamic key attribute: ${attribute}`)
@@ -298,6 +279,11 @@ function mcdoc_struct(type: mcdoc.McdocType) {
         if (child_dispatcher !== undefined && spread === false) {
             const new_list = child_dispatcher.flatMap(([parent_count, property]) => {
                 if (parent_count === 0) {
+                    // Skip if this property was already processed (avoids duplicate child_dispatcher entries corrupting indexed_access_type)
+                    if (indexed_access === property) {
+                        return []
+                    }
+
                     const generic_prop = pair_indices[property]
 
                     if (generic_prop === undefined) {
@@ -363,18 +349,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
         } else {
             return {
                 type: template(factory.createParenthesizedType(factory.createIndexedAccessTypeNode(
-                    factory.createMappedTypeNode(
-                        undefined,
-                        factory.createTypeParameterDeclaration(
-                            undefined,
-                            'S',
-                            indexed_access_type!,
-                        ),
-                        undefined,
-                        undefined,
-                        inner_type,
-                        undefined
-                    ),
+                    Bind.MappedType(indexed_access_type!, inner_type, { key_name: 'S', parenthesized: false }),
                     indexed_access_type!
                 ))),
                 ...add({imports, child_dispatcher}),

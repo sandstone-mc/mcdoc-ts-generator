@@ -123,11 +123,11 @@ When creating TypeScript AST nodes, use plain strings instead of `factory.create
 ```ts
 // Preferred
 factory.createTypeReferenceNode('Record', [...])
-factory.createTypeParameterDeclaration(undefined, 'K', ...)
+factory.createTypeParameterDeclaration(undefined, 'T', ...)
 
 // Avoid
 factory.createTypeReferenceNode(factory.createIdentifier('Record'), [...])
-factory.createTypeParameterDeclaration(undefined, factory.createIdentifier('K'), ...)
+factory.createTypeParameterDeclaration(undefined, factory.createIdentifier('T'), ...)
 ```
 
 ### Naming Conventions

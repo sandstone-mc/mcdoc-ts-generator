@@ -19,6 +19,8 @@ function DispatcherArgs(args: Record<string, unknown>): asserts args is {
     generic_types?: ts.TypeNode[]
 
     dispatcher_properties?: Map<string, { supports_none?: true }>
+
+    root_type?: boolean
 } {}
 
 const SimpleKeyIndex = JSON.stringify([{
@@ -67,29 +69,39 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
         )
 
         if (indices.length === 1 && indices[0].kind === 'dynamic' && typeof indices[0].accessor.at(-1) === 'string') {
-            child_dispatcher = [[indices[0].accessor.length - 1, indices[0].accessor.at(-1) as string]]
-
-            // Result: Dispatcher['registry'][S]
-            const indexed_type = factory.createIndexedAccessTypeNode(
-                base_dispatcher_type,
-                factory.createTypeReferenceNode('S')
-            )
-
-            const properties = args.dispatcher_properties?.get(registry)
-            if (properties?.supports_none) {
-                // Result: S extends undefined ? Dispatcher['registry']['%none'] : Dispatcher['registry'][S]
-                result_type = factory.createConditionalTypeNode(
-                    factory.createTypeReferenceNode('S'),
-                    factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword),
-                    factory.createIndexedAccessTypeNode(
-                        base_dispatcher_type,
-                        None
-                    ),
-                    indexed_type
+            // If this is a root type, we can't use S (no generic parameter available)
+            // Fall back to %fallback instead
+            if (args.root_type) {
+                // Result: Dispatcher['registry']['%fallback']
+                result_type = factory.createIndexedAccessTypeNode(
+                    base_dispatcher_type,
+                    Fallback
                 )
             } else {
+                child_dispatcher = [[indices[0].accessor.length - 1, indices[0].accessor.at(-1) as string]]
+
                 // Result: Dispatcher['registry'][S]
-                result_type = indexed_type
+                const indexed_type = factory.createIndexedAccessTypeNode(
+                    base_dispatcher_type,
+                    factory.createTypeReferenceNode('S')
+                )
+
+                const properties = args.dispatcher_properties?.get(registry)
+                if (properties?.supports_none) {
+                    // Result: S extends undefined ? Dispatcher['registry']['%none'] : Dispatcher['registry'][S]
+                    result_type = factory.createConditionalTypeNode(
+                        factory.createTypeReferenceNode('S'),
+                        factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword),
+                        factory.createIndexedAccessTypeNode(
+                            base_dispatcher_type,
+                            None
+                        ),
+                        indexed_type
+                    )
+                } else {
+                    // Result: Dispatcher['registry'][S]
+                    result_type = indexed_type
+                }
             }
         } else if (indices.length === 1 && indices[0].kind === 'static') {
             if (indices[0].value === '%fallback') {
