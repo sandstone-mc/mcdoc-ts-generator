@@ -180,17 +180,21 @@ function mcdoc_string(type: mcdoc.McdocType) {
                 // TODO: Implement Advancement generics
                 return (args: Record<string, unknown>) => ({ type: static_value.not_empty } as const)
             })
-            .with({ name: 'entity' }, (entity) => {
-                // TODO: Add types for entity in Assert, implement type generics
-                const Selector = 'SelectorClass'
+            .with({ name: 'entity' }, ({ value }) => {
+                let Target = 'SingleEntityArgument'
+
+                if (value === undefined || (value.values.amount?.value.value !== 'single' && value.values.type?.value.value !== 'players')) {
+                    Target = 'MultipleEntitiesArgument'
+                } else if (value.values.amount?.value.value !== 'single' && value.values.type?.value.value === 'players') {
+                    Target = 'MultiplePlayersArgument'
+                } else if (value.values.amount?.value.value === 'single' && value.values.type?.value.value === 'players') {
+                    Target = 'SinglePlayerArgument'
+                }
                 return (args: Record<string, unknown>) => ({
-                    type: factory.createUnionTypeNode([
-                        static_value.not_empty,
-                        factory.createTypeReferenceNode(Selector)
-                    ]),
+                    type: factory.createTypeReferenceNode(Target),
                     imports: {
-                        ordered: [`sandstone::${Selector}`] as NonEmptyList<string>,
-                        check: new Map([[`sandstone::${Selector}`, 0]])
+                        ordered: [`sandstone::arguments::${Target}`] as NonEmptyList<string>,
+                        check: new Map([[`sandstone::arguments::${Target}`, 0]])
                     }
                 } as const)
             })
@@ -304,11 +308,15 @@ function mcdoc_string(type: mcdoc.McdocType) {
                 const Texture = 'TextureClass'
                 // TODO: Implement Model struct generic, this is `kind="value"` or `kind="reference"`
 
+                if (value === 'reference') {
+                    return (args: Record<string, unknown>) => static_value.hash
+                }
+
                 return (args: Record<string, unknown>) => ({
                     type: factory.createUnionTypeNode([
                         static_value.not_empty,
                         static_value.hash.type,
-                        ...(value === 'value' ? [factory.createTypeReferenceNode(Texture)] : [])
+                        factory.createTypeReferenceNode(Texture)
                     ]),
                     imports: {
                         ordered: [`sandstone::${Texture}`] as NonEmptyList<string>,

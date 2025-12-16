@@ -1,7 +1,6 @@
 import * as mcdoc from '@spyglassmc/mcdoc'
 import { Set } from './utils'
 import { match, P } from 'ts-pattern'
-import type { NonEmptyList } from '.'
 
 
 type ReferenceType = {
@@ -306,7 +305,30 @@ type ImplementedAttributes = {
             value: number
         }
     },
-    entity: undefined,
+    entity: (undefined | {
+        attributes: never,
+        kind: 'tree',
+        values: {
+            amount?: {
+                attributes: never,
+                kind: 'literal',
+                value: {
+                    attributes: never,
+                    kind: 'string',
+                    value: 'single' | 'multiple'
+                }
+            },
+            type?: {
+                attributes: never,
+                kind: 'literal',
+                value: {
+                    attributes: never,
+                    kind: 'string',
+                    value: 'entities' | 'players'
+                }
+            }
+        }
+    }),
     integer: {
         attributes: never,
         kind: 'tree',
@@ -702,7 +724,7 @@ export class Assert {
                                 // @author Claude - #[permutation] requires a value
                                 throw new Error(`[mcdoc_assert] #[permutation] attribute must have a value`)
                             }
-                            if (!(attribute.value!.kind === 'tree' && 'definition' in attribute.value.values && attribute.value.values.definition.kind === 'literal' && attribute.value.values.definition.value.value === true)) {
+                            if (!(attribute.value.kind === 'tree' && 'definition' in attribute.value.values && attribute.value.values.definition.kind === 'literal' && attribute.value.values.definition.value.value === true)) {
                                 // @author Claude - #[permutation] value must be {definition: true}
                                 throw new Error(`[mcdoc_assert] #[permutation] attribute value must be a tree with 'definition: true', got: ${JSON.stringify(attribute.value)}`)
                             }
@@ -712,7 +734,34 @@ export class Assert {
                             }
                         })
                         .with('entity', (entity) => {
-                            // TODO
+                            if (attribute.value !== undefined) {
+                                if (attribute.value.kind !== 'tree') {
+                                    throw new Error(`[mcdoc_assert] #[entity] attribute value must contain arguments, received a ${attribute.value.kind}`)
+                                }
+                                const keys = new Set(Object.keys(attribute.value.values))
+
+                                if ('amount' in attribute.value.values) {
+                                    keys.delete('amount')
+                                    if (attribute.value.values.amount.kind !== 'literal' || attribute.value.values.amount.value.kind !== 'string') {
+                                        throw new Error(`[mcdoc_assert] #[entity(amount)] has unsupported value: ${JSON.stringify(attribute.value.values.amount)}`)
+                                    }
+                                    if (attribute.value.values.amount.value.value !== 'multiple' && attribute.value.values.amount.value.value !== 'single') {
+                                        throw new Error(`[mcdoc_assert] #[entity(amount="${attribute.value.values.amount.value.value}")] is unsupported`)
+                                    }
+                                }
+                                if ('type' in attribute.value.values) {
+                                    keys.delete('type')
+                                    if (attribute.value.values.type.kind !== 'literal' || attribute.value.values.type.value.kind !== 'string') {
+                                        throw new Error(`[mcdoc_assert] #[entity(type)] has unsupported value: ${JSON.stringify(attribute.value.values.type)}`)
+                                    }
+                                    if (attribute.value.values.type.value.value !== 'entities' && attribute.value.values.type.value.value !== 'players') {
+                                        throw new Error(`[mcdoc_assert] #[entity(type="${attribute.value.values.type.value.value}")] is unsupported`)
+                                    }
+                                }
+                                if (keys.size > 0) {
+                                    throw new Error(`[mcdoc_assert] Unsupported #[entity] attribute arguments: ${[...keys.values()].join(', ')}`)
+                                }
+                            }
                         })
                         .with('random', 'regex_pattern', 'time_pattern', 'canonical', 'text_component', 'score_holder', 'objective', 'translation_key', 'translation_value', 'item_slots', 'uuid', 'url', 'team', 'game_rule', 'tag', 'block_predicate', (a) => {
                             // these two are old attributes

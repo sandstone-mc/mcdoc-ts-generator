@@ -145,6 +145,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                         .with('string', () => {
                             if (pair.key.attributes === undefined) {
                                 Assert.StringType(pair.key)
+                                // TODO: docs
                                 inherit.push(Bind.MappedType(
                                     ((('lengthRange' in pair.key && 'min' in pair.key.lengthRange) ? pair.key.lengthRange.min : 0) >= 1 ?
                                         Bind.NonEmptyString
@@ -158,7 +159,6 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                                 // There's only ever one attribute
                                 const attribute = pair.key.attributes[0]
 
-                                // TODO: Implement non-empty string types here
                                 match(attribute)
                                     .with({ name: 'id' }, (attr) => {
                                         const id_attr = attr.value

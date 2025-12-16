@@ -64,10 +64,22 @@ export class Bind {
      */
     static MappedType(key_type: ts.TypeNode, value_type: ts.TypeNode, options?: { key_name?: string, parenthesized?: boolean }) {
         const { key_name = 'Key', parenthesized = true } = options ?? {}
-        const constraint_type = factory.createTypeReferenceNode('Extract', [
-            key_type,
-            factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
-        ])
+        const constraint_type = key_type.kind === ts.SyntaxKind.StringKeyword ? Bind.NonEmptyString : factory.createTemplateLiteralType(
+            factory.createTemplateHead(''),
+            [
+                factory.createTemplateLiteralTypeSpan(
+                    factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
+                    factory.createTemplateMiddle('')
+                ),
+                factory.createTemplateLiteralTypeSpan(
+                    factory.createTypeReferenceNode('Extract', [
+                        key_type,
+                        factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
+                    ]),
+                    factory.createTemplateTail('')
+                )
+            ]
+        )
         const mapped_type = factory.createMappedTypeNode(
             undefined,
             factory.createTypeParameterDeclaration(
