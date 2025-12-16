@@ -31,6 +31,11 @@ type DispatcherSymbolResult = {
         readonly check: Map<string, number>
     }
     readonly references?: DispatcherReferenceCounter
+    /**
+     * Number of required generic parameters for this dispatcher (excluding CASE).
+     * Determined by whether the first member is a template type.
+     */
+    readonly generic_count: number
 }
 
 type DispatcherMember = { typeDef: mcdoc.McdocType }
@@ -320,6 +325,7 @@ export function dispatcher_symbol(
         ],
         ...add({imports}),
         ...(has_references ? { references: dispatcher_references.get(id)! } : {} ),
+        generic_count: has_generics && first_type.kind === 'template' ? first_type.typeParams.length : 0,
     } as const
 }
 

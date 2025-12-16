@@ -21,14 +21,21 @@ export type ResolvedSymbol = {
 }
 
 export type ResolvedRegistry = {
-    symbol_path: string,
-    registry: ts.Identifier,
-    constant_name: string
+    import_path: string,
+    registry: ts.Identifier
 }
 
 export type ResolvedDispatcher = {
-    symbol_path: string,
-    type: ts.TypeReferenceNode
+    import_path: string,
+    type: ts.TypeReferenceNode,
+    /**
+     * Number of required generic parameters (excluding CASE)
+     */
+    generic_count: number,
+    /**
+     * The symbol type name (e.g., "SymbolDataComponent")
+     */
+    symbol_name: string
 }
 
 export class TypesGenerator {
@@ -114,8 +121,7 @@ export class TypesGenerator {
 
             this.resolved_registries.set(registry_name, {
                 registry: factory.createIdentifier(type_name),
-                symbol_path,
-                constant_name: type_name,
+                import_path: `${symbol_path}::${type_name}`,
             })
         }
     }
@@ -196,7 +202,7 @@ export class TypesGenerator {
             const name = pascal_case(`${namespace === 'mcdoc' ? 'mcdoc_' : ''}${_name}`)
 
             // Once/if the dispatcher symbol map gets declaration paths we can switch to that instead of `references`
-            const { types, imports, references } = DispatcherSymbol(id, name, members, this.dispatcher_properties, module_map)
+            const { types, imports, references, generic_count } = DispatcherSymbol(id, name, members, this.dispatcher_properties, module_map)
 
             let in_module = false
 
@@ -218,8 +224,10 @@ export class TypesGenerator {
             // Store dispatcher reference for the Dispatcher export type
             const dispatcher_type_name = `Symbol${name}`
             this.resolved_dispatchers.set(id, {
-                symbol_path: `${symbol_path}::Symbol${name}`,
-                type: factory.createTypeReferenceNode(dispatcher_type_name)
+                import_path: `${symbol_path}::${dispatcher_type_name}`,
+                type: factory.createTypeReferenceNode(dispatcher_type_name),
+                generic_count,
+                symbol_name: dispatcher_type_name
             })
 
             if (in_module && this.resolved_symbols.has(symbol_path)) {
