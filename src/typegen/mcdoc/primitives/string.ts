@@ -4,6 +4,7 @@ import * as mcdoc from '@spyglassmc/mcdoc'
 import type { NonEmptyList, TypeHandler } from '..'
 import { Assert } from '../assert'
 import { Bind } from '../bind'
+import { add_import } from '../utils'
 
 const { factory } = ts
 
@@ -26,6 +27,21 @@ const static_value = {
             )
         ]
     ),
+    namespaced_tag: {
+        type: factory.createTemplateLiteralType(
+            factory.createTemplateHead('#'),
+            [
+                factory.createTemplateLiteralTypeSpan(
+                    factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                    factory.createTemplateMiddle(':')
+                ),
+                factory.createTemplateLiteralTypeSpan(
+                    factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                    factory.createTemplateTail('')
+                )
+            ]
+        )
+    },
     namespaced: {
         type: factory.createTemplateLiteralType(
             factory.createTemplateHead(''),
@@ -99,6 +115,12 @@ const static_value = {
     }
 } as const
 
+const ResourceClasses = {
+    'minecraft:advancement': 'AdvancementClass',
+    'minecraft:function': '_RawFunctionClass'
+    // TODO: IMPORTANT - List out all sandstone resource classes
+} as const
+
 /**
  * This only handles strings as value types, not struct keys
  */
@@ -132,35 +154,130 @@ function mcdoc_string(type: mcdoc.McdocType) {
 
                 let registry_id: string
 
-                if (id_attr.kind === 'literal') {
-                    registry_id = id_attr.value.value
-                } else {
-                    registry_id = id_attr.values.registry.value.value
+                let exclude = (reg: ts.TypeNode) => reg
 
-                    // TODO: actually implement these
-                    if ('path' in id_attr.values) {}
-                    if ('definition' in id_attr.values) {}
-                    if ('exclude' in id_attr.values) {}
-                    if ('tags' in id_attr.values) {}
-                    if ('empty' in id_attr.values) {}
-                    if ('prefix' in id_attr.values) {}
-                }
-                // Import the central Registry type and index by registry ID
+                let Resource: string | (() => string | undefined) | undefined = () => registry_id in ResourceClasses ? ResourceClasses[registry_id as keyof typeof ResourceClasses] : undefined
+
                 const registry_import = `::java::_registry::Registry`
 
-                const LiteralUnion = 'LiteralUnion'
+                const extras: ts.TypeNode[] = []
+
+                const imports = {
+                    ordered: [registry_import] as NonEmptyList<string>,
+                    check: new Map([[registry_import, 0]])
+                } as const
+
+                if (id_attr.kind === 'literal') {
+                    registry_id = `minecraft:${id_attr.value.value}`
+                } else {
+                    registry_id = `minecraft:${id_attr.values.registry.value.value}`
+
+                    if ('path' in id_attr.values) {
+                        return (args: Record<string, unknown>) => ({
+                            type: static_value.namespaced.type,
+                            docs: ['', `Value: A ${registry_id} ID within a path root of \`(namespace)/textures/${id_attr.values.path!.value.value}\``]
+                        } as const)
+                    }
+                    if ('definition' in id_attr.values) {
+                        return (args: Record<string, unknown>) => ({
+                            type: static_value.namespaced.type,
+                            docs: ['', `Value: Defines a \`${registry_id}\` id.`] as NonEmptyList<string>
+                        } as const)
+                    }
+                    if ('exclude' in id_attr.values) {
+                        exclude = (reg: ts.TypeNode) => factory.createTypeReferenceNode('Exclude', [
+                            reg,
+                            factory.createParenthesizedType(factory.createUnionTypeNode(
+                                Object.values(id_attr.values.exclude!.values).map((literal) => Bind.StringLiteral(literal.value.value))
+                            ))
+                        ])
+                    }
+                    if ('tags' in id_attr.values) {
+                        const Tag = 'TagClass'
+
+                        switch (id_attr.values.tags.value.value) {
+                            case 'allowed': {
+                                extras.push(
+                                    factory.createTemplateLiteralType(
+                                        factory.createTemplateHead('#'),
+                                        [factory.createTemplateLiteralTypeSpan(
+                                            factory.createIndexedAccessTypeNode(
+                                                factory.createTypeReferenceNode('Registry'),
+                                                Bind.StringLiteral(registry_id.replace(':', ':tag/'))
+                                            ),
+                                            factory.createTemplateTail('')
+                                        )]
+                                    ),
+                                    factory.createTypeReferenceNode(
+                                        Tag,
+                                        [Bind.StringLiteral(registry_id.split(':')[1])]
+                                    ),
+                                    static_value.namespaced_tag.type
+                                )
+                                add_import(imports, `sandstone::${Tag}`)
+                            } break
+                            case 'implicit': {
+                                return (args: Record<string, unknown>) => ({
+                                    type: factory.createParenthesizedType(factory.createUnionTypeNode([
+                                        factory.createIndexedAccessTypeNode(
+                                            factory.createTypeReferenceNode('Registry'),
+                                            Bind.StringLiteral(registry_id.replace(':', ':tag/'))
+                                        ),
+                                        static_value.namespaced.type
+                                    ])),
+                                    imports
+                                } as const)
+                            } break
+                            case 'required': {
+                                add_import(imports, 'sandstone::TagClass')
+                                return (args: Record<string, unknown>) => ({
+                                    type: factory.createParenthesizedType(factory.createUnionTypeNode([
+                                        factory.createTemplateLiteralType(
+                                            factory.createTemplateHead('#'),
+                                            [factory.createTemplateLiteralTypeSpan(
+                                                factory.createIndexedAccessTypeNode(
+                                                    factory.createTypeReferenceNode('Registry'),
+                                                    Bind.StringLiteral(registry_id.replace(':', ':tag/'))
+                                                ),
+                                                factory.createTemplateTail('')
+                                            )]
+                                        ),
+                                        factory.createTypeReferenceNode(
+                                            Tag,
+                                            [Bind.StringLiteral(registry_id.split(':')[1])]
+                                        ),
+                                        static_value.namespaced.type
+                                    ])),
+                                    imports
+                                } as const)
+                            } break
+                        }
+                    }
+                    if ('empty' in id_attr.values) {
+                        extras.push(Bind.StringLiteral(''))
+                    }
+                    if ('prefix' in id_attr.values) {
+                        throw new Error('[mcdoc_string] ID prefix is not currently supported as a value')
+                    }
+                }
+
+                Resource = Resource()
+                
+                if (Resource !== undefined) {
+                    extras.push(factory.createTypeReferenceNode(Resource))
+                    add_import(imports, `sandstone::${Resource}`)
+                }
 
                 return (args: Record<string, unknown>) => ({
-                    type: factory.createTypeReferenceNode(LiteralUnion, [
-                        factory.createIndexedAccessTypeNode(
+                    type: factory.createParenthesizedType(factory.createUnionTypeNode([
+                        exclude(factory.createIndexedAccessTypeNode(
                             factory.createTypeReferenceNode('Registry'),
                             Bind.StringLiteral(registry_id)
-                        )
-                    ]),
-                    imports: {
-                        ordered: [registry_import, `sandstone::${LiteralUnion}`] as NonEmptyList<string>,
-                        check: new Map([[registry_import, 0], [`sandstone::${LiteralUnion}`, 1]])
-                    }
+                        )),
+                        static_value.namespaced.type,
+                        ...extras
+                    ])),
+                    imports
                 } as const)
             }).narrow()
             .with({ name: 'color' }, ({ value: { value: { value } } }) => {

@@ -237,6 +237,12 @@ export function dispatcher_symbol(
                 factory.createStringLiteral(member_key, true),
                 undefined,
                 member_ref
+            ),
+            factory.createPropertySignature(
+                undefined,
+                factory.createStringLiteral(`minecraft:${member_key}`, true),
+                undefined,
+                member_ref
             )
         )
     }

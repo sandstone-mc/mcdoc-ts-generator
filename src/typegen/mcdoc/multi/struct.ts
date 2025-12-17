@@ -177,7 +177,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
 
                                         imports = add_import(imports, registry_import)
 
-                                        // TODO: Handle #[id()] key arguments; path, exclude, and prefix="!"
+                                        // TODO: IMPORTANT - Handle #[id()] key arguments; path, exclude, and prefix="!"
                                         inherit.push(Bind.MappedType(
                                             factory.createIndexedAccessTypeNode(
                                                 factory.createTypeReferenceNode('Registry'),

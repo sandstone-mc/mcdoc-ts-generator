@@ -105,7 +105,7 @@ export class TypesGenerator {
                                     undefined,
                                     [factory.createAsExpression(
                                         factory.createArrayLiteralExpression(
-                                            registry.map((s) => factory.createStringLiteral(s, true)),
+                                            registry.flatMap((s) => [factory.createStringLiteral(s, true), factory.createStringLiteral(s.split(':')[1], true)]),
                                             true
                                         ),
                                         factory.createTypeReferenceNode('const')

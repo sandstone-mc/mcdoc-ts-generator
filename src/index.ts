@@ -1,4 +1,4 @@
-import path, { dirname, resolve } from 'path'
+import { dirname, resolve } from 'path'
 import { fileURLToPath, pathToFileURL } from 'url'
 
 import {
@@ -19,7 +19,8 @@ import { fetchWithCache } from './util/fetch'
 import { TypesGenerator } from './typegen'
 import { compile_types } from './typegen/compile'
 import { handle_imports } from './typegen/import'
-import { export_registry, export_dispatcher } from './typegen/export'
+
+// TODO: IMPORTANT - Make this into an installable library you can run with `pnpm dlx mcdoc_ts_generator`
 
 const cache_root = join(dirname(fileURLToPath(import.meta.url)), 'cache')
 
@@ -225,15 +226,14 @@ const TypeGen = new TypesGenerator()
 
 TypeGen.resolve_types(service.project.symbols)
 
-const { resolved_registries, resolved_dispatchers, resolved_symbols } = TypeGen
-
-for await (const [symbol_path, { exports, imports }] of resolved_symbols.entries()) {
+for await (const [symbol_path, { exports, imports }] of TypeGen.resolved_symbols.entries()) {
     const parts = symbol_path.split('::')
     if (parts[0] === '') {
         parts.shift()
     }
     const file = parts.slice(1)
 
+    // TODO: IMPORTANT - set directory
     file.unshift('types')
 
     const outPath = `${join(...file)}.ts`
@@ -246,6 +246,7 @@ for await (const [symbol_path, { exports, imports }] of resolved_symbols.entries
     await Bun.write(outPath, code)
 }
 
+// TODO: IMPORTANT - Update this and make sure all imports are working
 await Bun.write(join(generated_path, 'tsconfig.json'), JSON.stringify({
     compilerOptions: {
         allowImportingTsExtensions: true,
