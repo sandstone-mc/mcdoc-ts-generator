@@ -177,6 +177,16 @@ export class TypesGenerator {
                 const name = path.at(-1)!
                 const module_path = path.slice(0, -1).join('::')
 
+                // Skip root type references without attributes.
+                // These are import-to-export type aliases (e.g., `type X = X` where X is imported)
+                // that cause TS2440 conflicts and break enum doc propagation.
+                if (type.kind === 'reference') {
+                    const has_attrs = 'attributes' in type && Array.isArray(type.attributes) && type.attributes.length > 0
+                    if (!has_attrs) {
+                        continue
+                    }
+                }
+
                 const resolved_member = get_type_handler(type)(type)({
                     dispatcher_properties: this.dispatcher_properties,
                     root_type: true,

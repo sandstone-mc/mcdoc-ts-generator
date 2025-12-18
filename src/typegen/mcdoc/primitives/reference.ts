@@ -25,9 +25,21 @@ function mcdoc_reference(type: mcdoc.McdocType) {
     return (args: Record<string, unknown>) => {
         ReferenceArgs(args)
 
-        const type_name_point = reference.path.lastIndexOf(':')
-        const type_name = reference.path.slice(type_name_point + 1)
-        const base_path = reference.path.slice(0, type_name_point - 1)
+        let import_path = reference.path
+
+        // If the referenced type is itself a reference without attributes, follow the chain (one level).
+        // This handles import-to-export type aliases that would otherwise point to non-existent types.
+        const initial_peek = args.module_map[reference.path]?.data
+        if (initial_peek !== undefined && initial_peek !== null && typeof initial_peek === 'object' && 'typeDef' in initial_peek) {
+            const initial_type = initial_peek.typeDef as mcdoc.McdocType
+            if (initial_type.kind === 'reference' && !('attributes' in initial_type && Array.isArray(initial_type.attributes) && initial_type.attributes.length > 0)) {
+                import_path = (initial_type as { path: string }).path
+            }
+        }
+
+        const type_name_point = import_path.lastIndexOf(':')
+        const type_name = import_path.slice(type_name_point + 1)
+        const base_path = import_path.slice(0, type_name_point - 1)
 
         if ('dispatcher_symbol' in args) {
             const dispatcher = args.dispatcher_symbol()
@@ -43,8 +55,8 @@ function mcdoc_reference(type: mcdoc.McdocType) {
 
         // Don't import modules that will end up in the same file
         const imports = args.module_path === base_path ? undefined : {
-            ordered: [reference.path] as NonEmptyList<string>,
-            check: new Map([[reference.path, 0]]) as Map<string, number>,
+            ordered: [import_path] as NonEmptyList<string>,
+            check: new Map([[import_path, 0]]) as Map<string, number>,
         } as const
 
         let docs: NonEmptyList<(string | [string])> | undefined
@@ -53,7 +65,7 @@ function mcdoc_reference(type: mcdoc.McdocType) {
 
         let id_wrap = (ref: ts.TypeReferenceNode) => ref as (ts.TypeReferenceNode | ts.ParenthesizedTypeNode)
 
-        const peek = args.module_map[reference.path]?.data
+        const peek = args.module_map[import_path]?.data
 
         if (peek !== undefined && peek !== null && typeof peek === 'object' && 'typeDef' in peek) {
             const referenced_type = peek.typeDef as mcdoc.McdocType
