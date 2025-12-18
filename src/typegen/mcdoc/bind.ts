@@ -41,6 +41,26 @@ export class Bind {
     )
 
     /**
+     * Creates a template literal type that represents a namespaced identifier.
+     * ```ts
+     * type Namespaced = `${string}:${string}` // <-- This type
+     * ```
+     */
+    static readonly Namespaced = factory.createTemplateLiteralType(
+        factory.createTemplateHead(''),
+        [
+            factory.createTemplateLiteralTypeSpan(
+                factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                factory.createTemplateMiddle(':')
+            ),
+            factory.createTemplateLiteralTypeSpan(
+                factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                factory.createTemplateTail('')
+            )
+        ]
+    )
+
+    /**
      * Creates a mapped type with optional properties.
      *
      * The key type is always wrapped in `Extract<KeyType, string>` for safety.

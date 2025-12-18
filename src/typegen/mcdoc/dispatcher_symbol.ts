@@ -1,5 +1,5 @@
 import ts from 'typescript'
-import type { SymbolMap } from '@spyglassmc/core'
+import type { SymbolMap, SymbolUtil } from '@spyglassmc/core'
 import * as mcdoc from '@spyglassmc/mcdoc'
 import { get_type_handler, type NonEmptyList, type TypeHandlerResult } from '.'
 import { merge_imports } from './utils'
@@ -69,6 +69,7 @@ export function dispatcher_symbol(
     members: SymbolMap,
     dispatcher_properties: Map<string, { supports_none?: true }>,
     module_map: SymbolMap,
+    symbols: SymbolUtil,
 ): DispatcherSymbolResult {
     let imports = undefined as unknown as TypeHandlerResult['imports']
     let has_references = false
@@ -124,6 +125,7 @@ export function dispatcher_symbol(
             dispatcher_symbol: add_reference,
             dispatcher_properties,
             module_map,
+            symbols,
         })
 
         // Collect imports from fallback type
@@ -161,6 +163,7 @@ export function dispatcher_symbol(
             dispatcher_symbol: add_reference,
             dispatcher_properties,
             module_map,
+            symbols,
         })
 
         // Collect imports from none type
@@ -202,6 +205,7 @@ export function dispatcher_symbol(
             dispatcher_symbol: add_reference,
             dispatcher_properties,
             module_map,
+            symbols,
         })
 
         // Collect imports

@@ -65,10 +65,10 @@ export class TypesGenerator {
 
         console.log('modules')
         const module_map = symbols.getVisibleSymbols('mcdoc')
-        this.resolve_module_symbols(module_map)
+        this.resolve_module_symbols(module_map, symbols)
 
         console.log('dispatchers')
-        this.resolve_dispatcher_symbols(dispatchers, module_map)
+        this.resolve_dispatcher_symbols(dispatchers, module_map, symbols)
         const dispatcher_exports = export_dispatcher(this.resolved_dispatchers)
         this.resolved_symbols.set('mcdoc::dispatcher', dispatcher_exports)
     }
@@ -152,7 +152,7 @@ export class TypesGenerator {
         }
     }
 
-    private resolve_module_symbols(module_map: SymbolMap) {
+    private resolve_module_symbols(module_map: SymbolMap, symbols: SymbolUtil) {
         for (const _path of Object.keys(module_map)) {
             const { data } = module_map[_path]
 
@@ -193,6 +193,7 @@ export class TypesGenerator {
                     name,
                     module_path,
                     module_map,
+                    symbols,
                 })
 
                 const module = (() => {
@@ -228,7 +229,7 @@ export class TypesGenerator {
         }
     }
 
-    private resolve_dispatcher_symbols(dispatchers: SymbolMap, module_map: SymbolMap) {
+    private resolve_dispatcher_symbols(dispatchers: SymbolMap, module_map: SymbolMap, symbols: SymbolUtil) {
         for (const id of Object.keys(dispatchers)) {
             const { members } = dispatchers[id]
             if (members === undefined) {
@@ -238,7 +239,7 @@ export class TypesGenerator {
             const name = pascal_case(`${namespace === 'mcdoc' ? 'mcdoc_' : ''}${_name}`)
 
             // Once/if the dispatcher symbol map gets declaration paths we can switch to that instead of `references`
-            const { types, imports, references, generic_count } = DispatcherSymbol(id, name, members, this.dispatcher_properties, module_map)
+            const { types, imports, references, generic_count } = DispatcherSymbol(id, name, members, this.dispatcher_properties, module_map, symbols)
 
             let in_module = false
 

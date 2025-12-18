@@ -137,25 +137,18 @@ factory.createTypeParameterDeclaration(undefined, factory.createIdentifier('T'),
 
 ## Remaining Issues
 
-Generated types have **75 errors** when type-checked with `bun tsc --noEmit -p types/tsconfig.json`.
+Generated types have **11 errors** when type-checked with `bun tsc --noEmit -p types/tsconfig.json`.
 
 ### Error Summary
 
 | Code | Count | Description |
 |------|-------|-------------|
-| TS2339 | 64 | Property does not exist on `Registry` |
 | TS2307 | 7 | Cannot find module |
 | TS2538 | 4 | Cannot be used as an index type |
 
 ### Root Causes
 
-**1. TS2339 - Missing registry entries**
-
-The `Registry` type is missing keys that are referenced in generated code. Run type check and grep for specific missing keys to identify gaps.
-
-Dev Note: these, like `minecraft:function`, should not attempt to use `Registry`. There's TODOs in the string type handler for this.
-
-**2. TS2538 (4 remaining) - Invalid index types in mapped type pattern**
+**1. TS2538 (4 remaining) - Invalid index types in mapped type pattern**
 
 Affects `BlockPredicate` and `EntityTypePredicate` in `types/data/advancement/predicate.ts`.
 

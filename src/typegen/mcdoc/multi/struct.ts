@@ -1,9 +1,10 @@
 import ts from 'typescript'
 import { match, P } from 'ts-pattern'
 import * as mcdoc from '@spyglassmc/mcdoc'
+import type { SymbolUtil } from '@spyglassmc/core'
 import { TypeHandlers, type NonEmptyList, type TypeHandler, type TypeHandlerResult } from '..'
 import { Assert } from '../assert'
-import { add_import, merge_imports } from '../utils'
+import { add_import, is_valid_registry, merge_imports } from '../utils'
 import { add, pascal_case } from '../../../util'
 import { Bind } from '../bind'
 
@@ -168,10 +169,22 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                                             throw new Error(`[mcdoc_struct] #[id] on a struct key is currently not handled`)
                                         }
                                         if (id_attr.kind === 'literal') {
-                                            registry_id = id_attr.value.value
+                                            registry_id = `minecraft:${id_attr.value.value}`
                                         } else {
-                                            registry_id = id_attr.values.registry.value.value
+                                            registry_id = `minecraft:${id_attr.values.registry.value.value}`
                                         }
+
+                                        const symbols = 'symbols' in args ? (args.symbols as SymbolUtil | undefined) : undefined
+
+                                        // Check if registry exists; if not, fall back to namespaced string
+                                        if (!is_valid_registry(symbols, registry_id)) {
+                                            inherit.push(Bind.MappedType(
+                                                Bind.Namespaced,
+                                                value.type
+                                            ))
+                                            return
+                                        }
+
                                         // Import the central Registry type and index by registry ID
                                         const registry_import = `::java::registry::Registry`
 

@@ -1,6 +1,23 @@
+import type { SymbolUtil } from '@spyglassmc/core'
 import type { TypeHandlerResult } from '.'
 
 export type NonEmptyList<T> = T[] & { 0: T }
+
+/**
+ * Check if a registry has entries in the symbol table.
+ * @param symbols The symbol utility
+ * @param registry_id The registry ID with minecraft: prefix (e.g., 'minecraft:block')
+ * @returns true if the registry is non-empty
+ */
+export function is_valid_registry(symbols: SymbolUtil | undefined, registry_id: string): boolean {
+    if (symbols === undefined) {
+        return true // Fall back to assuming valid if no symbols available
+    }
+    // Remove 'minecraft:' prefix to get the registry category name
+    const registry_name = registry_id.replace(/^minecraft:/, '')
+    const registry = symbols.getVisibleSymbols(registry_name as any)
+    return Object.keys(registry).length > 0
+}
 
 export function add_import(imports: TypeHandlerResult['imports'], add_import: string): NonNullable<TypeHandlerResult['imports']> {
     if (imports === undefined) {

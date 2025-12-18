@@ -1,10 +1,11 @@
 import ts from 'typescript'
 import { match, P } from 'ts-pattern'
 import * as mcdoc from '@spyglassmc/mcdoc'
+import type { SymbolUtil } from '@spyglassmc/core'
 import type { NonEmptyList, TypeHandler } from '..'
 import { Assert } from '../assert'
 import { Bind } from '../bind'
-import { add_import } from '../utils'
+import { add_import, is_valid_registry } from '../utils'
 
 const { factory } = ts
 
@@ -43,19 +44,7 @@ const static_value = {
         )
     },
     namespaced: {
-        type: factory.createTemplateLiteralType(
-            factory.createTemplateHead(''),
-            [
-                factory.createTemplateLiteralTypeSpan(
-                    StringKeyword,
-                    factory.createTemplateMiddle(':')
-                ),
-                factory.createTemplateLiteralTypeSpan(
-                    StringKeyword,
-                    factory.createTemplateTail('')
-                )
-            ]
-        )
+        type: Bind.Namespaced
     },
     hash: {
         type: factory.createTemplateLiteralType(
@@ -121,6 +110,7 @@ const ResourceClasses = {
     // TODO: IMPORTANT - List out all sandstone resource classes
 } as const
 
+
 /**
  * This only handles strings as value types, not struct keys
  */
@@ -152,113 +142,83 @@ function mcdoc_string(type: mcdoc.McdocType) {
             .with({ name: 'id', value: P.nonNullable }, ({ value }) => {
                 const id_attr = value
 
-                let registry_id: string
+                return (args: Record<string, unknown>) => {
+                    const symbols = args.symbols as SymbolUtil | undefined
 
-                let exclude = (reg: ts.TypeNode) => reg
+                    let registry_id: string
 
-                let Resource: string | (() => string | undefined) | undefined = () => registry_id in ResourceClasses ? ResourceClasses[registry_id as keyof typeof ResourceClasses] : undefined
+                    let exclude = (reg: ts.TypeNode) => reg
 
-                const registry_import = `::java::registry::Registry`
+                    let Resource: string | (() => string | undefined) | undefined = () => registry_id in ResourceClasses ? ResourceClasses[registry_id as keyof typeof ResourceClasses] : undefined
 
-                const types: ts.TypeNode[] = []
+                    const registry_import = `::java::registry::Registry`
 
-                const imports = {
-                    ordered: [registry_import] as NonEmptyList<string>,
-                    check: new Map([[registry_import, 0]])
-                } as const
+                    const types: ts.TypeNode[] = []
 
-                if (id_attr.kind === 'literal') {
-                    registry_id = `minecraft:${id_attr.value.value}`
+                    const imports = {
+                        ordered: [registry_import] as NonEmptyList<string>,
+                        check: new Map([[registry_import, 0]])
+                    }
 
-                    // TODO: IMPORTANT - Do a Set check here, there's other resources like this
-                    if (registry_id !== 'minecraft:function') {
-                        types.push(exclude(factory.createIndexedAccessTypeNode(
-                            factory.createTypeReferenceNode('Registry'),
-                            Bind.StringLiteral(registry_id)
-                        )))
+                    if (id_attr.kind === 'literal') {
+                        registry_id = `minecraft:${id_attr.value.value}`
+
+                        if (is_valid_registry(symbols, registry_id)) {
+                            types.push(exclude(factory.createIndexedAccessTypeNode(
+                                factory.createTypeReferenceNode('Registry'),
+                                Bind.StringLiteral(registry_id)
+                            )))
+                        } else {
+                            types.push(static_value.namespaced.type)
+                        }
                     } else {
-                        types.push(static_value.namespaced.type)
-                    }
-                } else {
-                    registry_id = `minecraft:${id_attr.values.registry.value.value}`
+                        registry_id = `minecraft:${id_attr.values.registry.value.value}`
 
-                    let empty_registry = false
+                        let empty_registry = !is_valid_registry(symbols, registry_id)
 
-                    // TODO: IMPORTANT - Do a Set check here, there's other resources like this
-                    if (registry_id !== 'minecraft:function') {
-                        types.push(exclude(factory.createIndexedAccessTypeNode(
-                            factory.createTypeReferenceNode('Registry'),
-                            Bind.StringLiteral(registry_id)
-                        )))
-                    } else {
-                        types.push(static_value.namespaced.type)
-                        empty_registry = true
-                    }
+                        if (!empty_registry) {
+                            types.push(exclude(factory.createIndexedAccessTypeNode(
+                                factory.createTypeReferenceNode('Registry'),
+                                Bind.StringLiteral(registry_id)
+                            )))
+                        } else {
+                            types.push(static_value.namespaced.type)
+                        }
 
-                    if ('path' in id_attr.values) {
-                        return (args: Record<string, unknown>) => ({
-                            type: static_value.namespaced.type,
-                            docs: ['', `Value: A ${registry_id} ID within a path root of \`(namespace)/textures/${id_attr.values.path!.value.value}\``]
-                        } as const)
-                    }
-                    if ('definition' in id_attr.values) {
-                        return (args: Record<string, unknown>) => ({
-                            type: static_value.namespaced.type,
-                            docs: ['', `Value: Defines a \`${registry_id}\` id.`] as NonEmptyList<string>
-                        } as const)
-                    }
-                    if ('exclude' in id_attr.values) {
-                        exclude = (reg: ts.TypeNode) => factory.createTypeReferenceNode('Exclude', [
-                            reg,
-                            factory.createParenthesizedType(factory.createUnionTypeNode(
-                                Object.values(id_attr.values.exclude!.values).map((literal) => Bind.StringLiteral(literal.value.value))
-                            ))
-                        ])
-                    }
-                    if ('tags' in id_attr.values) {
-                        const Tag = 'TagClass'
+                        if ('path' in id_attr.values) {
+                            return {
+                                type: static_value.namespaced.type,
+                                docs: ['', `Value: A ${registry_id} ID within a path root of \`(namespace)/textures/${id_attr.values.path!.value.value}\``] as NonEmptyList<string>
+                            } as const
+                        }
+                        if ('definition' in id_attr.values) {
+                            return {
+                                type: static_value.namespaced.type,
+                                docs: ['', `Value: Defines a \`${registry_id}\` id.`] as NonEmptyList<string>
+                            } as const
+                        }
+                        if ('exclude' in id_attr.values) {
+                            exclude = (reg: ts.TypeNode) => factory.createTypeReferenceNode('Exclude', [
+                                reg,
+                                factory.createParenthesizedType(factory.createUnionTypeNode(
+                                    Object.values(id_attr.values.exclude!.values).map((literal) => Bind.StringLiteral(literal.value.value))
+                                ))
+                            ])
+                        }
+                        if ('tags' in id_attr.values) {
+                            const Tag = 'TagClass'
+                            const tag_registry_id = registry_id.replace(':', ':tag/')
+                            const empty_tag_registry = !is_valid_registry(symbols, tag_registry_id)
 
-                        switch (id_attr.values.tags.value.value) {
-                            case 'allowed': {
-                                types.push(
-                                    empty_registry ? static_value.namespaced_tag.type : factory.createTemplateLiteralType(
-                                        factory.createTemplateHead('#'),
-                                        [factory.createTemplateLiteralTypeSpan(
-                                            factory.createIndexedAccessTypeNode(
-                                                factory.createTypeReferenceNode('Registry'),
-                                                Bind.StringLiteral(registry_id.replace(':', ':tag/'))
-                                            ),
-                                            factory.createTemplateTail('')
-                                        )]
-                                    ),
-                                    factory.createTypeReferenceNode(
-                                        Tag,
-                                        [Bind.StringLiteral(registry_id.split(':')[1])]
-                                    ),
-                                )
-                                add_import(imports, `sandstone::${Tag}`)
-                            } break
-                            case 'implicit': {
-                                return (args: Record<string, unknown>) => ({
-                                    type: empty_registry ? static_value.namespaced.type : factory.createParenthesizedType(factory.createUnionTypeNode([
-                                        factory.createIndexedAccessTypeNode(
-                                            factory.createTypeReferenceNode('Registry'),
-                                            Bind.StringLiteral(registry_id.replace(':', ':tag/'))
-                                        ),
-                                    ])),
-                                    imports
-                                } as const)
-                            } break
-                            case 'required': {
-                                add_import(imports, 'sandstone::TagClass')
-                                return (args: Record<string, unknown>) => ({
-                                    type: factory.createParenthesizedType(factory.createUnionTypeNode([
-                                        empty_registry ? static_value.namespaced_tag.type : factory.createTemplateLiteralType(
+                            switch (id_attr.values.tags.value.value) {
+                                case 'allowed': {
+                                    types.push(
+                                        empty_tag_registry ? static_value.namespaced_tag.type : factory.createTemplateLiteralType(
                                             factory.createTemplateHead('#'),
                                             [factory.createTemplateLiteralTypeSpan(
                                                 factory.createIndexedAccessTypeNode(
                                                     factory.createTypeReferenceNode('Registry'),
-                                                    Bind.StringLiteral(registry_id.replace(':', ':tag/'))
+                                                    Bind.StringLiteral(tag_registry_id)
                                                 ),
                                                 factory.createTemplateTail('')
                                             )]
@@ -267,31 +227,64 @@ function mcdoc_string(type: mcdoc.McdocType) {
                                             Tag,
                                             [Bind.StringLiteral(registry_id.split(':')[1])]
                                         ),
-                                    ])),
-                                    imports
-                                } as const)
-                            } break
+                                    )
+                                    add_import(imports, `sandstone::${Tag}`)
+                                } break
+                                case 'implicit': {
+                                    return {
+                                        type: empty_tag_registry ? static_value.namespaced.type : factory.createParenthesizedType(factory.createUnionTypeNode([
+                                            factory.createIndexedAccessTypeNode(
+                                                factory.createTypeReferenceNode('Registry'),
+                                                Bind.StringLiteral(tag_registry_id)
+                                            ),
+                                        ])),
+                                        imports
+                                    } as const
+                                }
+                                case 'required': {
+                                    add_import(imports, 'sandstone::TagClass')
+                                    return {
+                                        type: factory.createParenthesizedType(factory.createUnionTypeNode([
+                                            empty_tag_registry ? static_value.namespaced_tag.type : factory.createTemplateLiteralType(
+                                                factory.createTemplateHead('#'),
+                                                [factory.createTemplateLiteralTypeSpan(
+                                                    factory.createIndexedAccessTypeNode(
+                                                        factory.createTypeReferenceNode('Registry'),
+                                                        Bind.StringLiteral(tag_registry_id)
+                                                    ),
+                                                    factory.createTemplateTail('')
+                                                )]
+                                            ),
+                                            factory.createTypeReferenceNode(
+                                                Tag,
+                                                [Bind.StringLiteral(registry_id.split(':')[1])]
+                                            ),
+                                        ])),
+                                        imports
+                                    } as const
+                                }
+                            }
+                        }
+                        if ('empty' in id_attr.values) {
+                            types.push(Bind.StringLiteral(''))
+                        }
+                        if ('prefix' in id_attr.values) {
+                            throw new Error('[mcdoc_string] ID prefix is not currently supported as a value')
                         }
                     }
-                    if ('empty' in id_attr.values) {
-                        types.push(Bind.StringLiteral(''))
-                    }
-                    if ('prefix' in id_attr.values) {
-                        throw new Error('[mcdoc_string] ID prefix is not currently supported as a value')
-                    }
-                }
 
-                Resource = Resource()
-                
-                if (Resource !== undefined) {
-                    types.push(factory.createTypeReferenceNode(Resource))
-                    add_import(imports, `sandstone::${Resource}`)
-                }
+                    Resource = Resource()
 
-                return (args: Record<string, unknown>) => ({
-                    type: types.length === 0 ? types[0] : factory.createParenthesizedType(factory.createUnionTypeNode(types)),
-                    imports
-                } as const)
+                    if (Resource !== undefined) {
+                        types.push(factory.createTypeReferenceNode(Resource))
+                        add_import(imports, `sandstone::${Resource}`)
+                    }
+
+                    return {
+                        type: types.length === 0 ? types[0] : factory.createParenthesizedType(factory.createUnionTypeNode(types)),
+                        imports
+                    } as const
+                }
             }).narrow()
             .with({ name: 'color' }, ({ value: { value: { value } } }) => {
                 Assert.ColorStringType(value)
