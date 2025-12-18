@@ -155,6 +155,8 @@ function mcdoc_string(type: mcdoc.McdocType) {
 
                     const types: ts.TypeNode[] = []
 
+                    let has_non_indexable = false
+
                     const imports = {
                         ordered: [registry_import] as NonEmptyList<string>,
                         check: new Map([[registry_import, 0]])
@@ -229,6 +231,7 @@ function mcdoc_string(type: mcdoc.McdocType) {
                                         ),
                                     )
                                     add_import(imports, `sandstone::${Tag}`)
+                                    has_non_indexable = true
                                 } break
                                 case 'implicit': {
                                     return {
@@ -278,10 +281,17 @@ function mcdoc_string(type: mcdoc.McdocType) {
                     if (Resource !== undefined) {
                         types.push(factory.createTypeReferenceNode(Resource))
                         add_import(imports, `sandstone::${Resource}`)
+                        has_non_indexable = true
+                    }
+
+                    const result_type = types.length === 1 ? types[0] : factory.createParenthesizedType(factory.createUnionTypeNode(types))
+
+                    if (has_non_indexable) {
+                        Object.assign(result_type, { '--mcdoc_has_non_indexable': true })
                     }
 
                     return {
-                        type: types.length === 0 ? types[0] : factory.createParenthesizedType(factory.createUnionTypeNode(types)),
+                        type: result_type,
                         imports
                     } as const
                 }

@@ -246,7 +246,6 @@ for await (const [symbol_path, { exports, imports }] of TypeGen.resolved_symbols
     await Bun.write(outPath, code)
 }
 
-// TODO: IMPORTANT - Update this and make sure all imports are working
 await Bun.write(join('types', 'tsconfig.json'), JSON.stringify({
     compilerOptions: {
         allowImportingTsExtensions: true,

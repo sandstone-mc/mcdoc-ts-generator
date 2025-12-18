@@ -83,10 +83,17 @@ function mcdoc_union(type: mcdoc.McdocType) {
             }) : undefined
         ) as unknown as undefined | NonEmptyList<string | [string]>
 
+        const result_type = members.length === 1 ? members[0] : factory.createParenthesizedType(
+            factory.createUnionTypeNode(members)
+        )
+
+        // Propagate non-indexable marker if any member has it
+        if (members.some(m => '--mcdoc_has_non_indexable' in m)) {
+            Object.assign(result_type, { '--mcdoc_has_non_indexable': true })
+        }
+
         return {
-            type: members.length === 1 ? members[0] : factory.createParenthesizedType(
-                factory.createUnionTypeNode(members)
-            ),
+            type: result_type,
             ...add({imports, child_dispatcher, docs})
         } as const
     }

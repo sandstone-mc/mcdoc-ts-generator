@@ -35,17 +35,22 @@ function mcdoc_list(type: mcdoc.McdocType) {
 
             imports = add_import(imports, NBTListImport)
 
+            const list_type = factory.createTypeReferenceNode(NBTListType, [
+                item.type,
+                factory.createTypeLiteralNode(generic),
+            ])
+            Object.assign(list_type, { '--mcdoc_has_non_indexable': true })
+
             return {
-                type: factory.createTypeReferenceNode(NBTListType, [
-                    item.type,
-                    factory.createTypeLiteralNode(generic),
-                ]),
+                type: list_type,
                 docs,
                 ...add({imports, child_dispatcher}),
             } as const
         } else {
+            const array_type = factory.createTypeReferenceNode('Array', [item.type])
+            Object.assign(array_type, { '--mcdoc_has_non_indexable': true })
             return {
-                type: factory.createTypeReferenceNode('Array', [item.type]),
+                type: array_type,
                 ...add({imports, child_dispatcher}),
             } as const
         }

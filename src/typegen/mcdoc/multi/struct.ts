@@ -316,7 +316,18 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                     indexed_access_type = pairs[generic_prop].type
 
                     // yes this is cursed
-                    if ('--mcdoc_id_ref' in indexed_access_type!) {
+                    if ('--mcdoc_has_non_indexable' in indexed_access_type!) {
+                        // Keep original type - don't replace with S
+                        // pairs[generic_prop].type stays as-is
+                        if (root_type) {
+                            template = (type_node: typeof inner_type) => factory.createTypeAliasDeclaration(
+                                [factory.createToken(ts.SyntaxKind.ExportKeyword)],
+                                args.name,
+                                [factory.createTypeParameterDeclaration(undefined, 'S', undefined, factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword))],
+                                type_node
+                            )
+                        }
+                    } else if ('--mcdoc_id_ref' in indexed_access_type!) {
                         const id_ref = indexed_access_type['--mcdoc_id_ref'] as { ref: ts.TypeReferenceNode, alt: ts.ParenthesizedTypeNode }
                         // @ts-ignore
                         pairs[generic_prop].type = id_ref.alt
@@ -355,6 +366,13 @@ function mcdoc_struct(type: mcdoc.McdocType) {
         }
 
         if (indexed_access === undefined) {
+            return {
+                type: template(inner_type),
+                ...add({imports, child_dispatcher}),
+            } as const
+        } else if ('--mcdoc_has_non_indexable' in indexed_access_type!) {
+            // Skip mapped type pattern - just use inner_type directly
+            // The type parameter S is already added by the template (line 337)
             return {
                 type: template(inner_type),
                 ...add({imports, child_dispatcher}),
