@@ -252,7 +252,6 @@ await Bun.write(join('types', 'tsconfig.json'), JSON.stringify({
         allowImportingTsExtensions: true,
         noEmit: true,
         baseUrl: "./",
-        rootDir: "./",
         paths: {
             "sandstone": ["../sandstone-types/index.ts"],
             'sandstone/generated/*': [`./*`],

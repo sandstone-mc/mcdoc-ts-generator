@@ -134,3 +134,54 @@ factory.createTypeParameterDeclaration(undefined, factory.createIdentifier('T'),
 - `PascalCase`: Classes, types, static class members, effectively-static variables, type handler exports
 - `snake_case`: Functions, methods, most variables
 - Exception: Utility classes like `Assert` and `Bind`, and functions similar in nature to their methods, use PascalCase
+
+## Remaining Issues
+
+Generated types have **95 errors** when type-checked with `bun tsc --noEmit -p types/tsconfig.json`.
+
+### Error Summary
+
+| Code | Count | Description |
+|------|-------|-------------|
+| TS2339 | 64 | Property does not exist on `Registry` |
+| TS2559 | 10 | Type has no properties in common |
+| TS2440 | 7 | Import conflicts with local declaration |
+| TS2307 | 7 | Cannot find module |
+| TS2538 | 4 | Cannot be used as an index type |
+| TS2395 | 2 | Merged declaration export mismatch |
+| TS6059 | 1 | rootDir configuration issue |
+
+### Root Causes
+
+**1. TS2339 - Missing registry entries**
+
+The `Registry` type is missing keys that are referenced in generated code. Run type check and grep for specific missing keys to identify gaps.
+
+Dev Note: these, like `minecraft:function`, should not attempt to use `Registry`. There's TODOs in the string type handler for this. 
+
+**2. TS2440 - Import/local declaration conflicts**
+
+Files import a type then re-declare it locally with the same name:
+- `types/util.ts`: `BlockState`, `DyeColor`, `DyeColorByte`, `DyeColorInt`, `EffectId`
+- `types/data/enchantment.ts`: `LevelBasedValue`
+
+Dev Note: these are import-to-export type aliases from upstream, they break enum doc propagation and are annoying.
+this should be fixed in two parts:
+- if a reference peek returns another reference, peek that reference and update the import
+- skip root type references when resolving the module map
+
+**3. TS2538 (4 remaining) - Invalid index types in mapped type pattern**
+
+Affects `BlockPredicate` and `EntityTypePredicate` in `types/data/advancement/predicate.ts`.
+
+The generator creates mapped types with `Extract<Union, string>` for keys but uses the unfiltered union for the indexed access:
+```ts
+type BlockPredicate = ({
+    [S in Extract<(Registry['minecraft:block'] | TagClass<'block'> | Array<...>), string>]?: { ... };
+}[(Registry['minecraft:block'] | TagClass<'block'> | Array<...>)])  // ← TagClass and Array are not valid index types
+```
+
+Dev Note: the `Extract` here is actually a bug because we need the value where `S` is defined to support the class/array types.
+we need to make `S` actually be a type generic initialized to `undefined`, and leave the value where `S` would have been defined alone.
+to do this, the string type handler has to somehow pass the info that "hey, this contains stuff that isn't a literal nor literal union, don't touch this".
+probably want to do another hacky `Object.assign` thing for this.

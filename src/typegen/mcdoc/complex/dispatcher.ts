@@ -46,11 +46,18 @@ function DispatcherGeneric(registry: string, args: ts.TypeNode[]) {
 /**
  * Helper to create `(S extends keyof Dispatcher<'minecraft:trigger'> ? Dispatcher<'minecraft:trigger'>[S] : Record<string, unknown>)` - get map then index
  */
-function DispatcherMapIndex(registry: string, key: ts.TypeNode, generics: ts.TypeNode[], indexed?: NonEmptyList<string>) {
+function DispatcherMapIndex(registry: string, key: ts.TypeNode, generics: ts.TypeNode[]) {
     const dispatcher: ts.TypeReferenceNode | ts.IndexedAccessTypeNode = factory.createTypeReferenceNode(
         'Dispatcher',
         [Bind.StringLiteral(registry), ...(generics.length === 0 ? [] : [factory.createTupleTypeNode(generics)])]
     )
+
+    if (key.kind === ts.SyntaxKind.LiteralType) {
+        return factory.createIndexedAccessTypeNode(
+            dispatcher,
+            key
+        )
+    }
 
     return factory.createParenthesizedType(factory.createConditionalTypeNode(
       key,
