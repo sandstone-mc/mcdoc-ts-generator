@@ -44,18 +44,102 @@ function DispatcherGeneric(registry: string, args: ts.TypeNode[]) {
 }
 
 /**
- * Helper to create `Dispatcher<'registry'>[Key]` - get map then index
+ * Helper to create `(S extends keyof Dispatcher<'minecraft:trigger'> ? Dispatcher<'minecraft:trigger'>[S] : Record<string, unknown>)` - get map then index
  */
-function DispatcherMapIndex(registry: string, key: ts.TypeNode, generics: ts.TypeNode[]) {
-    return factory.createIndexedAccessTypeNode(
-        factory.createTypeReferenceNode(
-            'Dispatcher', 
-            [
-                Bind.StringLiteral(registry), 
-                ...(generics.length === 0 ? [] : [factory.createTupleTypeNode(generics)])
-            ]),
-        key
+function DispatcherMapIndex(registry: string, key: ts.TypeNode, generics: ts.TypeNode[], indexed?: NonEmptyList<string>) {
+    const dispatcher: ts.TypeReferenceNode | ts.IndexedAccessTypeNode = factory.createTypeReferenceNode(
+        'Dispatcher',
+        [Bind.StringLiteral(registry), ...(generics.length === 0 ? [] : [factory.createTupleTypeNode(generics)])]
     )
+
+    return factory.createParenthesizedType(factory.createConditionalTypeNode(
+      key,
+      factory.createTypeOperatorNode(
+        ts.SyntaxKind.KeyOfKeyword,
+        dispatcher
+      ),
+      factory.createIndexedAccessTypeNode(
+        dispatcher,
+        key
+      ),
+      factory.createTypeReferenceNode(
+        'Record',
+        [
+          factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+          factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
+        ]
+      )
+    ))
+}
+
+/**
+ * Helper to create `(S extends keyof Dispatcher<'minecraft:trigger'> ? ('sub_index' extends keyof Dispatcher<'minecraft:trigger'>[S] ? Dispatcher<'minecraft:trigger'>[S]['sub_index'] : Record<string, unknown>) : Record<string, unknown>)`
+ * 
+ * get map, index a member, index within that member
+ */
+function DispatcherMapSubIndex(registry: string, member_key: ts.TypeNode, generics: ts.TypeNode[], sub_index: NonEmptyList<string>) {
+    const dispatcher = factory.createTypeReferenceNode(
+        'Dispatcher',
+        [Bind.StringLiteral(registry), ...(generics.length === 0 ? [] : [factory.createTupleTypeNode(generics)])]
+    )
+    const dispatcher_member: ts.IndexedAccessTypeNode = factory.createIndexedAccessTypeNode(
+        dispatcher,
+        member_key
+    )
+    let indexed_dispatcher: ts.IndexedAccessTypeNode | ts.ParenthesizedTypeNode | undefined = undefined
+
+    // Assembles the type inside-out
+    for (let i = sub_index.length; i > 0; i--) {
+        const key = Bind.StringLiteral(sub_index[i - 1])
+
+        let index_stack = dispatcher_member
+
+        for (let j = 0; j < i - 1; j++) {
+            index_stack = factory.createIndexedAccessTypeNode(
+                index_stack,
+                Bind.StringLiteral(sub_index[j])
+            )
+        }
+
+        if (indexed_dispatcher === undefined) {
+            indexed_dispatcher = factory.createIndexedAccessTypeNode(
+                index_stack,
+                key
+            )
+        }
+
+        indexed_dispatcher = factory.createParenthesizedType(factory.createConditionalTypeNode(
+            key,
+            factory.createTypeOperatorNode(
+                ts.SyntaxKind.KeyOfKeyword,
+                index_stack
+            ),
+            indexed_dispatcher,
+            factory.createTypeReferenceNode(
+                'Record',
+                [
+                factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
+                ]
+            )
+        ))
+    }
+
+    return factory.createParenthesizedType(factory.createConditionalTypeNode(
+      member_key,
+      factory.createTypeOperatorNode(
+        ts.SyntaxKind.KeyOfKeyword,
+        dispatcher
+      ),
+      indexed_dispatcher!,
+      factory.createTypeReferenceNode(
+        'Record',
+        [
+          factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+          factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
+        ]
+      )
+    ))
 }
 
 /**
@@ -99,20 +183,20 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
             } else {
                 child_dispatcher = [[indices[0].accessor.length - 1, indices[0].accessor.at(-1) as string]]
 
-                // Result: Dispatcher<'registry'>[S]
+                // Result: (S extends keyof Dispatcher<'minecraft:trigger'> ? Dispatcher<'minecraft:trigger'>[S] : Record<string, unknown>)
                 const indexed_type = DispatcherMapIndex(registry, factory.createTypeReferenceNode('S'), generics)
 
                 const properties = args.dispatcher_properties?.get(registry)
                 if (properties?.supports_none) {
-                    // Result: S extends undefined ? Dispatcher<'registry', ['%none']> : Dispatcher<'registry'>[S]
-                    result_type = factory.createConditionalTypeNode(
+                    // Result: (S extends undefined ? Dispatcher<'registry', ['%none']> : (S extends keyof Dispatcher<'minecraft:trigger'> ? Dispatcher<'minecraft:trigger'>[S] : Record<string, unknown>))
+                    result_type = factory.createParenthesizedType(factory.createConditionalTypeNode(
                         factory.createTypeReferenceNode('S'),
                         factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword),
                         DispatcherGeneric(registry, [...generics, None]),
                         indexed_type
-                    )
+                    ))
                 } else {
-                    // Result: Dispatcher<'registry'>[S]
+                    // Result: (S extends keyof Dispatcher<'minecraft:trigger'> ? Dispatcher<'minecraft:trigger'>[S] : Record<string, unknown>)
                     result_type = indexed_type
                 }
             }
@@ -126,16 +210,12 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
                 result_type = DispatcherMapIndex(registry, Bind.StringLiteral(indices[0].value), generics)
             }
         } else if (JSON.stringify(indices) === SimpleKeyIndex) {
-            // Result: Dispatcher<'registry'>[Key]
-            result_type = DispatcherMapIndex(registry, factory.createTypeReferenceNode('Key'), generics)
-            // Result: Dispatcher<'registry'>[Key]['static_index']
             if (args.index_keys !== undefined) {
-                for (const key of args.index_keys) {
-                    result_type = factory.createIndexedAccessTypeNode(
-                        result_type,
-                        Bind.StringLiteral(key)
-                    )
-                }
+                // Result: (Key extends keyof Dispatcher<'minecraft:trigger'> ? ('static_index' extends keyof Dispatcher<'minecraft:trigger'>[Key] ? Dispatcher<'minecraft:trigger'>[Key]['static_index'] : Record<string, unknown>) : Record<string, unknown>)
+                result_type = DispatcherMapSubIndex(registry, factory.createTypeReferenceNode('Key'), generics, args.index_keys)
+            } else {
+                // Result: (Key extends keyof Dispatcher<'minecraft:trigger'> ? Dispatcher<'minecraft:trigger'>[Key] : Record<string, unknown>)
+                result_type = DispatcherMapIndex(registry, factory.createTypeReferenceNode('Key'), generics)
             }
         } else {
             throw new Error(`[mcdoc_dispatcher] Unsupported dispatcher: ${dispatcher}`)

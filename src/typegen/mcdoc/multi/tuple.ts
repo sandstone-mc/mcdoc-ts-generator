@@ -24,7 +24,20 @@ function mcdoc_tuple(type: mcdoc.McdocType) {
         let child_dispatcher: NonEmptyList<[parent_count: number, property: string]> | undefined
 
         for (const item of tuple.items) {
-            if (item.attributes?.indexOf((attr: mcdoc.Attribute) => attr.name === 'until') !== -1) {
+            let unsupported = false
+            if (item.attributes !== undefined) {
+                Assert.Attributes(item.attributes, true)
+
+                const attributes = item.attributes
+
+                for (const attribute of attributes) {
+                    if (attribute.name === 'until' || attribute.name === 'deprecated') {
+                        unsupported = true
+                        break
+                    }
+                }
+            }
+            if (unsupported) {
                 continue
             }
 

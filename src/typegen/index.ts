@@ -91,30 +91,56 @@ export class TypesGenerator {
                 {
                     imports: {
                         check: new Map(),
-                        ordered: ['sandstone::Set'] as const,
+                        ordered: ['sandstone::NamespacedLiteralUnion', 'sandstone::Set', 'sandstone::SetType'] as const,
                     },
-                    exports: [factory.createVariableStatement(
-                        [factory.createToken(ts.SyntaxKind.ExportKeyword)],
-                        factory.createVariableDeclarationList(
-                            [factory.createVariableDeclaration(
-                                type_name,
-                                undefined,
-                                undefined,
-                                factory.createNewExpression(
-                                    factory.createIdentifier('Set'),
-                                    undefined,
-                                    [factory.createAsExpression(
-                                        factory.createArrayLiteralExpression(
-                                            registry.flatMap((s) => [factory.createStringLiteral(s, true), factory.createStringLiteral(s.split(':')[1], true)]),
-                                            true
+                    exports: [
+                        factory.createTypeAliasDeclaration(
+                            [factory.createToken(ts.SyntaxKind.ExportKeyword)],
+                            type_name,
+                            undefined,
+                            factory.createParenthesizedType(factory.createUnionTypeNode([
+                                factory.createTypeReferenceNode(
+                                    'NamespacedLiteralUnion',
+                                    [factory.createTypeReferenceNode(
+                                        factory.createIdentifier('SetType'),
+                                        [factory.createTypeQueryNode(factory.createIdentifier(`${type_name}_SET`))]
+                                    )]
+                                ),
+                                factory.createTemplateLiteralType(
+                                    factory.createTemplateHead('minecraft:'),
+                                    [factory.createTemplateLiteralTypeSpan(
+                                        factory.createTypeReferenceNode(
+                                            factory.createIdentifier('SetType'),
+                                            [factory.createTypeQueryNode(factory.createIdentifier(`${type_name}_SET`))]
                                         ),
-                                        factory.createTypeReferenceNode('const')
+                                        factory.createTemplateTail('')
                                     )]
                                 )
-                            )],
-                            ts.NodeFlags.Const
-                        )
-                    )],
+                            ])),
+                        ),
+                        factory.createVariableStatement(
+                            [factory.createToken(ts.SyntaxKind.ExportKeyword)],
+                            factory.createVariableDeclarationList(
+                                [factory.createVariableDeclaration(
+                                    `${type_name}_SET`,
+                                    undefined,
+                                    undefined,
+                                    factory.createNewExpression(
+                                        factory.createIdentifier('Set'),
+                                        undefined,
+                                        [factory.createAsExpression(
+                                            factory.createArrayLiteralExpression(
+                                                registry.map((s) => factory.createStringLiteral(s.split(':')[1], true)),
+                                                true
+                                            ),
+                                            factory.createTypeReferenceNode('const')
+                                        )]
+                                    )
+                                )],
+                                ts.NodeFlags.Const
+                            )
+                        ),
+                    ],
                     paths: new Set()
                 }
             )

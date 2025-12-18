@@ -158,9 +158,9 @@ function mcdoc_string(type: mcdoc.McdocType) {
 
                 let Resource: string | (() => string | undefined) | undefined = () => registry_id in ResourceClasses ? ResourceClasses[registry_id as keyof typeof ResourceClasses] : undefined
 
-                const registry_import = `::java::_registry::Registry`
+                const registry_import = `::java::registry::Registry`
 
-                const extras: ts.TypeNode[] = []
+                const types: ts.TypeNode[] = []
 
                 const imports = {
                     ordered: [registry_import] as NonEmptyList<string>,
@@ -169,8 +169,31 @@ function mcdoc_string(type: mcdoc.McdocType) {
 
                 if (id_attr.kind === 'literal') {
                     registry_id = `minecraft:${id_attr.value.value}`
+
+                    // TODO: IMPORTANT - Do a Set check here, there's other resources like this
+                    if (registry_id !== 'minecraft:function') {
+                        types.push(exclude(factory.createIndexedAccessTypeNode(
+                            factory.createTypeReferenceNode('Registry'),
+                            Bind.StringLiteral(registry_id)
+                        )))
+                    } else {
+                        types.push(static_value.namespaced.type)
+                    }
                 } else {
                     registry_id = `minecraft:${id_attr.values.registry.value.value}`
+
+                    let empty_registry = false
+
+                    // TODO: IMPORTANT - Do a Set check here, there's other resources like this
+                    if (registry_id !== 'minecraft:function') {
+                        types.push(exclude(factory.createIndexedAccessTypeNode(
+                            factory.createTypeReferenceNode('Registry'),
+                            Bind.StringLiteral(registry_id)
+                        )))
+                    } else {
+                        types.push(static_value.namespaced.type)
+                        empty_registry = true
+                    }
 
                     if ('path' in id_attr.values) {
                         return (args: Record<string, unknown>) => ({
@@ -197,8 +220,8 @@ function mcdoc_string(type: mcdoc.McdocType) {
 
                         switch (id_attr.values.tags.value.value) {
                             case 'allowed': {
-                                extras.push(
-                                    factory.createTemplateLiteralType(
+                                types.push(
+                                    empty_registry ? static_value.namespaced_tag.type : factory.createTemplateLiteralType(
                                         factory.createTemplateHead('#'),
                                         [factory.createTemplateLiteralTypeSpan(
                                             factory.createIndexedAccessTypeNode(
@@ -212,18 +235,16 @@ function mcdoc_string(type: mcdoc.McdocType) {
                                         Tag,
                                         [Bind.StringLiteral(registry_id.split(':')[1])]
                                     ),
-                                    static_value.namespaced_tag.type
                                 )
                                 add_import(imports, `sandstone::${Tag}`)
                             } break
                             case 'implicit': {
                                 return (args: Record<string, unknown>) => ({
-                                    type: factory.createParenthesizedType(factory.createUnionTypeNode([
+                                    type: empty_registry ? static_value.namespaced.type : factory.createParenthesizedType(factory.createUnionTypeNode([
                                         factory.createIndexedAccessTypeNode(
                                             factory.createTypeReferenceNode('Registry'),
                                             Bind.StringLiteral(registry_id.replace(':', ':tag/'))
                                         ),
-                                        static_value.namespaced.type
                                     ])),
                                     imports
                                 } as const)
@@ -232,7 +253,7 @@ function mcdoc_string(type: mcdoc.McdocType) {
                                 add_import(imports, 'sandstone::TagClass')
                                 return (args: Record<string, unknown>) => ({
                                     type: factory.createParenthesizedType(factory.createUnionTypeNode([
-                                        factory.createTemplateLiteralType(
+                                        empty_registry ? static_value.namespaced_tag.type : factory.createTemplateLiteralType(
                                             factory.createTemplateHead('#'),
                                             [factory.createTemplateLiteralTypeSpan(
                                                 factory.createIndexedAccessTypeNode(
@@ -246,7 +267,6 @@ function mcdoc_string(type: mcdoc.McdocType) {
                                             Tag,
                                             [Bind.StringLiteral(registry_id.split(':')[1])]
                                         ),
-                                        static_value.namespaced.type
                                     ])),
                                     imports
                                 } as const)
@@ -254,7 +274,7 @@ function mcdoc_string(type: mcdoc.McdocType) {
                         }
                     }
                     if ('empty' in id_attr.values) {
-                        extras.push(Bind.StringLiteral(''))
+                        types.push(Bind.StringLiteral(''))
                     }
                     if ('prefix' in id_attr.values) {
                         throw new Error('[mcdoc_string] ID prefix is not currently supported as a value')
@@ -264,19 +284,12 @@ function mcdoc_string(type: mcdoc.McdocType) {
                 Resource = Resource()
                 
                 if (Resource !== undefined) {
-                    extras.push(factory.createTypeReferenceNode(Resource))
+                    types.push(factory.createTypeReferenceNode(Resource))
                     add_import(imports, `sandstone::${Resource}`)
                 }
 
                 return (args: Record<string, unknown>) => ({
-                    type: factory.createParenthesizedType(factory.createUnionTypeNode([
-                        exclude(factory.createIndexedAccessTypeNode(
-                            factory.createTypeReferenceNode('Registry'),
-                            Bind.StringLiteral(registry_id)
-                        )),
-                        static_value.namespaced.type,
-                        ...extras
-                    ])),
+                    type: types.length === 0 ? types[0] : factory.createParenthesizedType(factory.createUnionTypeNode(types)),
                     imports
                 } as const)
             }).narrow()

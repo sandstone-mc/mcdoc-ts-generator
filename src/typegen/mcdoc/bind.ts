@@ -64,22 +64,13 @@ export class Bind {
      */
     static MappedType(key_type: ts.TypeNode, value_type: ts.TypeNode, options?: { key_name?: string, parenthesized?: boolean }) {
         const { key_name = 'Key', parenthesized = true } = options ?? {}
-        const constraint_type = key_type.kind === ts.SyntaxKind.StringKeyword ? Bind.NonEmptyString : factory.createTemplateLiteralType(
-            factory.createTemplateHead(''),
-            [
-                factory.createTemplateLiteralTypeSpan(
-                    factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
-                    factory.createTemplateMiddle('')
-                ),
-                factory.createTemplateLiteralTypeSpan(
-                    factory.createTypeReferenceNode('Extract', [
-                        key_type,
-                        factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
-                    ]),
-                    factory.createTemplateTail('')
-                )
-            ]
-        )
+        const constraint_type = key_type.kind === ts.SyntaxKind.StringKeyword ? 
+            Bind.NonEmptyString 
+            : factory.createTypeReferenceNode('Extract', [
+                key_type,
+                factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
+            ])
+
         const mapped_type = factory.createMappedTypeNode(
             undefined,
             factory.createTypeParameterDeclaration(
@@ -122,7 +113,7 @@ export class Bind {
             if (Array.isArray(_doc)) {
                 // y e s
                 try {
-                    const sanitized = _doc[0].trim().replaceAll('\n\n\n\n ', '@@bad@@').replaceAll('\n\n', '\n').replaceAll('@@bad@@', '\n\n').split('\n')
+                    const sanitized = Bind.DocPart(_doc[0])
                     for (const __doc of sanitized) {
                         if (__doc === '') {
                             doc += '\n *'

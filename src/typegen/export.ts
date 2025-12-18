@@ -6,17 +6,6 @@ import { Bind } from './mcdoc/bind'
 
 const { factory } = ts
 
-/**
- * Generates a `Registry` type that maps registry IDs to their element types.
- *
- * Example output:
- * ```ts
- * export type Registry = {
- *   'minecraft:block': typeof BLOCKS extends Set<infer T> ? T : never,
- *   'minecraft:item': typeof ITEMS extends Set<infer T> ? T : never,
- * }
- * ```
- */
 export function export_registry(resolved_registries: Map<string, ResolvedRegistry>) {
     let imports: undefined | { readonly ordered: NonEmptyList<string>, readonly check: Map<string, number> }
 
@@ -27,24 +16,13 @@ export function export_registry(resolved_registries: Map<string, ResolvedRegistr
         // Add import for the registry symbol
         imports = add_import(imports, import_path)
 
-        // Create: 'minecraft:block': typeof BLOCKS extends Set<infer T> ? T : never
         const registry_id = registry_name.includes(':') ? registry_name : `minecraft:${registry_name}`
 
         properties.push(factory.createPropertySignature(
             undefined,
             factory.createStringLiteral(registry_id),
             undefined,
-            // typeof BLOCKS extends Set<infer T> ? T : never
-            factory.createConditionalTypeNode(
-                factory.createTypeQueryNode(registry),
-                factory.createTypeReferenceNode('Set', [
-                    factory.createInferTypeNode(
-                        factory.createTypeParameterDeclaration(undefined, 'T')
-                    )
-                ]),
-                factory.createTypeReferenceNode('T'),
-                factory.createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
-            )
+            factory.createTypeReferenceNode(registry)
         ))
     }
 

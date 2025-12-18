@@ -247,14 +247,15 @@ for await (const [symbol_path, { exports, imports }] of TypeGen.resolved_symbols
 }
 
 // TODO: IMPORTANT - Update this and make sure all imports are working
-await Bun.write(join(generated_path, 'tsconfig.json'), JSON.stringify({
+await Bun.write(join('types', 'tsconfig.json'), JSON.stringify({
     compilerOptions: {
         allowImportingTsExtensions: true,
+        noEmit: true,
         baseUrl: "./",
         rootDir: "./",
         paths: {
-            'resources/*': [`./*`],
-            'registries/*': ['./*']
+            "sandstone": ["../sandstone-types/index.ts"],
+            'sandstone/generated/*': [`./*`],
         }
     }
 }))

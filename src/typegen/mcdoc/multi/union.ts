@@ -26,7 +26,20 @@ function mcdoc_union(type: mcdoc.McdocType) {
         let child_dispatcher: NonEmptyList<[number, string]> | undefined
 
         for (const member of union.members) {
-            if (member.attributes !== undefined && member.attributes.indexOf((attr: mcdoc.Attribute) => attr.name === 'until') !== -1) {
+            let unsupported = false
+            if (member.attributes !== undefined) {
+                Assert.Attributes(member.attributes, true)
+
+                const attributes = member.attributes
+
+                for (const attribute of attributes) {
+                    if (attribute.name === 'until' || attribute.name === 'deprecated') {
+                        unsupported = true
+                        break
+                    }
+                }
+            }
+            if (unsupported) {
                 continue
             }
             const value = TypeHandlers[member.kind](member)(args)
