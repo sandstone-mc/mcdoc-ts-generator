@@ -1,3 +1,4 @@
+import { TaggableResourceLocationCategories } from '@spyglassmc/core'
 import ts from 'typescript'
 import { add_import, type NonEmptyList } from './mcdoc/utils'
 import { add } from '../util'
@@ -8,6 +9,10 @@ const { factory } = ts
 
 export function export_registry(resolved_registries: Map<string, ResolvedRegistry>) {
     let imports: undefined | { readonly ordered: NonEmptyList<string>, readonly check: Map<string, number> }
+
+    // Add imports for Set and SetType from sandstone
+    imports = add_import(imports, 'sandstone::Set')
+    imports = add_import(imports, 'sandstone::SetType')
 
     // Build property signatures for each registry
     const properties: ts.TypeElement[] = []
@@ -34,8 +39,45 @@ export function export_registry(resolved_registries: Map<string, ResolvedRegistr
         factory.createTypeLiteralNode(properties)
     )
 
+    // Create: export const REGISTRIES_SET = new Set([...] as const)
+    const registries_set = factory.createVariableStatement(
+        [factory.createToken(ts.SyntaxKind.ExportKeyword)],
+        factory.createVariableDeclarationList(
+            [factory.createVariableDeclaration(
+                'REGISTRIES_SET',
+                undefined,
+                undefined,
+                factory.createNewExpression(
+                    factory.createIdentifier('Set'),
+                    undefined,
+                    [factory.createAsExpression(
+                        factory.createArrayLiteralExpression(
+                            TaggableResourceLocationCategories.map((category) =>
+                                factory.createStringLiteral(category, true)
+                            ),
+                            true
+                        ),
+                        factory.createTypeReferenceNode('const')
+                    )]
+                )
+            )],
+            ts.NodeFlags.Const
+        )
+    )
+
+    // Create: export type REGISTRIES = SetType<typeof REGISTRIES_SET>
+    const registries_type = factory.createTypeAliasDeclaration(
+        [factory.createToken(ts.SyntaxKind.ExportKeyword)],
+        'REGISTRIES',
+        undefined,
+        factory.createTypeReferenceNode(
+            'SetType',
+            [factory.createTypeQueryNode(factory.createIdentifier('REGISTRIES_SET'))]
+        )
+    )
+
     return {
-        exports: [registry_type] as ts.TypeAliasDeclaration[],
+        exports: [registry_type, registries_set, registries_type] as (ts.TypeAliasDeclaration | ts.VariableStatement)[],
         paths: new Set<string>(),
         ...add({imports})
     } as const
