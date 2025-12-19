@@ -35,7 +35,7 @@ export function handle_imports(imports?: { readonly ordered: NonEmptyList<string
             file = `sandstone/arguments/generated/${path.slice(2).join('/')}.js`
         } else if (path[0] === 'sandstone') {
             // sandstone::* → sandstone/*
-            file = `${path.join('/')}.js`
+            file = path.length === 1 ? 'sandstone' : `${path.join('/')}.js`
         } else {
             throw new Error(`[mcdoc_import] Unsupported import location "${path[0]}" in "${import_path}"`)
         }
