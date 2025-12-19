@@ -265,7 +265,7 @@ export async function generate(options: GeneratorOptions = {}): Promise<void> {
                 baseUrl: "./",
                 paths: {
                     "sandstone": ["../sandstone-types/index.ts"],
-                    'sandstone/generated/*': [`./*`],
+                    'sandstone/arguments/generated/*': [`./*`],
                 }
             }
         }, null, 2))

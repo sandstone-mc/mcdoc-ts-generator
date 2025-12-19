@@ -31,8 +31,8 @@ export function handle_imports(imports?: { readonly ordered: NonEmptyList<string
         if (path.length === 0) {
             throw new Error(`[mcdoc_import] Import path has no module prefix: "${import_path}"`)
         } else if (path[1] === 'java') {
-            // java::* → sandstone/generated/*
-            file = `sandstone/generated/${path.slice(2).join('/')}`
+            // java::* → sandstone/arguments/generated/*
+            file = `sandstone/arguments/generated/${path.slice(2).join('/')}`
         } else if (path[0] === 'sandstone') {
             // sandstone::* → sandstone/*
             file = path.join('/')

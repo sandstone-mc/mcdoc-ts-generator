@@ -65,7 +65,7 @@ Handler subdirectories:
 Import strings use `::` as separator and are converted to file paths:
 - `sandstone::TypeName` → imports from `sandstone`
 - `sandstone::arguments::TypeName` → imports from `sandstone/arguments`
-- `java::*` → imports from `sandstone/generated/*`
+- `java::*` → imports from `sandstone/arguments/generated/*`
 
 Note: Mcdoc module paths have a leading `::` (e.g., `::java::data::advancement`). The first empty segment and `java` namespace are stripped when generating output paths.
 
