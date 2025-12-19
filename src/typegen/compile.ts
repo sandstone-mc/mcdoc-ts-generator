@@ -10,7 +10,7 @@ const eslint = new ESLint({
     overrideConfig: [
         wrap.config({
             maxLen: 120,
-            tabWidth: 4,
+            tabWidth: 2,
             autoFix: true,
             severity: 'warn',
         }),
