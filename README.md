@@ -1,15 +1,6 @@
 # @sandstone/mcdoc-ts-generator
 
-To install dependencies:
-
+To be used in Sandstone with
 ```bash
-bun install
+pnpm --package=@sandstone-mc/mcdoc-ts-generator -c dlx 'mcdoc-ts-generator --out-dir "src/arguments/generated/" --no-tsconfig'
 ```
-
-To run:
-
-```bash
-bun run index.ts
-```
-
-This project was created using `bun init` in bun v1.1.0. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.

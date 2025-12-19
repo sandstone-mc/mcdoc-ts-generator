@@ -1,7 +1,44 @@
 {
-  "name": "@sandstone/mcdoc-ts-generator",
-  "module": "src/index.ts",
+  "name": "@sandstone-mc/mcdoc-ts-generator",
+  "version": "0.1.1",
+  "description": "Generate TypeScript types from Minecraft mcdoc definitions",
   "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "mcdoc-ts-generator": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "compile": "bun run ./src/cli.ts",
+    "build": "bun run build:bundle && bun run build:types",
+    "build:bundle": "bun build ./src/cli.ts --outfile ./dist/cli.js --target node --format esm --packages external && bun build ./src/index.ts --outfile ./dist/index.js --target node --format esm --packages external",
+    "build:types": "bun tsc --emitDeclarationOnly --declaration --outDir ./dist",
+    "prepublishOnly": "bun run build"
+  },
+  "keywords": [
+    "minecraft",
+    "mcdoc",
+    "typescript",
+    "types",
+    "generator",
+    "datapack",
+    "resourcepack"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sandstone-mc/mcdoc-ts-generator"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
@@ -16,10 +53,6 @@
     "@stylistic/eslint-plugin": "^5.6.1",
     "@typescript-eslint/parser": "^8.49.0",
     "eslint": "^9.39.2",
-    "ts-pattern": "^5.9.0",
-    "typescript": "^5.5.3"
-  },
-  "scripts": {
-    "compile": "bun run ./src/index.ts"
+    "ts-pattern": "^5.9.0"
   }
 }

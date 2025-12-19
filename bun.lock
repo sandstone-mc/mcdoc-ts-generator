@@ -12,7 +12,6 @@
         "@typescript-eslint/parser": "^8.49.0",
         "eslint": "^9.39.2",
         "ts-pattern": "^5.9.0",
-        "typescript": "^5.5.3",
       },
       "devDependencies": {
         "@types/bun": "latest",

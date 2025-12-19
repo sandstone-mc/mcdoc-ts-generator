@@ -1,5 +1,10 @@
 import { dirname, resolve } from 'path'
 import { fileURLToPath, pathToFileURL } from 'url'
+import { promisify } from 'util'
+import * as fs from 'fs'
+
+const writeFile = promisify(fs.writeFile)
+const mkdir = promisify(fs.mkdir)
 
 import {
     ConfigService,
@@ -20,15 +25,14 @@ import { TypesGenerator } from './typegen'
 import { compile_types } from './typegen/compile'
 import { handle_imports } from './typegen/import'
 
-// TODO: IMPORTANT - Make this into an installable library you can run with `pnpm dlx mcdoc_ts_generator`
+export interface GeneratorOptions {
+    /** Output directory for generated types (default: "types") */
+    out_dir?: string
+    /** Whether to generate a tsconfig.json in the output directory (default: true) */
+    tsconfig?: boolean
+}
 
 const cache_root = join(dirname(fileURLToPath(import.meta.url)), 'cache')
-
-const project_path = resolve(process.cwd(), 'dummy')
-
-// haha funny Bun
-/* @ts-ignore */
-await fileUtil.ensureDir(NodeJsExternals, project_path)
 
 function registerAttributes(meta: MetaRegistry, release: ReleaseVersion) {
     // We always generate for the latest version
@@ -188,74 +192,84 @@ const initialize: ProjectInitializer = async (ctx) => {
     return { loadedVersion: release }
 }
 
-const service = new Service({
-    logger: {
-        log: (...log_args: any[]) => console.log(...log_args),
+export async function generate(options: GeneratorOptions = {}): Promise<void> {
+    const { out_dir = 'types', tsconfig = true } = options
 
-        warn: (...log_args: any[]) => console.warn(...log_args),
+    const project_path = resolve(process.cwd(), 'dummy')
 
-        error: (...log_args: any[]) => console.error(...log_args),
+    // haha funny Bun
+    /* @ts-ignore */
+    await fileUtil.ensureDir(NodeJsExternals, project_path)
 
-        info: (...log_args: any[]) => console.info(...log_args),
-    },
-    project: {
-        cacheRoot: fileUtil.ensureEndingSlash(
-            pathToFileURL(cache_root).toString(),
-        ),
-        defaultConfig: ConfigService.merge(VanillaConfig, {
-            env: { dependencies: [] },
-        }),
-        // haha funny Bun
-        /* @ts-ignore */
-        externals: NodeJsExternals,
-        initializers: [mcdoc.initialize, initialize],
-        projectRoots: [fileUtil.ensureEndingSlash(
-            pathToFileURL(project_path).toString(),
-        )],
-    },
-})
+    const service = new Service({
+        logger: {
+            log: (...log_args: any[]) => console.log(...log_args),
 
-await service.project.ready()
-await service.project.cacheService.save()
+            warn: (...log_args: any[]) => console.warn(...log_args),
 
-const parent_dir = 'types'
+            error: (...log_args: any[]) => console.error(...log_args),
 
-const generated_path = `${parent_dir}/resources`
+            info: (...log_args: any[]) => console.info(...log_args),
+        },
+        project: {
+            cacheRoot: fileUtil.ensureEndingSlash(
+                pathToFileURL(cache_root).toString(),
+            ),
+            defaultConfig: ConfigService.merge(VanillaConfig, {
+                env: { dependencies: [] },
+            }),
+            // haha funny Bun
+            /* @ts-ignore */
+            externals: NodeJsExternals,
+            initializers: [mcdoc.initialize, initialize],
+            projectRoots: [fileUtil.ensureEndingSlash(
+                pathToFileURL(project_path).toString(),
+            )],
+        },
+    })
 
-const TypeGen = new TypesGenerator()
+    await service.project.ready()
+    await service.project.cacheService.save()
 
-TypeGen.resolve_types(service.project.symbols)
+    const type_gen = new TypesGenerator()
 
-for await (const [symbol_path, { exports, imports }] of TypeGen.resolved_symbols.entries()) {
-    const parts = symbol_path.split('::')
-    if (parts[0] === '') {
-        parts.shift()
-    }
-    const file = parts.slice(1)
+    type_gen.resolve_types(service.project.symbols)
 
-    // TODO: IMPORTANT - set directory
-    file.unshift('types')
-
-    const outPath = `${join(...file)}.ts`
-
-    const code = await compile_types([
-        ...handle_imports(imports),
-        ...exports
-    ], outPath)
-
-    await Bun.write(outPath, code)
-}
-
-await Bun.write(join('types', 'tsconfig.json'), JSON.stringify({
-    compilerOptions: {
-        allowImportingTsExtensions: true,
-        noEmit: true,
-        baseUrl: "./",
-        paths: {
-            "sandstone": ["../sandstone-types/index.ts"],
-            'sandstone/generated/*': [`./*`],
+    for await (const [symbol_path, { exports, imports }] of type_gen.resolved_symbols.entries()) {
+        const parts = symbol_path.split('::')
+        if (parts[0] === '') {
+            parts.shift()
         }
-    }
-}))
+        const file = parts.slice(1)
 
-service.project.close()
+        file.unshift(out_dir)
+
+        const out_path = `${join(...file)}.ts`
+
+        const code = await compile_types([
+            ...handle_imports(imports),
+            ...exports
+        ], out_path)
+
+        await mkdir(dirname(out_path), { recursive: true })
+        await writeFile(out_path, code)
+    }
+
+    if (tsconfig) {
+        const tsconfig_path = join(out_dir, 'tsconfig.json')
+        await mkdir(dirname(tsconfig_path), { recursive: true })
+        await writeFile(tsconfig_path, JSON.stringify({
+            compilerOptions: {
+                allowImportingTsExtensions: true,
+                noEmit: true,
+                baseUrl: "./",
+                paths: {
+                    "sandstone": ["../sandstone-types/index.ts"],
+                    'sandstone/generated/*': [`./*`],
+                }
+            }
+        }, null, 2))
+    }
+
+    service.project.close()
+}

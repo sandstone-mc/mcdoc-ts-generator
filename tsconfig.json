@@ -12,7 +12,10 @@
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
-    "noEmit": true,
+
+    // Emit declarations only (bundling done by Bun)
+    "declaration": true,
+    "emitDeclarationOnly": true,
 
     // Best practices
     "strict": true,
@@ -24,5 +27,7 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
-  }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "types"]
 }
