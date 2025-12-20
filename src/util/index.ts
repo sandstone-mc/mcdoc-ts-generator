@@ -23,6 +23,7 @@ export function camel_case(name: string) {
 }
 
 export function pluralize(name: string) {
+    if (name.endsWith('ey')) return name + 's'
     if (name.endsWith('y')) return name.slice(0, -1) + 'ies'
     if (name.endsWith('s') || name.endsWith('ch') || name.endsWith('sh') || name.endsWith('x') || name.endsWith('z')) return name + 'es'
     return name + 's'

@@ -462,16 +462,16 @@ function mcdoc_string(type: mcdoc.McdocType) {
             })
             .with({ name: 'translation_key' }, () => {
                 // TODO: Add translation key abstraction in Sandstone
-                const TRANSLATION_KEYS = 'TRANSLATION_KEYS'
-                const LiteralUnion = 'LiteralUnion'
+                const Registry = '::java::registry::Registry'
 
                 return (args: Record<string, unknown>) => ({
-                    type: factory.createTypeReferenceNode(LiteralUnion, [
-                        factory.createTypeReferenceNode(TRANSLATION_KEYS)
-                    ]),
+                    type: factory.createIndexedAccessTypeNode(
+                        factory.createTypeReferenceNode('Registry'),
+                        Bind.StringLiteral('minecraft:translation_key')
+                    ),
                     imports: {
-                        ordered: [`sandstone::arguments::${TRANSLATION_KEYS}`, `sandstone::${LiteralUnion}`] as NonEmptyList<string>,
-                        check: new Map([[`sandstone::arguments::${TRANSLATION_KEYS}`, 0], [`sandstone::${LiteralUnion}`, 1]])
+                        ordered: [Registry,] as NonEmptyList<string>,
+                        check: new Map([[Registry, 0]])
                     }
                 } as const)
             })

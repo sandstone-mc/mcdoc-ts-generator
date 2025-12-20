@@ -49,9 +49,9 @@ export class TypesGenerator {
 
     constructor() {}
 
-    resolve_types(symbols: SymbolUtil) {
+    resolve_types(symbols: SymbolUtil, translation_keys: string[]) {
         console.log('registries')
-        this.resolve_registry_symbols(symbols)
+        this.resolve_registry_symbols(symbols, translation_keys)
         const registry_exports = export_registry(this.resolved_registries)
         this.resolved_symbols.set('::java::registry', registry_exports)
 
@@ -73,13 +73,13 @@ export class TypesGenerator {
         this.resolved_symbols.set('mcdoc::dispatcher', dispatcher_exports)
     }
 
-    private resolve_registry_symbols(registries: SymbolUtil) {
-        for (const registry_name of AllCategories) {
+    private resolve_registry_symbols(registries: SymbolUtil, translation_keys: string[]) {
+        for (const registry_name of [...AllCategories]) {
             if (registry_name === 'mcdoc' || registry_name === 'mcdoc/dispatcher') {
                 continue
             }
 
-            const registry = Object.keys(registries.getVisibleSymbols(registry_name))
+            const registry = registry_name === 'translation_key' ? translation_keys : Object.keys(registries.getVisibleSymbols(registry_name))
 
             if (registry.length === 0) continue
 

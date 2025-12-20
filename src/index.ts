@@ -14,6 +14,8 @@ import {
     MetaRegistry,
     type SymbolRegistrar,
     type ProjectInitializer,
+    Range,
+    type SymbolMap,
 } from '@spyglassmc/core'
 import { NodeJsExternals } from '@spyglassmc/core/lib/nodejs.js'
 import * as je from '@spyglassmc/java-edition'
@@ -127,6 +129,20 @@ export async function fetchBlockStates(versionId: string) {
     return [result, etag] as const
 }
 
+export async function fetchTranslationKeys() {
+    console.debug(`[fetchTranslationKeys] latest from github`)
+    const result = new Map<string, string>()
+    try {
+        const req = await fetchWithCache(`https://raw.githubusercontent.com/misode/mcmeta/refs/heads/assets-tiny/assets/minecraft/lang/en_us.json`)
+
+        const data = await req.json() as Record<string, string>
+        return Object.keys(data).map((key) => `minecraft:${key}`)
+    } catch (e) {
+        console.warn('Error occurred while fetching translation keys:', errorMessage(e))
+    }
+    return []
+}
+
 const VanillaMcdocUri = 'mcdoc://vanilla-mcdoc/symbols.json'
 
 function vanillaMcdocRegistrar(vanillaMcdoc: VanillaMcdocSymbols): SymbolRegistrar {
@@ -233,7 +249,7 @@ export async function generate(options: GeneratorOptions = {}): Promise<void> {
 
     const type_gen = new TypesGenerator()
 
-    type_gen.resolve_types(service.project.symbols)
+    type_gen.resolve_types(service.project.symbols, await fetchTranslationKeys())
 
     for await (const [symbol_path, { exports, imports }] of type_gen.resolved_symbols.entries()) {
         const parts = symbol_path.split('::')
@@ -262,10 +278,11 @@ export async function generate(options: GeneratorOptions = {}): Promise<void> {
             compilerOptions: {
                 allowImportingTsExtensions: true,
                 noEmit: true,
-                baseUrl: "./",
+                baseUrl: './',
                 paths: {
-                    "sandstone": ["../sandstone-types/index.ts"],
-                    'sandstone/arguments/generated/*': [`./*`],
+                    'sandstone': ['../sandstone-types/index.ts'],
+                    'sandstone/arguments': ['../sandstone-types/arguments/index.ts'],
+                    'sandstone/arguments/generated/*': ['./*'],
                 }
             }
         }, null, 2))
