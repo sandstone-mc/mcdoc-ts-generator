@@ -106,7 +106,7 @@ const static_value = {
 
 const ResourceClasses = {
     'minecraft:advancement': 'AdvancementClass',
-    'minecraft:function': '_RawFunctionClass'
+    'minecraft:function': 'MCFunctionClass'
     // TODO: IMPORTANT - List out all sandstone resource classes
 } as const
 
@@ -335,16 +335,16 @@ function mcdoc_string(type: mcdoc.McdocType) {
                 return (args: Record<string, unknown>) => static_value.number
             })
             .with({ name: 'item_slots' }, () => {
-                const ITEM_SLOTS = 'ITEM_SLOTS'
+                const ENTITY_SLOTS = 'ENTITY_SLOTS'
                 const LiteralUnion = 'LiteralUnion'
 
                 return (args: Record<string, unknown>) => ({
                     type: factory.createTypeReferenceNode(LiteralUnion, [
-                        factory.createTypeReferenceNode(ITEM_SLOTS)
+                        factory.createTypeReferenceNode(ENTITY_SLOTS)
                     ]),
                     imports: {
-                        ordered: [`sandstone::arguments::${ITEM_SLOTS}`, `sandstone::${LiteralUnion}`] as NonEmptyList<string>,
-                        check: new Map([[`sandstone::arguments::${ITEM_SLOTS}`, 0], [`sandstone::${LiteralUnion}`, 1]])
+                        ordered: [`sandstone::arguments::${ENTITY_SLOTS}`, `sandstone::${LiteralUnion}`] as NonEmptyList<string>,
+                        check: new Map([[`sandstone::arguments::${ENTITY_SLOTS}`, 0], [`sandstone::${LiteralUnion}`, 1]])
                     }
                 } as const)
             })
@@ -404,7 +404,7 @@ function mcdoc_string(type: mcdoc.McdocType) {
                 } as const)
             })
             .with({ name: 'score_holder' }, () => {
-                const Score = 'ScoreClass'
+                const Score = 'Score'
                 return (args: Record<string, unknown>) => ({
                     type: factory.createUnionTypeNode([
                         static_value.not_empty,

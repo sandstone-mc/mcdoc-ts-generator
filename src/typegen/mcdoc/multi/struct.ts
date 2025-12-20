@@ -200,14 +200,14 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                                         ))
                                     })
                                     .with({ name: 'item_slots' }, () => {
-                                        const ITEM_SLOTS = 'ITEM_SLOTS'
+                                        const ENTITY_SLOTS = 'ENTITY_SLOTS'
                                         const LiteralUnion = 'LiteralUnion'
-                                        imports = add_import(imports, `sandstone::arguments::${ITEM_SLOTS}`)
+                                        imports = add_import(imports, `sandstone::arguments::${ENTITY_SLOTS}`)
                                         imports = add_import(imports, `sandstone::${LiteralUnion}`)
 
                                         inherit.push(Bind.MappedType(
                                             factory.createTypeReferenceNode(LiteralUnion, [
-                                                factory.createTypeReferenceNode(ITEM_SLOTS)
+                                                factory.createTypeReferenceNode(ENTITY_SLOTS)
                                             ]),
                                             value.type
                                         ))
