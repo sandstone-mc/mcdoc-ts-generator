@@ -160,13 +160,15 @@ export class TypesGenerator {
             if (_path.endsWith('>')) {
                 continue
             }
-            // If a full symbol path only shows up in the AST once, it is always a duplicate of a nested struct which is unreached by any of our exported types. The reason these exist in the AST is as a hack for locales.
-            const matches = mcdoc_raw.matchAll(new RegExp(_path, 'g'))
-            const first_match = matches.next()
-            const second_match = matches.next()
+            if (!_path.endsWith('::StructureNBT')) {
+                // If a full symbol path only shows up in the AST once, it is always a duplicate of a nested struct which is unreached by any of our exported types. The reason these exist in the AST is as a hack for locales.
+                const matches = mcdoc_raw.matchAll(new RegExp(_path, 'g'))
+                const first_match = matches.next()
+                const second_match = matches.next()
 
-            if (!first_match.done && second_match.done) {
-                continue
+                if (!first_match.done && second_match.done) {
+                    continue
+                }
             }
 
             if (data !== null && typeof data === 'object' && 'typeDef' in data) {
