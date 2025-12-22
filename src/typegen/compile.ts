@@ -27,7 +27,7 @@ const eslint = new ESLint({
                 '@stylistic': stylistic,
             },
             rules: {
-                '@stylistic/indent': ['error', 4],
+                '@stylistic/indent': ['error', 2],
                 '@stylistic/quotes': ['error', 'single'],
                 '@stylistic/semi': ['error', 'never'],
                 '@stylistic/member-delimiter-style': ['error', {
