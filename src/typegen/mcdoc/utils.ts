@@ -70,16 +70,22 @@ export function add_import(imports: TypeHandlerResult['imports'], add_import: st
 export function merge_imports(
     imports: TypeHandlerResult['imports'],
     new_imports: NonNullable<TypeHandlerResult['imports']>,
+    filter?: Set<string>,
 ): NonNullable<TypeHandlerResult['imports']> {
     if (imports === undefined) {
-        return new_imports
+        if (filter === undefined) {
+            return new_imports
+        }
     }
     for (const import_path of new_imports.ordered) {
-        if (!imports.check.has(import_path)) {
+        if (filter?.has(import_path)) {
+            continue
+        }
+        if (imports === undefined || !imports.check.has(import_path)) {
             imports = add_import(imports, import_path)
         }
     }
-    return imports
+    return imports!
 }
 
 // Thanks TypeScript

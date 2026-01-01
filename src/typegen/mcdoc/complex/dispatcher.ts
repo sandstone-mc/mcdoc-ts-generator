@@ -1,6 +1,7 @@
 import ts from 'typescript'
 import * as mcdoc from '@spyglassmc/mcdoc'
 import type { NonEmptyList, TypeHandler } from '..'
+import type { DispatcherInfo } from '../..'
 import { Assert } from '../assert'
 import { Bind } from '../bind'
 import { add } from '../../../util'
@@ -12,13 +13,15 @@ function DispatcherArgs(args: Record<string, unknown>): asserts args is {
      * Property keys to chain as indexed access types after the dispatcher access.
      * Used by the `indexed` type handler to access nested properties.
      *
-     * Example: `['attribute_track']` results in `Dispatcher['registry'][K]['attribute_track']`
+     * Example: `['attribute_track']` results in `SymbolX[K]['attribute_track']`
      */
     index_keys?: NonEmptyList<string>
 
     generic_types?: ts.TypeNode[]
 
     dispatcher_properties?: Map<string, { supports_none?: true }>
+
+    dispatcher_info?: Map<string, DispatcherInfo>
 
     root_type?: boolean
 } {}
@@ -34,72 +37,64 @@ const Fallback = Bind.StringLiteral('%fallback')
 const None = Bind.StringLiteral('%none')
 
 /**
- * Helper to create `Dispatcher<'registry', [args]>` type reference
+ * Helper to create `SymbolX<generics..., case>` type reference
  */
-function DispatcherGeneric(registry: string, args: ts.TypeNode[]) {
-    return factory.createTypeReferenceNode('Dispatcher', [
-        Bind.StringLiteral(registry),
-        factory.createTupleTypeNode(args)
-    ])
+function SymbolGeneric(symbol_name: string, generics: ts.TypeNode[], case_arg: ts.TypeNode) {
+    return factory.createTypeReferenceNode(symbol_name, [...generics, case_arg])
 }
 
 /**
- * Helper to create `(S extends keyof Dispatcher<'minecraft:trigger'> ? Dispatcher<'minecraft:trigger'>[S] : Record<string, unknown>)` - get map then index
+ * Helper to create `SymbolX<generics...>[key]` - get map then index
+ * If key is dynamic, wraps in a conditional: `(S extends keyof SymbolX ? SymbolX[S] : Record<string, unknown>)`
  */
-function DispatcherMapIndex(registry: string, key: ts.TypeNode, generics: ts.TypeNode[]) {
-    const dispatcher: ts.TypeReferenceNode | ts.IndexedAccessTypeNode = factory.createTypeReferenceNode(
-        'Dispatcher',
-        [Bind.StringLiteral(registry), ...(generics.length === 0 ? [] : [factory.createTupleTypeNode(generics)])]
-    )
+function SymbolMapIndex(symbol_name: string, key: ts.TypeNode, generics: ts.TypeNode[]) {
+    const symbol_type = factory.createTypeReferenceNode(symbol_name, generics.length === 0 ? undefined : generics)
 
     if (key.kind === ts.SyntaxKind.LiteralType) {
         return factory.createIndexedAccessTypeNode(
-            dispatcher,
+            symbol_type,
             key
         )
     }
 
     return factory.createParenthesizedType(factory.createConditionalTypeNode(
-      key,
-      factory.createTypeOperatorNode(
-        ts.SyntaxKind.KeyOfKeyword,
-        dispatcher
-      ),
-      factory.createIndexedAccessTypeNode(
-        dispatcher,
-        key
-      ),
-      factory.createTypeReferenceNode(
-        'Record',
-        [
-          factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-          factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
-        ]
-      )
+        key,
+        factory.createTypeOperatorNode(
+            ts.SyntaxKind.KeyOfKeyword,
+            symbol_type
+        ),
+        factory.createIndexedAccessTypeNode(
+            symbol_type,
+            key
+        ),
+        factory.createTypeReferenceNode(
+            'Record',
+            [
+                factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
+            ]
+        )
     ))
 }
 
 /**
- * Helper to create `(S extends keyof Dispatcher<'minecraft:trigger'> ? ('sub_index' extends keyof Dispatcher<'minecraft:trigger'>[S] ? Dispatcher<'minecraft:trigger'>[S]['sub_index'] : Record<string, unknown>) : Record<string, unknown>)`
- * 
- * get map, index a member, index within that member
+ * Helper to create `(S extends keyof SymbolX ? ('sub_index' extends keyof SymbolX[S] ? SymbolX[S]['sub_index'] : Record<string, unknown>) : Record<string, unknown>)`
+ *
+ * Get map, index a member, index within that member
  */
-function DispatcherMapSubIndex(registry: string, member_key: ts.TypeNode, generics: ts.TypeNode[], sub_index: NonEmptyList<string>) {
-    const dispatcher = factory.createTypeReferenceNode(
-        'Dispatcher',
-        [Bind.StringLiteral(registry), ...(generics.length === 0 ? [] : [factory.createTupleTypeNode(generics)])]
-    )
-    const dispatcher_member: ts.IndexedAccessTypeNode = factory.createIndexedAccessTypeNode(
-        dispatcher,
+function SymbolMapSubIndex(symbol_name: string, member_key: ts.TypeNode, generics: ts.TypeNode[], sub_index: NonEmptyList<string>) {
+    const symbol_type = factory.createTypeReferenceNode(symbol_name, generics.length === 0 ? undefined : generics)
+    const symbol_member: ts.IndexedAccessTypeNode = factory.createIndexedAccessTypeNode(
+        symbol_type,
         member_key
     )
-    let indexed_dispatcher: ts.IndexedAccessTypeNode | ts.ParenthesizedTypeNode | undefined = undefined
+    let indexed_symbol: ts.IndexedAccessTypeNode | ts.ParenthesizedTypeNode | undefined = undefined
 
     // Assembles the type inside-out
     for (let i = sub_index.length; i > 0; i--) {
         const key = Bind.StringLiteral(sub_index[i - 1])
 
-        let index_stack = dispatcher_member
+        let index_stack = symbol_member
 
         for (let j = 0; j < i - 1; j++) {
             index_stack = factory.createIndexedAccessTypeNode(
@@ -108,44 +103,44 @@ function DispatcherMapSubIndex(registry: string, member_key: ts.TypeNode, generi
             )
         }
 
-        if (indexed_dispatcher === undefined) {
-            indexed_dispatcher = factory.createIndexedAccessTypeNode(
+        if (indexed_symbol === undefined) {
+            indexed_symbol = factory.createIndexedAccessTypeNode(
                 index_stack,
                 key
             )
         }
 
-        indexed_dispatcher = factory.createParenthesizedType(factory.createConditionalTypeNode(
+        indexed_symbol = factory.createParenthesizedType(factory.createConditionalTypeNode(
             key,
             factory.createTypeOperatorNode(
                 ts.SyntaxKind.KeyOfKeyword,
                 index_stack
             ),
-            indexed_dispatcher,
+            indexed_symbol,
             factory.createTypeReferenceNode(
                 'Record',
                 [
-                factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
+                    factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                    factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
                 ]
             )
         ))
     }
 
     return factory.createParenthesizedType(factory.createConditionalTypeNode(
-      member_key,
-      factory.createTypeOperatorNode(
-        ts.SyntaxKind.KeyOfKeyword,
-        dispatcher
-      ),
-      indexed_dispatcher!,
-      factory.createTypeReferenceNode(
-        'Record',
-        [
-          factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-          factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
-        ]
-      )
+        member_key,
+        factory.createTypeOperatorNode(
+            ts.SyntaxKind.KeyOfKeyword,
+            symbol_type
+        ),
+        indexed_symbol!,
+        factory.createTypeReferenceNode(
+            'Record',
+            [
+                factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
+            ]
+        )
     ))
 }
 
@@ -156,11 +151,11 @@ function DispatcherMapSubIndex(registry: string, member_key: ts.TypeNode, generi
  * - `registry`: The dispatcher identifier (e.g., `minecraft:entity_effect`)
  * - `parallelIndices`: How to look up into the dispatcher (static or dynamic)
  *
- * The generated type references the central Dispatcher type:
- * - Static index: `Dispatcher<'minecraft:entity_effect'>['specific_key']`
- * - Dynamic index: `Dispatcher<'minecraft:entity_effect'>[Key]`
- * - Fallback: `Dispatcher<'minecraft:entity_effect', ['%fallback']>`
- * - None: `Dispatcher<'minecraft:entity_effect', ['%none']>`
+ * The generated type directly references the Symbol type:
+ * - Static index: `SymbolEntityEffect['specific_key']`
+ * - Dynamic index: `SymbolEntityEffect[Key]`
+ * - Fallback: `SymbolEntityEffect<'%fallback'>`
+ * - None: `SymbolEntityEffect<'%none'>`
  */
 function mcdoc_dispatcher(type: mcdoc.McdocType) {
     Assert.DispatcherType(type)
@@ -172,8 +167,14 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
     return (args: Record<string, unknown>) => {
         DispatcherArgs(args)
 
-        // Import the central Dispatcher type
-        const dispatcher_import = `::java::dispatcher::Dispatcher`
+        // Look up the dispatcher symbol info
+        const info = args.dispatcher_info?.get(registry)
+        if (!info) {
+            throw new Error(`[mcdoc_dispatcher] Unknown dispatcher: ${registry}`)
+        }
+
+        const { symbol_name } = info
+        const import_path = `::java::dispatcher::${symbol_name}`
 
         let result_type: ts.TypeNode
 
@@ -185,44 +186,44 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
             // If this is a root type, we can't use S (no generic parameter available)
             // Fall back to %fallback instead
             if (args.root_type) {
-                // Result: Dispatcher<'registry', ['%fallback']>
-                result_type = DispatcherGeneric(registry, [...generics, Fallback])
+                // Result: SymbolX<generics..., '%fallback'>
+                result_type = SymbolGeneric(symbol_name, generics, Fallback)
             } else {
                 child_dispatcher = [[indices[0].accessor.length - 1, indices[0].accessor.at(-1) as string]]
 
-                // Result: (S extends keyof Dispatcher<'minecraft:trigger'> ? Dispatcher<'minecraft:trigger'>[S] : Record<string, unknown>)
-                const indexed_type = DispatcherMapIndex(registry, factory.createTypeReferenceNode('S'), generics)
+                // Result: (S extends keyof SymbolX ? SymbolX[S] : Record<string, unknown>)
+                const indexed_type = SymbolMapIndex(symbol_name, factory.createTypeReferenceNode('S'), generics)
 
                 const properties = args.dispatcher_properties?.get(registry)
                 if (properties?.supports_none) {
-                    // Result: (S extends undefined ? Dispatcher<'registry', ['%none']> : (S extends keyof Dispatcher<'minecraft:trigger'> ? Dispatcher<'minecraft:trigger'>[S] : Record<string, unknown>))
+                    // Result: (S extends undefined ? SymbolX<generics..., '%none'> : (S extends keyof SymbolX ? SymbolX[S] : Record<string, unknown>))
                     result_type = factory.createParenthesizedType(factory.createConditionalTypeNode(
                         factory.createTypeReferenceNode('S'),
                         factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword),
-                        DispatcherGeneric(registry, [...generics, None]),
+                        SymbolGeneric(symbol_name, generics, None),
                         indexed_type
                     ))
                 } else {
-                    // Result: (S extends keyof Dispatcher<'minecraft:trigger'> ? Dispatcher<'minecraft:trigger'>[S] : Record<string, unknown>)
+                    // Result: (S extends keyof SymbolX ? SymbolX[S] : Record<string, unknown>)
                     result_type = indexed_type
                 }
             }
         } else if (indices.length === 1 && indices[0].kind === 'static') {
             if (indices[0].value === '%fallback') {
                 // Intentional fallback
-                // Result: Dispatcher<'registry', ['%fallback']>
-                result_type = DispatcherGeneric(registry, [...generics, Fallback])
+                // Result: SymbolX<generics..., '%fallback'>
+                result_type = SymbolGeneric(symbol_name, generics, Fallback)
             } else {
-                // Result: Dispatcher<'registry'>['static_member']
-                result_type = DispatcherMapIndex(registry, Bind.StringLiteral(indices[0].value), generics)
+                // Result: SymbolX['static_member']
+                result_type = SymbolMapIndex(symbol_name, Bind.StringLiteral(indices[0].value), generics)
             }
         } else if (JSON.stringify(indices) === SimpleKeyIndex) {
             if (args.index_keys !== undefined) {
-                // Result: (Key extends keyof Dispatcher<'minecraft:trigger'> ? ('static_index' extends keyof Dispatcher<'minecraft:trigger'>[Key] ? Dispatcher<'minecraft:trigger'>[Key]['static_index'] : Record<string, unknown>) : Record<string, unknown>)
-                result_type = DispatcherMapSubIndex(registry, factory.createTypeReferenceNode('Key'), generics, args.index_keys)
+                // Result: (Key extends keyof SymbolX ? ('static_index' extends keyof SymbolX[Key] ? SymbolX[Key]['static_index'] : Record<string, unknown>) : Record<string, unknown>)
+                result_type = SymbolMapSubIndex(symbol_name, factory.createTypeReferenceNode('Key'), generics, args.index_keys)
             } else {
-                // Result: (Key extends keyof Dispatcher<'minecraft:trigger'> ? Dispatcher<'minecraft:trigger'>[Key] : Record<string, unknown>)
-                result_type = DispatcherMapIndex(registry, factory.createTypeReferenceNode('Key'), generics)
+                // Result: (Key extends keyof SymbolX ? SymbolX[Key] : Record<string, unknown>)
+                result_type = SymbolMapIndex(symbol_name, factory.createTypeReferenceNode('Key'), generics)
             }
         } else {
             throw new Error(`[mcdoc_dispatcher] Unsupported dispatcher: ${dispatcher}`)
@@ -231,8 +232,8 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
         return {
             type: result_type,
             imports: {
-                ordered: [dispatcher_import] as NonEmptyList<string>,
-                check: new Map([[dispatcher_import, 0]]),
+                ordered: [import_path] as NonEmptyList<string>,
+                check: new Map([[import_path, 0]]),
             },
             ...add({child_dispatcher})
         } as const

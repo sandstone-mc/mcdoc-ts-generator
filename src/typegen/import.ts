@@ -32,7 +32,7 @@ export function handle_imports(imports?: { readonly ordered: NonEmptyList<string
             throw new Error(`[mcdoc_import] Import path has no module prefix: "${import_path}"`)
         } else if (path[1] === 'java') {
             // java::* → sandstone/arguments/generated/*
-            file = `sandstone/arguments/generated/${path.slice(2).join('/')}.js`
+            file = `sandstone/arguments/generated/${path.slice(2).join('/')}.ts`
         } else if (path[0] === 'sandstone') {
             // sandstone::* → sandstone/*
             if (path.length === 1) {
@@ -40,7 +40,7 @@ export function handle_imports(imports?: { readonly ordered: NonEmptyList<string
             } else if (path[1] === 'arguments' && path.length === 2) {
                 file = 'sandstone/arguments'
             } else {
-                file = `${path.join('/')}.js`
+                file = `${path.join('/')}.ts`
             }
         } else {
             throw new Error(`[mcdoc_import] Unsupported import location "${path[0]}" in "${import_path}"`)

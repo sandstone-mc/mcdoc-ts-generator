@@ -5,9 +5,9 @@ import { add, pascal_case, pluralize } from '../util'
 import { get_type_handler, type TypeHandlerResult } from './mcdoc'
 import { add_import, merge_imports, Set, type NonEmptyList } from './mcdoc/utils'
 import { Bind } from './mcdoc/bind'
-import { DispatcherSymbol } from './mcdoc/dispatcher_symbol'
+import { DispatcherSymbol, dispatcher_symbol_paths } from './mcdoc/dispatcher_symbol'
 import { mcdoc_raw } from '..'
-import { export_dispatcher, export_registry } from './export'
+import { export_dispatchers, export_registry } from './export'
 
 /**
  * Help: https://ts-ast-viewer.com/
@@ -38,6 +38,17 @@ export type ResolvedDispatcher = {
     symbol_name: string
 }
 
+/**
+ * Pre-computed dispatcher info for use during type resolution.
+ * Maps dispatcher ID (e.g., 'minecraft:entity_effect') to symbol info.
+ */
+export type DispatcherInfo = {
+    /** The symbol type name (e.g., "SymbolEntityEffect") */
+    symbol_name: string
+    /** Number of generic parameters (excluding CASE) */
+    generic_count: number
+}
+
 export class TypesGenerator {
     readonly resolved_registries = new Map<string, ResolvedRegistry>()
 
@@ -46,6 +57,9 @@ export class TypesGenerator {
     readonly resolved_symbols = new Map<string, ResolvedSymbol>()
 
     readonly resolved_dispatchers = new Map<string, ResolvedDispatcher>()
+
+    /** Pre-computed dispatcher info for use during type resolution */
+    readonly dispatcher_info = new Map<string, DispatcherInfo>()
 
     constructor() {}
 
@@ -57,11 +71,9 @@ export class TypesGenerator {
 
         const dispatchers = symbols.getVisibleSymbols('mcdoc/dispatcher')
 
-        for (const id of Object.keys(dispatchers)) {
-            if ('%none' in dispatchers[id].members!) {
-                this.dispatcher_properties.set(id, { supports_none: true })
-            }
-        }
+        // Pre-compute dispatcher info before resolving modules
+        console.log('dispatcher info')
+        this.precompute_dispatcher_info(dispatchers)
 
         console.log('modules')
         const module_map = symbols.getVisibleSymbols('mcdoc')
@@ -69,8 +81,53 @@ export class TypesGenerator {
 
         console.log('dispatchers')
         this.resolve_dispatcher_symbols(dispatchers, module_map, symbols)
-        const dispatcher_exports = export_dispatcher(this.resolved_dispatchers)
-        this.resolved_symbols.set('mcdoc::dispatcher', dispatcher_exports)
+
+        const dispatcher_exports = export_dispatchers(dispatcher_symbol_paths)
+        this.resolved_symbols.set('::java::dispatcher', dispatcher_exports)
+    }
+
+    /**
+     * Pre-computes dispatcher info (symbol names and import paths) before module resolution.
+     * This allows modules to directly reference SymbolX types instead of the central Dispatcher type.
+     *
+     * Also populates dispatcher_properties with supports_none info.
+     *
+     * Note: All dispatchers are placed in _dispatcher/ (or _builtin/ for mcdoc namespace) for predictability.
+     */
+    private precompute_dispatcher_info(dispatchers: SymbolMap) {
+        type DispatcherMember = { typeDef: mcdoc.McdocType }
+
+        for (const id of Object.keys(dispatchers)) {
+            const { members } = dispatchers[id]
+            if (members === undefined) {
+                continue
+            }
+
+            // Populate dispatcher_properties with supports_none info
+            if ('%none' in members) {
+                this.dispatcher_properties.set(id, { supports_none: true })
+            }
+
+            const [namespace, _name] = id.split(':')
+            const name = pascal_case(`${namespace === 'mcdoc' ? 'mcdoc_' : ''}${_name}`)
+            const symbol_name = `Symbol${name}`
+
+            // Determine generic count by checking if first member is a template type
+            const first_member_key = Object.keys(members).find(k => !k.startsWith('%'))
+            let generic_count = 0
+
+            if (first_member_key) {
+                const first_type = (members[first_member_key].data as DispatcherMember).typeDef
+                if (first_type.kind === 'template') {
+                    generic_count = first_type.typeParams.length
+                }
+            }
+
+            this.dispatcher_info.set(id, {
+                symbol_name,
+                generic_count
+            })
+        }
     }
 
     private resolve_registry_symbols(registries: SymbolUtil, translation_keys: string[]) {
@@ -189,6 +246,7 @@ export class TypesGenerator {
 
                 const resolved_member = get_type_handler(type)(type)({
                     dispatcher_properties: this.dispatcher_properties,
+                    dispatcher_info: this.dispatcher_info,
                     root_type: true,
                     name,
                     module_path,
@@ -239,7 +297,7 @@ export class TypesGenerator {
             const name = pascal_case(`${namespace === 'mcdoc' ? 'mcdoc_' : ''}${_name}`)
 
             // Once/if the dispatcher symbol map gets declaration paths we can switch to that instead of `references`
-            const { types, imports, references, generic_count } = DispatcherSymbol(id, name, members, this.dispatcher_properties, module_map, symbols)
+            const { types, imports, references, generic_count } = DispatcherSymbol(id, name, members, this.dispatcher_properties, this.dispatcher_info, module_map, symbols)
 
             let in_module = false
 
@@ -258,6 +316,9 @@ export class TypesGenerator {
                 return `::java::_dispatcher::${_name}`
             })()
 
+            // Track this path for dispatcher exports
+            dispatcher_symbol_paths.add(symbol_path)
+
             // Store dispatcher reference for the Dispatcher export type
             const dispatcher_type_name = `Symbol${name}`
             this.resolved_dispatchers.set(id, {
@@ -272,14 +333,23 @@ export class TypesGenerator {
 
                 mod.exports.push(...types)
 
+                let module_has_imports = false
+
+                if (mod.imports !== undefined) {
+                    module_has_imports = true
+                }
+
                 if (imports !== undefined) {
-                    // Once/if the dispatcher symbol map gets declaration paths we can use `merge_imports`
-                    for (const path of imports.ordered) {
-                        if (!mod.paths.has(path)) {
-                            // @ts-ignore
-                            mod.imports = add_import(mod.imports, path)
-                        }
+                    // @ts-ignore
+                    mod.imports = merge_imports(mod.imports, imports)
+
+                    if (module_has_imports) {
+                        // @ts-ignore
+                        mod.imports.ordered = mod.imports.ordered.filter((imp) => !imp.startsWith('::java::dispatcher::') && !imp.startsWith(symbol_path))
                     }
+                } else if (module_has_imports) {
+                    // @ts-ignore
+                    mod.imports.ordered = mod.imports.ordered.filter((imp) => !imp.startsWith('::java::dispatcher::') && !imp.startsWith(symbol_path))
                 }
             } else {
                 this.resolved_symbols.set(symbol_path, {

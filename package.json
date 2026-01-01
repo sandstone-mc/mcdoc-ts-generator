@@ -19,7 +19,8 @@
     "dist"
   ],
   "scripts": {
-    "compile": "bun run ./src/cli.ts",
+    "compile": "rm -rf types/ && bun run ./src/cli.ts",
+    "typecheck": "bun tsc --emitDeclarationOnly false --noEmit",
     "build": "bun run build:bundle && bun run build:types",
     "build:bundle": "bun build ./src/cli.ts --outfile ./dist/cli.js --target node --format esm --packages external && bun build ./src/index.ts --outfile ./dist/index.js --target node --format esm --packages external",
     "build:types": "bun tsc --emitDeclarationOnly --declaration --outDir ./dist",

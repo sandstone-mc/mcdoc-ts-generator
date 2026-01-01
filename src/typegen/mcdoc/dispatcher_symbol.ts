@@ -2,6 +2,7 @@ import ts from 'typescript'
 import type { SymbolMap, SymbolUtil } from '@spyglassmc/core'
 import * as mcdoc from '@spyglassmc/mcdoc'
 import { get_type_handler, type NonEmptyList, type TypeHandlerResult } from '.'
+import type { DispatcherInfo } from '..'
 import { merge_imports } from './utils'
 import { Bind } from './bind'
 import { add, pascal_case } from '../../util'
@@ -17,6 +18,12 @@ export type DispatcherReferenceCounter = {
 }
 
 export const dispatcher_references = new Map<string, DispatcherReferenceCounter>()
+
+/**
+ * Global set of all dispatcher symbol paths for generating export file.
+ * Populated during `resolve_dispatcher_symbols`.
+ */
+export const dispatcher_symbol_paths = new Set<string>()
 
 type DispatcherSymbolResult = {
     /**
@@ -68,11 +75,15 @@ export function dispatcher_symbol(
     name: string,
     members: SymbolMap,
     dispatcher_properties: Map<string, { supports_none?: true }>,
+    dispatcher_info: Map<string, DispatcherInfo>,
     module_map: SymbolMap,
     symbols: SymbolUtil,
 ): DispatcherSymbolResult {
     let imports = undefined as unknown as TypeHandlerResult['imports']
     let has_references = false
+
+    // Self-import path to filter out to prevent cycles
+    const self_import = new Set([`::java::dispatcher::Symbol${name}`])
 
     const member_types: ts.TypeAliasDeclaration[] = []
     const map_properties: ts.PropertySignature[] = []
@@ -124,13 +135,14 @@ export function dispatcher_symbol(
             name: unknown_type_name,
             dispatcher_symbol: add_reference,
             dispatcher_properties,
+            dispatcher_info,
             module_map,
             symbols,
         })
 
         // Collect imports from fallback type
         if ('imports' in result) {
-            imports = merge_imports(imports, result.imports)
+            imports = merge_imports(imports, result.imports, self_import)
         }
 
         fallback_type_name = factory.createTypeReferenceNode(
@@ -162,13 +174,14 @@ export function dispatcher_symbol(
             name: none_type_name,
             dispatcher_symbol: add_reference,
             dispatcher_properties,
+            dispatcher_info,
             module_map,
             symbols,
         })
 
         // Collect imports from none type
         if ('imports' in result) {
-            imports = merge_imports(imports, result.imports)
+            imports = merge_imports(imports, result.imports, self_import)
         }
 
         dispatcher_properties.set(id, {
@@ -204,13 +217,14 @@ export function dispatcher_symbol(
             name: member_type_name,
             dispatcher_symbol: add_reference,
             dispatcher_properties,
+            dispatcher_info,
             module_map,
             symbols,
         })
 
         // Collect imports
         if ('imports' in result) {
-            imports = merge_imports(imports, result.imports)
+            imports = merge_imports(imports, result.imports, self_import)
         }
 
         // Once/if the dispatcher symbol map gets declaration paths we can add these directly to the modules they belong in

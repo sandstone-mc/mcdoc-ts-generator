@@ -18,7 +18,7 @@ bun run compile
 bun run ./src/index.ts
 
 # Type check
-bun tsc --noEmit
+bun run typecheck
 ```
 
 ## Architecture

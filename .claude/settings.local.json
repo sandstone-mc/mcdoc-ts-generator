@@ -5,7 +5,8 @@
       "Bash(bun tsc:*)",
       "Bash(cat:*)",
       "Bash(bun run compile:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(bun run typecheck:*)"
     ],
     "deny": [],
     "ask": []
