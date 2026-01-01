@@ -3,7 +3,7 @@ import * as mcdoc from '@spyglassmc/mcdoc'
 import ts from 'typescript'
 import { add, pascal_case, pluralize } from '../util'
 import { get_type_handler, type TypeHandlerResult } from './mcdoc'
-import { add_import, merge_imports, Set, type NonEmptyList } from './mcdoc/utils'
+import { merge_imports, Set } from './mcdoc/utils'
 import { Bind } from './mcdoc/bind'
 import { DispatcherSymbol, dispatcher_symbol_paths } from './mcdoc/dispatcher_symbol'
 import { mcdoc_raw } from '..'
@@ -47,6 +47,8 @@ export type DispatcherInfo = {
     symbol_name: string
     /** Number of generic parameters (excluding CASE) */
     generic_count: number
+    /** Whether this dispatcher has a %unknown member (exports FallbackType) */
+    has_fallback_type: boolean
 }
 
 export class TypesGenerator {
@@ -125,7 +127,8 @@ export class TypesGenerator {
 
             this.dispatcher_info.set(id, {
                 symbol_name,
-                generic_count
+                generic_count,
+                has_fallback_type: '%unknown' in members
             })
         }
     }
@@ -317,7 +320,12 @@ export class TypesGenerator {
             })()
 
             // Track this path for dispatcher exports
-            dispatcher_symbol_paths.add(symbol_path)
+            const info = this.dispatcher_info.get(id)!
+            dispatcher_symbol_paths.set(symbol_path, {
+                symbol_name: `Symbol${name}`,
+                base_name: name,
+                has_fallback_type: info.has_fallback_type
+            })
 
             // Store dispatcher reference for the Dispatcher export type
             const dispatcher_type_name = `Symbol${name}`
@@ -345,11 +353,11 @@ export class TypesGenerator {
 
                     if (module_has_imports) {
                         // @ts-ignore
-                        mod.imports.ordered = mod.imports.ordered.filter((imp) => !imp.startsWith('::java::dispatcher::') && !imp.startsWith(symbol_path))
+                        mod.imports.ordered = mod.imports.ordered.filter((imp) => imp !== `::java::dispatcher::Symbol${name}` && !imp.startsWith(symbol_path))
                     }
                 } else if (module_has_imports) {
                     // @ts-ignore
-                    mod.imports.ordered = mod.imports.ordered.filter((imp) => !imp.startsWith('::java::dispatcher::') && !imp.startsWith(symbol_path))
+                    mod.imports.ordered = mod.imports.ordered.filter((imp) => imp !== `::java::dispatcher::Symbol${name}` && !imp.startsWith(symbol_path))
                 }
             } else {
                 this.resolved_symbols.set(symbol_path, {

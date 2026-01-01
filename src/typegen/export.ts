@@ -7,20 +7,31 @@ import type { ResolvedRegistry, ResolvedSymbol } from '.'
 const { factory } = ts
 
 /**
- * Generates `export * from './...'` statements for all dispatcher symbol paths.
- * The export file will be at `::java::dispatcher` and export from all paths where dispatcher symbols are declared.
+ * Generates named export statements for all dispatcher symbols.
+ * Exports `SymbolName` and optionally `NameFallbackType` when %unknown is present.
  */
-export function export_dispatchers(paths: Set<string>): ResolvedSymbol {
+export function export_dispatchers(paths: Map<string, { symbol_name: string, base_name: string, has_fallback_type: boolean }>): ResolvedSymbol {
     const exports: ts.ExportDeclaration[] = []
 
-    for (const path of paths) {
+    for (const [path, info] of paths) {
         // Convert `::java::_dispatcher::entity_effect` to `./_dispatcher/entity_effect`
         const relative_path = './' + path.split('::').slice(2).join('/')
+
+        // Build the list of named exports
+        const export_specifiers: ts.ExportSpecifier[] = [
+            factory.createExportSpecifier(false, undefined, info.symbol_name)
+        ]
+
+        if (info.has_fallback_type) {
+            export_specifiers.push(
+                factory.createExportSpecifier(false, undefined, `${info.base_name}FallbackType`)
+            )
+        }
 
         exports.push(factory.createExportDeclaration(
             undefined,
             false,
-            undefined,
+            factory.createNamedExports(export_specifiers),
             factory.createStringLiteral(relative_path, true)
         ))
     }

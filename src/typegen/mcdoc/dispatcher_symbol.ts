@@ -19,11 +19,20 @@ export type DispatcherReferenceCounter = {
 
 export const dispatcher_references = new Map<string, DispatcherReferenceCounter>()
 
+export type DispatcherExportInfo = {
+    /** The symbol name without the path (e.g., "SymbolEntityEffect") */
+    symbol_name: string
+    /** The base name without Symbol prefix (e.g., "EntityEffect") */
+    base_name: string
+    /** Whether this dispatcher exports a FallbackType */
+    has_fallback_type: boolean
+}
+
 /**
- * Global set of all dispatcher symbol paths for generating export file.
+ * Global map of dispatcher symbol paths to their export info.
  * Populated during `resolve_dispatcher_symbols`.
  */
-export const dispatcher_symbol_paths = new Set<string>()
+export const dispatcher_symbol_paths = new Map<string, DispatcherExportInfo>()
 
 type DispatcherSymbolResult = {
     /**
@@ -153,7 +162,7 @@ export function dispatcher_symbol(
             member_types.push(result.type)
         } else {
             member_types.push(factory.createTypeAliasDeclaration(
-                undefined,
+                [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
                 unknown_type_name,
                 undefined,
                 result.type as ts.TypeNode
