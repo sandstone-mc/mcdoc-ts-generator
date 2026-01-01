@@ -352,12 +352,17 @@ export class TypesGenerator {
                     mod.imports = merge_imports(mod.imports, imports)
 
                     if (module_has_imports) {
+                        // Filter out: 1) dispatcher self-import, 2) types defined in this exact module (not child modules)
+                        // Regex matches symbol_path::TypeName but not symbol_path::SubModule::TypeName
+                        const same_module_pattern = new RegExp(`^${symbol_path}::[^:]+$`)
                         // @ts-ignore
-                        mod.imports.ordered = mod.imports.ordered.filter((imp) => imp !== `::java::dispatcher::Symbol${name}` && !imp.startsWith(symbol_path))
+                        mod.imports.ordered = mod.imports.ordered.filter((imp) => imp !== `::java::dispatcher::Symbol${name}` && !same_module_pattern.test(imp))
                     }
                 } else if (module_has_imports) {
+                    // Filter out: 1) dispatcher self-import, 2) types defined in this exact module (not child modules)
+                    const same_module_pattern = new RegExp(`^${symbol_path}::[^:]+$`)
                     // @ts-ignore
-                    mod.imports.ordered = mod.imports.ordered.filter((imp) => imp !== `::java::dispatcher::Symbol${name}` && !imp.startsWith(symbol_path))
+                    mod.imports.ordered = mod.imports.ordered.filter((imp) => imp !== `::java::dispatcher::Symbol${name}` && !same_module_pattern.test(imp))
                 }
             } else {
                 this.resolved_symbols.set(symbol_path, {
