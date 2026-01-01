@@ -350,25 +350,35 @@ export class TypesGenerator {
                 if (imports !== undefined) {
                     // @ts-ignore
                     mod.imports = merge_imports(mod.imports, imports)
+                }
 
-                    if (module_has_imports) {
-                        // Filter out: 1) dispatcher self-import, 2) types defined in this exact module (not child modules)
-                        // Regex matches symbol_path::TypeName but not symbol_path::SubModule::TypeName
-                        const same_module_pattern = new RegExp(`^${symbol_path}::[^:]+$`)
-                        // @ts-ignore
-                        mod.imports.ordered = mod.imports.ordered.filter((imp) => imp !== `::java::dispatcher::Symbol${name}` && !same_module_pattern.test(imp))
-                    }
-                } else if (module_has_imports) {
+                // Always filter imports after merging (not just when module previously had imports)
+                if (mod.imports !== undefined) {
                     // Filter out: 1) dispatcher self-import, 2) types defined in this exact module (not child modules)
+                    // Regex matches symbol_path::TypeName but not symbol_path::SubModule::TypeName
                     const same_module_pattern = new RegExp(`^${symbol_path}::[^:]+$`)
                     // @ts-ignore
                     mod.imports.ordered = mod.imports.ordered.filter((imp) => imp !== `::java::dispatcher::Symbol${name}` && !same_module_pattern.test(imp))
                 }
             } else {
+                // Filter imports for standalone dispatcher files too
+                let filtered_imports = imports
+                if (imports !== undefined) {
+                    const same_module_pattern = new RegExp(`^${symbol_path}::[^:]+$`)
+                    const filtered_ordered = imports.ordered.filter((imp) => imp !== `::java::dispatcher::Symbol${name}` && !same_module_pattern.test(imp))
+                    if (filtered_ordered.length > 0) {
+                        filtered_imports = {
+                            ordered: filtered_ordered as typeof imports.ordered,
+                            check: new Map(filtered_ordered.map((imp, i) => [imp, i]))
+                        }
+                    } else {
+                        filtered_imports = undefined
+                    }
+                }
                 this.resolved_symbols.set(symbol_path, {
                     exports: types,
                     paths: new Set(),
-                    ...add({imports})
+                    ...add({ imports: filtered_imports })
                 })
             }
         }
