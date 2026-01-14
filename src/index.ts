@@ -34,7 +34,7 @@ export interface GeneratorOptions {
     tsconfig?: boolean
 }
 
-const cache_root = join(dirname(fileURLToPath(import.meta.url)), 'cache')
+const cache_root = join(process.cwd(), 'cache')
 
 function registerAttributes(meta: MetaRegistry, release: ReleaseVersion) {
     // We always generate for the latest version

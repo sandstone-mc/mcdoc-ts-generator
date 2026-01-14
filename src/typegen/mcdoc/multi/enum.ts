@@ -12,7 +12,7 @@ export function enum_docs(enum_type: mcdoc.EnumType) {
     for (const member of enum_type.values) {
         const id_value = `${member.identifier}(\`${member.value}\`)`
         if (member.desc) {
-            const member_doc = Bind.DocPart(member.desc)
+            const member_doc = member.desc.trim().split('\n')
 
             if (member_doc.length > 1) {
                 docs.push(` - ${id_value}:`)

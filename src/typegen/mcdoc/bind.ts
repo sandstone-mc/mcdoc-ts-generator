@@ -19,7 +19,6 @@ export class Bind {
         return factory.createLiteralTypeNode(factory.createStringLiteral(literal, true))
     }
 
-    // TODO: Implement this in LiteralUnion
     /**
      * Creates a template literal type that represents a non-empty string.
      * ```ts
@@ -117,10 +116,6 @@ export class Bind {
         factory.createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
     ])
 
-    static DocPart(doc: string) {
-        return doc.trim().replaceAll('\n\n\n\n ', '@@bad@@').replaceAll('\n\n', '\n').replaceAll('@@bad@@', '\n\n').split('\n')
-    }
-
     /**
      * https://stackoverflow.com/questions/67575784/typescript-ast-factory-how-to-use-comments
      */
@@ -133,7 +128,7 @@ export class Bind {
             if (Array.isArray(_doc)) {
                 // y e s
                 try {
-                    const sanitized = Bind.DocPart(_doc[0])
+                    const sanitized = _doc[0].trim().split('\n')
                     for (const __doc of sanitized) {
                         if (__doc === '') {
                             doc += '\n *'
