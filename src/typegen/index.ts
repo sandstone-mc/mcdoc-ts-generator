@@ -8,6 +8,7 @@ import { Bind } from './mcdoc/bind'
 import { DispatcherSymbol, dispatcher_symbol_paths } from './mcdoc/dispatcher_symbol'
 import { mcdoc_raw } from '..'
 import { export_dispatchers, export_registry } from './export'
+import { get_special_case } from './special_cases'
 
 /**
  * Help: https://ts-ast-viewer.com/
@@ -49,12 +50,12 @@ export type DispatcherInfo = {
     generic_count: number
     /** Whether this dispatcher has a %unknown member (exports FallbackType) */
     has_fallback_type: boolean
+    /** Whether this dispatcher has a %none member */
+    supports_none: boolean
 }
 
 export class TypesGenerator {
     readonly resolved_registries = new Map<string, ResolvedRegistry>()
-
-    readonly dispatcher_properties = new Map<string, { supports_none?: true }>
 
     readonly resolved_symbols = new Map<string, ResolvedSymbol>()
 
@@ -92,8 +93,6 @@ export class TypesGenerator {
      * Pre-computes dispatcher info (symbol names and import paths) before module resolution.
      * This allows modules to directly reference SymbolX types instead of the central Dispatcher type.
      *
-     * Also populates dispatcher_properties with supports_none info.
-     *
      * Note: All dispatchers are placed in _dispatcher/ (or _builtin/ for mcdoc namespace) for predictability.
      */
     private precompute_dispatcher_info(dispatchers: SymbolMap) {
@@ -103,11 +102,6 @@ export class TypesGenerator {
             const { members } = dispatchers[id]
             if (members === undefined) {
                 continue
-            }
-
-            // Populate dispatcher_properties with supports_none info
-            if ('%none' in members) {
-                this.dispatcher_properties.set(id, { supports_none: true })
             }
 
             const [namespace, _name] = id.split(':')
@@ -128,7 +122,8 @@ export class TypesGenerator {
             this.dispatcher_info.set(id, {
                 symbol_name,
                 generic_count,
-                has_fallback_type: '%unknown' in members
+                has_fallback_type: '%unknown' in members,
+                supports_none: '%none' in members
             })
         }
     }
@@ -146,12 +141,17 @@ export class TypesGenerator {
             const type_name = pluralize(registry_name.split('/').join('_')).toUpperCase()
             const symbol_path = `::java::_registry::${type_name.toLowerCase()}`
 
+            // TODO: Special case - sounds registry uses LiteralUnion instead of NamespacedLiteralUnion
+            // due to upstream vanilla-mcdoc issue
+            const is_sounds = registry_name === 'sound'
+            const literal_union_type = is_sounds ? 'LiteralUnion' : 'NamespacedLiteralUnion'
+
             this.resolved_symbols.set(
                 symbol_path,
                 {
                     imports: {
                         check: new Map(),
-                        ordered: ['sandstone::NamespacedLiteralUnion', 'sandstone::Set', 'sandstone::SetType'] as const,
+                        ordered: [`sandstone::${literal_union_type}`, 'sandstone::Set', 'sandstone::SetType'] as const,
                     },
                     exports: [
                         factory.createTypeAliasDeclaration(
@@ -160,7 +160,7 @@ export class TypesGenerator {
                             undefined,
                             factory.createParenthesizedType(factory.createUnionTypeNode([
                                 factory.createTypeReferenceNode(
-                                    'NamespacedLiteralUnion',
+                                    literal_union_type,
                                     [factory.createTypeReferenceNode(
                                         factory.createIdentifier('SetType'),
                                         [factory.createTypeQueryNode(factory.createIdentifier(`${type_name}_SET`))]
@@ -237,6 +237,37 @@ export class TypesGenerator {
                 const name = path.at(-1)!
                 const module_path = path.slice(0, -1).join('::')
 
+                // Check for special case overrides first
+                const special_case = get_special_case(_path)
+                if (special_case !== undefined) {
+                    const module = (() => {
+                        if (!this.resolved_symbols.has(module_path)) {
+                            return this.resolved_symbols.set(module_path, {
+                                paths: new Set([_path]),
+                                exports: [],
+                                ...(special_case.imports !== undefined ? { imports: special_case.imports } : {})
+                            }).get(module_path)!
+                        }
+                        const mod = this.resolved_symbols.get(module_path)!
+
+                        mod.paths.add(_path)
+
+                        if (special_case.imports !== undefined) {
+                            // @ts-ignore
+                            mod.imports = merge_imports(mod.imports, special_case.imports)
+                        }
+                        return mod
+                    })()
+
+                    module.exports.push(factory.createTypeAliasDeclaration(
+                        [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+                        name,
+                        undefined,
+                        special_case.type
+                    ))
+                    continue
+                }
+
                 // Skip root type references without attributes.
                 // These are import-to-export type aliases (e.g., `type X = X` where X is imported)
                 // that cause TS2440 conflicts and break enum doc propagation.
@@ -248,7 +279,6 @@ export class TypesGenerator {
                 }
 
                 const resolved_member = get_type_handler(type)(type)({
-                    dispatcher_properties: this.dispatcher_properties,
                     dispatcher_info: this.dispatcher_info,
                     root_type: true,
                     name,
@@ -300,7 +330,7 @@ export class TypesGenerator {
             const name = pascal_case(`${namespace === 'mcdoc' ? 'mcdoc_' : ''}${_name}`)
 
             // Once/if the dispatcher symbol map gets declaration paths we can switch to that instead of `references`
-            const { types, imports, references, generic_count } = DispatcherSymbol(id, name, members, this.dispatcher_properties, this.dispatcher_info, module_map, symbols)
+            const { types, imports, references, generic_count } = DispatcherSymbol(id, name, members, this.dispatcher_info, module_map, symbols)
 
             let in_module = false
 

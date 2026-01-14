@@ -67,6 +67,7 @@ export class Bind {
      * @param key_type - The type to iterate over (will be wrapped in Extract)
      * @param value_type - The type of each property value
      * @param options.key_name - The name of the type parameter (default `'Key'`)
+     * @param options.name_type - Optional key remapping type (the `as` clause)
      * @param options.parenthesized - Whether to wrap the result in parentheses (default `true`)
      * @returns A mapped type node: `({ [Key in Extract<KeyType, string>]?: ValueType })`
      *
@@ -79,12 +80,16 @@ export class Bind {
      * // Custom key name, no parentheses:
      * Bind.MappedType(keyType, valueType, { key_name: 'S', parenthesized: false })
      * // Produces: { [S in Extract<KeyType, string>]?: ValueType }
+     *
+     * // With key remapping (as clause):
+     * Bind.MappedType(keyType, valueType, { name_type: templateLiteralType })
+     * // Produces: ({ [Key in Extract<KeyType, string> as TemplateLiteralType]?: ValueType })
      * ```
      */
-    static MappedType(key_type: ts.TypeNode, value_type: ts.TypeNode, options?: { key_name?: string, parenthesized?: boolean }) {
-        const { key_name = 'Key', parenthesized = true } = options ?? {}
-        const constraint_type = key_type.kind === ts.SyntaxKind.StringKeyword ? 
-            Bind.NonEmptyString 
+    static MappedType(key_type: ts.TypeNode, value_type: ts.TypeNode, options?: { key_name?: string, name_type?: ts.TypeNode, parenthesized?: boolean }) {
+        const { key_name = 'Key', name_type, parenthesized = true } = options ?? {}
+        const constraint_type = key_type.kind === ts.SyntaxKind.StringKeyword ?
+            Bind.NonEmptyString
             : factory.createTypeReferenceNode('Extract', [
                 key_type,
                 factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
@@ -97,7 +102,7 @@ export class Bind {
                 key_name,
                 constraint_type
             ),
-            undefined,
+            name_type,
             factory.createToken(ts.SyntaxKind.QuestionToken),
             value_type,
             undefined

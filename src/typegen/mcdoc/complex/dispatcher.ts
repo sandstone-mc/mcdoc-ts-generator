@@ -1,12 +1,17 @@
 import ts from 'typescript'
 import * as mcdoc from '@spyglassmc/mcdoc'
-import type { NonEmptyList, TypeHandler } from '..'
+import type { NonEmptyList, TypeHandler, TypeHandlerResult } from '..'
 import type { DispatcherInfo } from '../..'
 import { Assert } from '../assert'
 import { Bind } from '../bind'
+import { add_import } from '../utils'
 import { add } from '../../../util'
 
 const { factory } = ts
+
+const Unknown = Bind.StringLiteral('%unknown')
+const RootNBT = factory.createTypeReferenceNode('RootNBT')
+const RootNBTImport = 'sandstone::arguments::nbt::RootNBT'
 
 function DispatcherArgs(args: Record<string, unknown>): asserts args is {
     /**
@@ -18,8 +23,6 @@ function DispatcherArgs(args: Record<string, unknown>): asserts args is {
     index_keys?: NonEmptyList<string>
 
     generic_types?: ts.TypeNode[]
-
-    dispatcher_properties?: Map<string, { supports_none?: true }>
 
     dispatcher_info?: Map<string, DispatcherInfo>
 
@@ -43,52 +46,92 @@ function SymbolGeneric(symbol_name: string, generics: ts.TypeNode[], case_arg: t
     return factory.createTypeReferenceNode(symbol_name, [...generics, case_arg])
 }
 
-/**
- * Helper to create `SymbolX<generics...>[key]` - get map then index
- * If key is dynamic, wraps in a conditional: `(S extends keyof SymbolX ? SymbolX[S] : Record<string, unknown>)`
- */
-function SymbolMapIndex(symbol_name: string, key: ts.TypeNode, generics: ts.TypeNode[]) {
-    const symbol_type = factory.createTypeReferenceNode(symbol_name, generics.length === 0 ? undefined : generics)
-
-    if (key.kind === ts.SyntaxKind.LiteralType) {
-        return factory.createIndexedAccessTypeNode(
-            symbol_type,
-            key
-        )
-    }
-
-    return factory.createParenthesizedType(factory.createConditionalTypeNode(
-        key,
-        factory.createTypeOperatorNode(
-            ts.SyntaxKind.KeyOfKeyword,
-            symbol_type
-        ),
-        factory.createIndexedAccessTypeNode(
-            symbol_type,
-            key
-        ),
-        factory.createTypeReferenceNode(
-            'Record',
-            [
-                factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
-            ]
-        )
-    ))
+type FallbackInfo = {
+    has_fallback_type: boolean
+    symbol_name: string
+    generics: ts.TypeNode[]
 }
 
 /**
- * Helper to create `(S extends keyof SymbolX ? ('sub_index' extends keyof SymbolX[S] ? SymbolX[S]['sub_index'] : Record<string, unknown>) : Record<string, unknown>)`
+ * Helper to create `SymbolX<generics...>[key]` - get map then index
+ * If key is dynamic, wraps in a conditional: `(S extends keyof SymbolX ? SymbolX[S] : FallbackType)`
+ *
+ * Fallback priority:
+ * 1. If dispatcher has %unknown → SymbolX<'%unknown'>
+ * 2. Otherwise → RootNBT (since this is intersection context)
+ */
+function SymbolMapIndex(symbol_name: string, key: ts.TypeNode, generics: ts.TypeNode[], fallback_info?: FallbackInfo): { type: ts.TypeNode, needs_import: boolean } {
+    const symbol_type = factory.createTypeReferenceNode(symbol_name, generics.length === 0 ? undefined : generics)
+
+    if (key.kind === ts.SyntaxKind.LiteralType) {
+        return {
+            type: factory.createIndexedAccessTypeNode(
+                symbol_type,
+                key
+            ),
+            needs_import: false
+        }
+    }
+
+    // Determine fallback type
+    let fallback_type: ts.TypeNode
+    let needs_import = false
+
+    if (fallback_info?.has_fallback_type) {
+        // Use SymbolX<generics..., '%unknown'>
+        fallback_type = SymbolGeneric(fallback_info.symbol_name, fallback_info.generics, Unknown)
+    } else {
+        // Use RootNBT (intersection context)
+        fallback_type = RootNBT
+        needs_import = true
+    }
+
+    return {
+        type: factory.createParenthesizedType(factory.createConditionalTypeNode(
+            key,
+            factory.createTypeOperatorNode(
+                ts.SyntaxKind.KeyOfKeyword,
+                symbol_type
+            ),
+            factory.createIndexedAccessTypeNode(
+                symbol_type,
+                key
+            ),
+            fallback_type
+        )),
+        needs_import
+    }
+}
+
+/**
+ * Helper to create `(S extends keyof SymbolX ? ('sub_index' extends keyof SymbolX[S] ? SymbolX[S]['sub_index'] : FallbackType) : FallbackType)`
  *
  * Get map, index a member, index within that member
+ *
+ * Fallback priority:
+ * 1. If dispatcher has %unknown → SymbolX<'%unknown'>
+ * 2. Otherwise → RootNBT (since this is intersection context)
  */
-function SymbolMapSubIndex(symbol_name: string, member_key: ts.TypeNode, generics: ts.TypeNode[], sub_index: NonEmptyList<string>) {
+function SymbolMapSubIndex(symbol_name: string, member_key: ts.TypeNode, generics: ts.TypeNode[], sub_index: NonEmptyList<string>, fallback_info?: FallbackInfo): { type: ts.TypeNode, needs_import: boolean } {
     const symbol_type = factory.createTypeReferenceNode(symbol_name, generics.length === 0 ? undefined : generics)
     const symbol_member: ts.IndexedAccessTypeNode = factory.createIndexedAccessTypeNode(
         symbol_type,
         member_key
     )
     let indexed_symbol: ts.IndexedAccessTypeNode | ts.ParenthesizedTypeNode | undefined = undefined
+
+    // Determine fallback type
+    let fallback_type: ts.TypeNode
+    let needs_import = false
+
+    if (fallback_info?.has_fallback_type) {
+        // Use SymbolX<generics..., '%unknown'>
+        fallback_type = SymbolGeneric(fallback_info.symbol_name, fallback_info.generics, Unknown)
+    } else {
+        // Use RootNBT (intersection context)
+        fallback_type = RootNBT
+        needs_import = true
+    }
 
     // Assembles the type inside-out
     for (let i = sub_index.length; i > 0; i--) {
@@ -117,31 +160,22 @@ function SymbolMapSubIndex(symbol_name: string, member_key: ts.TypeNode, generic
                 index_stack
             ),
             indexed_symbol,
-            factory.createTypeReferenceNode(
-                'Record',
-                [
-                    factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                    factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
-                ]
-            )
+            fallback_type
         ))
     }
 
-    return factory.createParenthesizedType(factory.createConditionalTypeNode(
-        member_key,
-        factory.createTypeOperatorNode(
-            ts.SyntaxKind.KeyOfKeyword,
-            symbol_type
-        ),
-        indexed_symbol!,
-        factory.createTypeReferenceNode(
-            'Record',
-            [
-                factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
-            ]
-        )
-    ))
+    return {
+        type: factory.createParenthesizedType(factory.createConditionalTypeNode(
+            member_key,
+            factory.createTypeOperatorNode(
+                ts.SyntaxKind.KeyOfKeyword,
+                symbol_type
+            ),
+            indexed_symbol!,
+            fallback_type
+        )),
+        needs_import
+    }
 }
 
 /**
@@ -173,14 +207,26 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
             throw new Error(`[mcdoc_dispatcher] Unknown dispatcher: ${registry}`)
         }
 
-        const { symbol_name } = info
+        const { symbol_name, has_fallback_type, supports_none } = info
         const import_path = `::java::dispatcher::${symbol_name}`
+
+        let imports: TypeHandlerResult['imports'] = {
+            ordered: [import_path] as NonEmptyList<string>,
+            check: new Map([[import_path, 0]]),
+        }
 
         let result_type: ts.TypeNode
 
         let child_dispatcher: NonEmptyList<[parent_count: number, property: string]> | undefined
 
         const generics = args.generic_types ?? []
+
+        // Fallback info for conditional types
+        const fallback_info: FallbackInfo = {
+            has_fallback_type,
+            symbol_name,
+            generics
+        }
 
         if (indices.length === 1 && indices[0].kind === 'dynamic' && typeof indices[0].accessor.at(-1) === 'string') {
             // If this is a root type, we can't use S (no generic parameter available)
@@ -191,21 +237,23 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
             } else {
                 child_dispatcher = [[indices[0].accessor.length - 1, indices[0].accessor.at(-1) as string]]
 
-                // Result: (S extends keyof SymbolX ? SymbolX[S] : Record<string, unknown>)
-                const indexed_type = SymbolMapIndex(symbol_name, factory.createTypeReferenceNode('S'), generics)
+                // Result: (S extends keyof SymbolX ? SymbolX[S] : FallbackType)
+                const indexed_result = SymbolMapIndex(symbol_name, factory.createTypeReferenceNode('S'), generics, fallback_info)
+                if (indexed_result.needs_import) {
+                    imports = add_import(imports, RootNBTImport)
+                }
 
-                const properties = args.dispatcher_properties?.get(registry)
-                if (properties?.supports_none) {
-                    // Result: (S extends undefined ? SymbolX<generics..., '%none'> : (S extends keyof SymbolX ? SymbolX[S] : Record<string, unknown>))
+                if (supports_none) {
+                    // Result: (S extends undefined ? SymbolX<generics..., '%none'> : (S extends keyof SymbolX ? SymbolX[S] : FallbackType))
                     result_type = factory.createParenthesizedType(factory.createConditionalTypeNode(
                         factory.createTypeReferenceNode('S'),
                         factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword),
                         SymbolGeneric(symbol_name, generics, None),
-                        indexed_type
+                        indexed_result.type
                     ))
                 } else {
-                    // Result: (S extends keyof SymbolX ? SymbolX[S] : Record<string, unknown>)
-                    result_type = indexed_type
+                    // Result: (S extends keyof SymbolX ? SymbolX[S] : FallbackType)
+                    result_type = indexed_result.type
                 }
             }
         } else if (indices.length === 1 && indices[0].kind === 'static') {
@@ -215,15 +263,25 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
                 result_type = SymbolGeneric(symbol_name, generics, Fallback)
             } else {
                 // Result: SymbolX['static_member']
-                result_type = SymbolMapIndex(symbol_name, Bind.StringLiteral(indices[0].value), generics)
+                const static_result = SymbolMapIndex(symbol_name, Bind.StringLiteral(indices[0].value), generics, fallback_info)
+                result_type = static_result.type
+                // Static access doesn't need fallback import
             }
         } else if (JSON.stringify(indices) === SimpleKeyIndex) {
             if (args.index_keys !== undefined) {
-                // Result: (Key extends keyof SymbolX ? ('static_index' extends keyof SymbolX[Key] ? SymbolX[Key]['static_index'] : Record<string, unknown>) : Record<string, unknown>)
-                result_type = SymbolMapSubIndex(symbol_name, factory.createTypeReferenceNode('Key'), generics, args.index_keys)
+                // Result: (Key extends keyof SymbolX ? ('static_index' extends keyof SymbolX[Key] ? SymbolX[Key]['static_index'] : FallbackType) : FallbackType)
+                const sub_result = SymbolMapSubIndex(symbol_name, factory.createTypeReferenceNode('Key'), generics, args.index_keys, fallback_info)
+                result_type = sub_result.type
+                if (sub_result.needs_import) {
+                    imports = add_import(imports, RootNBTImport)
+                }
             } else {
-                // Result: (Key extends keyof SymbolX ? SymbolX[Key] : Record<string, unknown>)
-                result_type = SymbolMapIndex(symbol_name, factory.createTypeReferenceNode('Key'), generics)
+                // Result: (Key extends keyof SymbolX ? SymbolX[Key] : FallbackType)
+                const key_result = SymbolMapIndex(symbol_name, factory.createTypeReferenceNode('Key'), generics, fallback_info)
+                result_type = key_result.type
+                if (key_result.needs_import) {
+                    imports = add_import(imports, RootNBTImport)
+                }
             }
         } else {
             throw new Error(`[mcdoc_dispatcher] Unsupported dispatcher: ${dispatcher}`)
@@ -231,10 +289,7 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
 
         return {
             type: result_type,
-            imports: {
-                ordered: [import_path] as NonEmptyList<string>,
-                check: new Map([[import_path, 0]]),
-            },
+            imports,
             ...add({child_dispatcher})
         } as const
     }

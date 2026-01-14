@@ -3,11 +3,14 @@ import type { SymbolMap, SymbolUtil } from '@spyglassmc/core'
 import * as mcdoc from '@spyglassmc/mcdoc'
 import { get_type_handler, type NonEmptyList, type TypeHandlerResult } from '.'
 import type { DispatcherInfo } from '..'
-import { merge_imports } from './utils'
+import { add_import, merge_imports } from './utils'
 import { Bind } from './bind'
 import { add, pascal_case } from '../../util'
 
 const { factory } = ts
+
+const NBTObject = factory.createTypeReferenceNode('NBTObject')
+const NBTObjectImport = 'sandstone::arguments::nbt::NBTObject'
 
 export type DispatcherReferenceCounter = {
     /**
@@ -76,14 +79,11 @@ type DispatcherMember = { typeDef: mcdoc.McdocType }
  * Special keys in dispatcher members:
  * - `%unknown`: Defines fallback type for arbitrary string keys not in the map, doesn't actually work because of TypeScript limitations
  * - `%none`: Indicates the dispatcher key can be omitted. Handled during dispatcher use.
- *
- * Also populates `dispatcherPropertiesMap` with the dispatcher's properties.
  */
 export function dispatcher_symbol(
     id: string,
     name: string,
     members: SymbolMap,
-    dispatcher_properties: Map<string, { supports_none?: true }>,
     dispatcher_info: Map<string, DispatcherInfo>,
     module_map: SymbolMap,
     symbols: SymbolUtil,
@@ -113,9 +113,12 @@ export function dispatcher_symbol(
             // Extract the generic name from the path (last segment)
             const param_name = type_param.path.split('::').pop()!
 
-            generic_params.push(factory.createTypeParameterDeclaration(undefined, param_name))
+            generic_params.push(factory.createTypeParameterDeclaration(undefined, param_name, NBTObject))
             generic_names.push(factory.createTypeReferenceNode(param_name))
         }
+
+        // Add NBTObject import for generic constraints
+        imports = add_import(imports, NBTObjectImport)
     }
 
     const add_reference = () => {
@@ -143,7 +146,6 @@ export function dispatcher_symbol(
             root_type: true,
             name: unknown_type_name,
             dispatcher_symbol: add_reference,
-            dispatcher_properties,
             dispatcher_info,
             module_map,
             symbols,
@@ -182,7 +184,6 @@ export function dispatcher_symbol(
             root_type: true,
             name: none_type_name,
             dispatcher_symbol: add_reference,
-            dispatcher_properties,
             dispatcher_info,
             module_map,
             symbols,
@@ -192,10 +193,6 @@ export function dispatcher_symbol(
         if ('imports' in result) {
             imports = merge_imports(imports, result.imports, self_import)
         }
-
-        dispatcher_properties.set(id, {
-            supports_none: true,
-        })
 
         if (ts.isTypeAliasDeclaration(result.type)) {
             member_types.push(result.type)
@@ -225,7 +222,6 @@ export function dispatcher_symbol(
             root_type: true,
             name: member_type_name,
             dispatcher_symbol: add_reference,
-            dispatcher_properties,
             dispatcher_info,
             module_map,
             symbols,
@@ -309,6 +305,8 @@ export function dispatcher_symbol(
     )
 
     // Create the main Symbol type with CASE generic first, then dispatcher generics
+    const has_unknown = fallback_type_name !== undefined
+
     generic_params.push(factory.createTypeParameterDeclaration(
         undefined,
         'CASE',
@@ -317,9 +315,34 @@ export function dispatcher_symbol(
             Bind.StringLiteral('keys'),
             Bind.StringLiteral('%fallback'),
             Bind.StringLiteral('%none'),
+            Bind.StringLiteral('%unknown'),
         ]),
         Bind.StringLiteral('map')
     ))
+
+    // Build conditional chain from innermost to outermost
+    // %unknown → %none → %fallback → keys → map
+    let innermost_conditional: ts.TypeNode = factory.createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
+
+    // Add %unknown case if fallback type exists
+    if (has_unknown) {
+        innermost_conditional = factory.createConditionalTypeNode(
+            factory.createTypeReferenceNode('CASE'),
+            Bind.StringLiteral('%unknown'),
+            factory.createTypeReferenceNode(`${name}FallbackType`, has_generics ? generic_names : undefined),
+            innermost_conditional
+        )
+    }
+
+    // Add %none case if none type exists
+    if (has_none) {
+        innermost_conditional = factory.createConditionalTypeNode(
+            factory.createTypeReferenceNode('CASE'),
+            Bind.StringLiteral('%none'),
+            factory.createTypeReferenceNode(`${name}NoneType`, has_generics ? generic_names : undefined),
+            innermost_conditional
+        )
+    }
 
     const symbol_type = factory.createTypeAliasDeclaration(
         [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
@@ -337,12 +360,7 @@ export function dispatcher_symbol(
                     factory.createTypeReferenceNode('CASE'),
                     Bind.StringLiteral('%fallback'),
                     factory.createTypeReferenceNode(`${name}Fallback`, has_generics ? generic_names : undefined),
-                    has_none ? factory.createConditionalTypeNode(
-                        factory.createTypeReferenceNode('CASE'),
-                        Bind.StringLiteral('%none'),
-                        factory.createTypeReferenceNode(`${name}NoneType`, has_generics ? generic_names : undefined),
-                        factory.createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
-                    ) : factory.createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
+                    innermost_conditional
                 )
             )
         )

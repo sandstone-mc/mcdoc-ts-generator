@@ -2,10 +2,13 @@ import ts from 'typescript'
 import * as mcdoc from '@spyglassmc/mcdoc'
 import { TypeHandlers, type NonEmptyList, type TypeHandler, type TypeHandlerResult } from '..'
 import { Assert } from '../assert'
-import { merge_imports } from '../utils'
+import { add_import, merge_imports } from '../utils'
 import { add } from '../../../util'
 
 const { factory } = ts
+
+const NBTObject = factory.createTypeReferenceNode('NBTObject')
+const NBTObjectImport = 'sandstone::arguments::nbt::NBTObject'
 
 /**
  * Arguments that can be passed to the template handler.
@@ -67,9 +70,13 @@ function mcdoc_template(type: mcdoc.McdocType) {
             generic_paths.add(generic.path)
             generics.push(factory.createTypeParameterDeclaration(
                 undefined,
-                generic.path.slice(generic.path.lastIndexOf(':') + 1)
+                generic.path.slice(generic.path.lastIndexOf(':') + 1),
+                NBTObject
             ))
         }
+
+        // Add NBTObject import for generic constraints
+        imports = add_import(imports, NBTObjectImport)
 
         // Process the child type
         const child_result = TypeHandlers[child.kind](child)({

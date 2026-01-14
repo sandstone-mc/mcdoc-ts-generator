@@ -384,11 +384,20 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                 ...add({imports, child_dispatcher}),
             } as const
         } else {
+            // Create the indexed access type: ({ [S in ...]?: ... }[...])
+            const indexed_access_node = factory.createParenthesizedType(factory.createIndexedAccessTypeNode(
+                Bind.MappedType(indexed_access_type!, inner_type, { key_name: 'S', parenthesized: false }),
+                indexed_access_type!
+            ))
+
+            // Wrap in NonNullable when this is a root type (top-level export)
+            // because mapped type indexed access can return undefined
+            const result_type = root_type
+                ? factory.createTypeReferenceNode('NonNullable', [indexed_access_node])
+                : indexed_access_node
+
             return {
-                type: template(factory.createParenthesizedType(factory.createIndexedAccessTypeNode(
-                    Bind.MappedType(indexed_access_type!, inner_type, { key_name: 'S', parenthesized: false }),
-                    indexed_access_type!
-                ))),
+                type: template(result_type),
                 ...add({imports, child_dispatcher}),
             } as const
         }
