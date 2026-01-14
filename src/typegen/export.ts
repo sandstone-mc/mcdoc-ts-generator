@@ -14,8 +14,8 @@ export function export_dispatchers(paths: Map<string, { symbol_name: string, bas
     const exports: ts.ExportDeclaration[] = []
 
     for (const [path, info] of paths) {
-        // Convert `::java::_dispatcher::entity_effect` to `./_dispatcher/entity_effect`
-        const relative_path = './' + path.split('::').slice(2).join('/')
+        // Convert `::java::_dispatcher::entity_effect` to `./_dispatcher/entity_effect.ts`
+        const relative_path = `./${path.split('::').slice(2).join('/')}.ts`
 
         // Build the list of named exports
         const export_specifiers: ts.ExportSpecifier[] = [
