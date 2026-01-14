@@ -138,6 +138,8 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                         .with('reference', 'concrete', (kind) => {
                             const key = TypeHandlers[kind](pair.key)(args)
 
+                            // TODO: Handle #[id]
+
                             if ('imports' in key) {
                                 imports = merge_imports(imports, key.imports)
                             }
@@ -166,7 +168,11 @@ function mcdoc_struct(type: mcdoc.McdocType) {
 
                                         let registry_id: string
                                         if (id_attr === undefined) {
-                                            throw new Error(`[mcdoc_struct] #[id] on a struct key is currently not handled`)
+                                            inherit.push(Bind.MappedType(
+                                                Bind.NonEmptyString,
+                                                value.type
+                                            ))
+                                            return
                                         }
                                         if (id_attr.kind === 'literal') {
                                             registry_id = `minecraft:${id_attr.value.value}`

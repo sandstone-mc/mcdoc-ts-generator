@@ -1,6 +1,6 @@
 {
   "name": "@sandstone-mc/mcdoc-ts-generator",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "description": "Generate TypeScript types from Minecraft mcdoc definitions",
   "type": "module",
   "main": "./dist/index.js",

@@ -46,6 +46,7 @@ const eslint = new ESLint({
                 '@stylistic/eol-last': ['error', 'always'],
                 '@stylistic/no-trailing-spaces': 'error',
                 '@stylistic/no-multiple-empty-lines': ['error', { max: 1 }],
+                '@stylistic/multiline-comment-style': ['error', 'starred-block'],
                 '@stylistic/padding-line-between-statements': ['error',
                     { blankLine: 'always', prev: 'export', next: 'export' },
                     { blankLine: 'always', prev: 'import', next: '*' },

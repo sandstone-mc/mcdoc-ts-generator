@@ -29,11 +29,11 @@ bun run typecheck
 2. Fetches Minecraft registries and block states for the latest version
 3. Initializes a Spyglass Service with mcdoc parsers
 4. Uses `TypesGenerator` to resolve and convert mcdoc types to TypeScript AST nodes
-5. Formats output with Biome and writes to `types/` directory
+5. Formats output with ESLint and writes to `types/` directory
 
 ### Type Generation (`src/typegen/`)
 - `index.ts` - `TypesGenerator` class: Main orchestrator for type resolution. Handles references, dispatchers, and module organization.
-- `compile.ts` - Compiles TypeScript AST nodes to formatted source code using Biome
+- `compile.ts` - Compiles TypeScript AST nodes to formatted source code using ESLint
 - `import.ts` - `handle_imports()`: Converts import paths to TypeScript import declarations
 - `export.ts` - Generates registry and dispatcher export types
 
@@ -58,7 +58,7 @@ Handler subdirectories:
 ### Key Dependencies
 - `@spyglassmc/core`, `@spyglassmc/java-edition`, `@spyglassmc/mcdoc` - Mcdoc parsing and Minecraft data
 - `typescript` - AST generation for output types
-- `@biomejs/biome` - Code formatting
+- `eslint`, `@stylistic/eslint-plugin` - Code formatting
 - `ts-pattern` - Pattern matching (used in type handlers)
 
 ### Import Path Convention

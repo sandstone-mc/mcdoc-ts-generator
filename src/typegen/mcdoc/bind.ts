@@ -150,8 +150,8 @@ export class Bind {
         return ts.addSyntheticLeadingComment(
             node,
             ts.SyntaxKind.MultiLineCommentTrivia,
-            `${doc}\n `, 
-            true, 
+            `${doc}\n `,
+            true,
         )
     }
 }
