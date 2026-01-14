@@ -1,12 +1,16 @@
 import ts from 'typescript'
 import * as mcdoc from '@spyglassmc/mcdoc'
-import type { TypeHandler } from '..'
+import type { NonEmptyList, TypeHandler } from '..'
 import { Assert } from '../assert'
 
 const { factory } = ts
 
 const static_value = {
-    type: factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
+    type: factory.createTypeReferenceNode('NBTObject'),
+    imports: {
+        ordered: ['sandstone::arguments::nbt::NBTObject'] as NonEmptyList<string>,
+        check: new Map([['sandstone::arguments::nbt::NBTObject', 0]])
+    }
 } as const
 
 function mcdoc_any(type: mcdoc.McdocType) {
