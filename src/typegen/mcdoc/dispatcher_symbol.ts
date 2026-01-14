@@ -288,7 +288,7 @@ export function dispatcher_symbol(
             ts.SyntaxKind.KeyOfKeyword,
             factory.createTypeReferenceNode(
                 `${name}DispatcherMap`,
-                has_generics ? generic_names.map(() => factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)) : undefined
+                has_generics ? generic_names.map(() => factory.createTypeReferenceNode('NBTObject')) : undefined
             )
         )
     )

@@ -174,7 +174,7 @@ type McdocListType = TypeHandler<{
 
 type McdocStructType = TypeHandler<{
     readonly child_dispatcher?: NonEmptyList<[parent_count: number, property: string]>
-    readonly type: ts.TypeLiteralNode | ts.TypeReferenceNode | ts.ParenthesizedTypeNode | ts.KeywordTypeNode<ts.SyntaxKind.UnknownKeyword>
+    readonly type: ts.TypeLiteralNode | ts.TypeReferenceNode | ts.ParenthesizedTypeNode
     readonly imports?: {
         readonly ordered: NonEmptyList<string>
         readonly check: Map<string, number>
