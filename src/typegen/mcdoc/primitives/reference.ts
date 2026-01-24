@@ -116,22 +116,30 @@ function mcdoc_reference(type: mcdoc.McdocType) {
         }
       } else if (referenced_type.kind === 'struct' && args.spread) {
         // extremely funny
-        const generic_field = (referenced_type.fields.find((f) => {
-            return (
-              f.type.kind === 'dispatcher'
-              && f.type.parallelIndices[0].kind === 'dynamic'
-              && typeof f.type.parallelIndices[0].accessor[0] === 'string'
-              && ((
-                key: string,
-              ) => referenced_type.fields.findIndex((_f) => _f.kind === 'pair' && _f.key === key))(
-                f.type.parallelIndices[0].accessor[0],
-              ) === -1
+        const generic_field = (
+          (
+            referenced_type.fields.find((f) => {
+              if (
+                f.type.kind === 'dispatcher'
+                && f.type.parallelIndices[0].kind === 'dynamic'
+                && typeof f.type.parallelIndices[0].accessor[0] === 'string'
+                && ((
+                  key: string,
+                ) => referenced_type.fields.findIndex((_f) => _f.kind === 'pair' && _f.key === key))(
+                  f.type.parallelIndices[0].accessor[0],
+                ) === -1
+              ) {
+                return true
+              }
+              return false
+            }) as (
+              | undefined
+              | (mcdoc.StructFieldNode & {
+                  type: { kind: 'dispatcher', parallelIndices: [ { kind: 'dynamic', accessor: [string] } ] };
+                })
             )
-          }) as undefined | (
-            mcdoc.StructFieldNode & {
-              type: { kind: 'dispatcher', parallelIndices: [ { kind: 'dynamic', accessor: [string] } ] };
-            }
-          ))?.type.parallelIndices[0].accessor[0]
+          )?.type.parallelIndices[0].accessor[0]
+        )
 
         if (generic_field !== undefined) {
           child_dispatcher = [[0, generic_field]]

@@ -75,7 +75,7 @@
     "no-with": "error",
     "no-var": "error",
 
-    "@stylistic/indent": ["error", 2, { "SwitchCase": 1, "ignoredNodes": ["TSConditionalType", "TSConditionalType *", "TSTypeAliasDeclaration TSTypeLiteral", "TSTypeAliasDeclaration TSTupleType", "TSUnionType TSTypeLiteral", "TSUnionType TSTypeLiteral *", "TSTypeAliasDeclaration TSUnionType", "TSTypeAliasDeclaration TSUnionType *", "TSUnionType TSTupleType", "TSUnionType TSTupleType *", "TSDeclareMethod TSTypeAnnotation", "TSDeclareMethod TSTypeAnnotation *", "MethodDefinition TSTypeAnnotation", "MethodDefinition TSTypeAnnotation *"] }],
+    "@stylistic/indent": ["error", 2, { "SwitchCase": 1 }],
     "@stylistic/quotes": ["error", "single"],
     "@stylistic/semi": ["error", "never"],
     "@stylistic/comma-dangle": ["error", "always-multiline"],
@@ -102,10 +102,6 @@
   },
   "ignorePatterns": [
     "node_modules/**",
-    "build/**",
-    "dist/**",
-    "scripts/**",
-    "coverage/**",
     "*.js"
   ]
 }

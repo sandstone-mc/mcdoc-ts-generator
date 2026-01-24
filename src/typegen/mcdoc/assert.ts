@@ -379,7 +379,7 @@ type ImplementedAttributes = {
 }
 
 export type ImplementedAttributeType<
-  KIND extends (keyof ImplementedAttributes | undefined) = undefined
+  KIND extends (keyof ImplementedAttributes | undefined) = undefined,
 > = mcdoc.Attribute & (
   KIND extends undefined ? ({
       [K in keyof ImplementedAttributes]: ({
@@ -566,7 +566,7 @@ export class Assert {
                     }
                     if (args.path !== undefined) {
                       if (
-                        args.path.kind !== 'literal' 
+                        args.path.kind !== 'literal'
                         || !`${args.path.value.value}`.endsWith('/')
                       ) {
                         throw new Error(
@@ -785,8 +785,8 @@ export class Assert {
                 throw new Error(
                   `[mcdoc_assert] #[dispatcher_key] attribute value must be a namespaced ID (e.g., 'namespace:path'), got '${
                     attribute.value?.kind === 'literal'
-                    ? attribute.value.value.value
-                    : attribute.value.kind}'`,
+                      ? attribute.value.value.value
+                      : attribute.value.kind}'`,
                 )
               }
             })
@@ -885,7 +885,7 @@ export class Assert {
               }
               if (
                 !(
-                  attribute.value.kind === 'tree' 
+                  attribute.value.kind === 'tree'
                   && 'definition' in attribute.value.values
                   && attribute.value.values.definition.kind === 'literal'
                   && attribute.value.values.definition.value.value === true
@@ -967,20 +967,20 @@ export class Assert {
               'block_predicate',
               (a) => {
               // these two are old attributes
-              if (a !== 'translation_key' && a !== 'game_rule' && attribute.value !== undefined) {
-                console.log(attribute)
-                throw new Error(`[mcdoc_assert] Unexpected value on attribute '${a}'`)
-              }
-            })
+                if (a !== 'translation_key' && a !== 'game_rule' && attribute.value !== undefined) {
+                  console.log(attribute)
+                  throw new Error(`[mcdoc_assert] Unexpected value on attribute '${a}'`)
+                }
+              })
             .with('texture_slot', () => {
               if (attribute.value === undefined) {
                 // @author Claude - #[texture_slot] requires a value with kind
                 throw new Error('[mcdoc_assert] #[texture_slot] attribute must have a value')
               }
               if (
-                attribute.value.kind !== 'tree' 
-                || !('kind' in attribute.value.values) 
-                || attribute.value.values.kind.kind !== 'literal' 
+                attribute.value.kind !== 'tree'
+                || !('kind' in attribute.value.values)
+                || attribute.value.values.kind.kind !== 'literal'
                 || !AssertKinds.TextureSlotAttributeKind.has(attribute.value.values.kind.value.value)
               ) {
                 // @author Claude - #[texture_slot] must have a valid kind value
@@ -1127,7 +1127,7 @@ export class Assert {
       | 'int_array'
       | 'long_array'
       | undefined
-    ) = undefined
+    ) = undefined,
   >(type: mcdoc.McdocType): asserts type is (
         KIND extends undefined ? never :
         mcdoc.PrimitiveArrayType & { kind: KIND }
@@ -1193,7 +1193,7 @@ export class Assert {
     }
   }
   static KeywordType<
-    KIND extends (mcdoc.KeywordType['kind'] | undefined) = undefined
+    KIND extends (mcdoc.KeywordType['kind'] | undefined) = undefined,
   >(type: mcdoc.McdocType): asserts type is (
       KIND extends undefined ? never :
       mcdoc.KeywordType & { kind: KIND }
@@ -1203,7 +1203,7 @@ export class Assert {
     }
   }
   static NumericType<
-    KIND extends (mcdoc.NumericTypeKind | undefined) = undefined
+    KIND extends (mcdoc.NumericTypeKind | undefined) = undefined,
   >(type: mcdoc.McdocType): asserts type is (
       KIND extends undefined ? never :
       mcdoc.NumericType & { kind: KIND }
