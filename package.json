@@ -19,8 +19,6 @@
     "dist"
   ],
   "scripts": {
-    "format": "bun oxlint src --fix",
-    "lint": "bun oxlint src",
     "compile": "rm -rf types/ && bun run ./src/cli.ts",
     "typecheck": "bun tsc --emitDeclarationOnly false --noEmit",
     "build": "bun run build:bundle && bun run build:types",
@@ -54,7 +52,8 @@
     "@spyglassmc/java-edition": "^0.3.51",
     "@spyglassmc/mcdoc": "^0.3.43",
     "@stylistic/eslint-plugin": "^5.6.1",
-    "oxlint": "^1.41.0",
+    "@typescript-eslint/parser": "^8.49.0",
+    "eslint": "^9.39.2",
     "ts-pattern": "^5.9.0"
   }
 }
