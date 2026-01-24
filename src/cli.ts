@@ -2,7 +2,7 @@
 import { generate, type GeneratorOptions } from './index'
 
 function print_help(): void {
-    console.log(`
+  console.log(`
 @sandstone-mc/mcdoc_ts_generator
 
 Generate TypeScript types from Minecraft mcdoc definitions.
@@ -23,61 +23,61 @@ Examples:
 }
 
 function parse_args(args: string[]): GeneratorOptions | null {
-    const options: GeneratorOptions = {}
+  const options: GeneratorOptions = {}
 
-    let i = 0
-    while (i < args.length) {
-        const arg = args[i]
+  let i = 0
+  while (i < args.length) {
+    const arg = args[i]
 
-        if (arg === '-h' || arg === '--help') {
-            print_help()
-            return null
-        }
-
-        if (arg === '-o' || arg === '--out-dir') {
-            const value = args[i + 1]
-            if (!value || value.startsWith('-')) {
-                console.error(`Error: ${arg} requires a directory path`)
-                process.exit(1)
-            }
-            options.out_dir = value
-            i += 2
-            continue
-        }
-
-        if (arg === '--no-tsconfig') {
-            options.tsconfig = false
-            i++
-            continue
-        }
-
-        console.error(`Error: Unknown option "${arg}"`)
-        console.error('Run with --help for usage information')
-        process.exit(1)
+    if (arg === '-h' || arg === '--help') {
+      print_help()
+      return null
     }
 
-    return options
+    if (arg === '-o' || arg === '--out-dir') {
+      const value = args[i + 1]
+      if (!value || value.startsWith('-')) {
+        console.error(`Error: ${arg} requires a directory path`)
+        process.exit(1)
+      }
+      options.out_dir = value
+      i += 2
+      continue
+    }
+
+    if (arg === '--no-tsconfig') {
+      options.tsconfig = false
+      i++
+      continue
+    }
+
+    console.error(`Error: Unknown option "${arg}"`)
+    console.error('Run with --help for usage information')
+    process.exit(1)
+  }
+
+  return options
 }
 
 async function main(): Promise<void> {
-    const args = process.argv.slice(2)
-    const options = parse_args(args)
+  const args = process.argv.slice(2)
+  const options = parse_args(args)
 
-    if (options === null) {
-        return
-    }
+  if (options === null) {
+    return
+  }
 
-    console.log('Generating TypeScript types from mcdoc definitions...')
-    if (options.out_dir) {
-        console.log(`Output directory: ${options.out_dir}`)
-    }
+  console.log('Generating TypeScript types from mcdoc definitions...')
+  if (options.out_dir) {
+    console.log(`Output directory: ${options.out_dir}`)
+  }
 
-    await generate(options)
+  await generate(options)
 
-    console.log('Done!')
+  console.log('Done!')
 }
 
 main().catch((error) => {
-    console.error('Error:', error.message || error)
-    process.exit(1)
+  console.error('Error:', error.message || error)
+  process.exit(1)
 })

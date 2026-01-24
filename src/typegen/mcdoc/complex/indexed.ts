@@ -1,4 +1,4 @@
-import * as mcdoc from '@spyglassmc/mcdoc'
+import type * as mcdoc from '@spyglassmc/mcdoc'
 import type { NonEmptyList, TypeHandler } from '..'
 import { Assert } from '../assert'
 import { McdocDispatcher } from './dispatcher'
@@ -31,17 +31,17 @@ import { McdocDispatcher } from './dispatcher'
  * The index keys are passed through to the dispatcher handler via args.
  */
 function mcdoc_indexed(type: mcdoc.McdocType) {
-    Assert.IndexedType(type)
-    Assert.DispatcherType(type.child)
+  Assert.IndexedType(type)
+  Assert.DispatcherType(type.child)
 
-    const indices = type.parallelIndices as mcdoc.StaticIndex[]
+  const indices = type.parallelIndices as mcdoc.StaticIndex[]
 
-    return (args: Record<string, unknown>) => {
-        // Extract static index values - these become the property access keys
-        const index_keys = indices.map((index) => index.value) as NonEmptyList<string>
+  return (args: Record<string, unknown>) => {
+    // Extract static index values - these become the property access keys
+    const index_keys = indices.map((index) => index.value) as NonEmptyList<string>
 
-        return McdocDispatcher(type.child)({ index_keys, ...args})
-    }
+    return McdocDispatcher(type.child)({ index_keys, ...args })
+  }
 }
 
 export const McdocIndexed = mcdoc_indexed satisfies TypeHandler
