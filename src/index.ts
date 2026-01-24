@@ -291,9 +291,7 @@ export async function generate(options: GeneratorOptions = {}): Promise<void> {
   }
 
   console.log('[oxlint] Formatting output...')
-  // TODO: Get oxlint to run through all formatting without needing to run it multiple times
-  // TODO: Generate the oxlint file so that this is portable
-  await $`bun oxlint --fix --config .oxlintrc.generated.json ${out_dir}`.quiet().nothrow()
+  await $`bun oxlint --fix ${out_dir}`.quiet()
 
   service.project.close()
 }
