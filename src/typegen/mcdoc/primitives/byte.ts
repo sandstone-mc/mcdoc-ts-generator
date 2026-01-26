@@ -1,5 +1,5 @@
 import ts from 'typescript'
-import * as mcdoc from '@spyglassmc/mcdoc'
+import type * as mcdoc from '@spyglassmc/mcdoc'
 import type { NonEmptyList, TypeHandler } from '..'
 import { Assert } from '../assert'
 import { whole_number_generic } from './int'
@@ -12,7 +12,7 @@ function mcdoc_byte(type: mcdoc.McdocType) {
   const byte = type
   Assert.NumericType<'byte'>(byte)
 
-  return (args: Record<string, unknown>) => {
+  return (_args: Record<string, unknown>) => {
     if (byte.valueRange === undefined) {
       return {
         type: factory.createTypeReferenceNode(NBTByteType),

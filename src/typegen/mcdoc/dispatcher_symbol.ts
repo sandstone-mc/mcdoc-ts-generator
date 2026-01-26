@@ -1,6 +1,6 @@
 import ts from 'typescript'
 import type { SymbolMap, SymbolUtil } from '@spyglassmc/core'
-import * as mcdoc from '@spyglassmc/mcdoc'
+import type * as mcdoc from '@spyglassmc/mcdoc'
 import { get_type_handler, type NonEmptyList, type TypeHandlerResult } from '.'
 import type { DispatcherInfo } from '..'
 import { add_import, merge_imports } from './utils'
@@ -126,7 +126,7 @@ export function dispatcher_symbol(
     if (!dispatcher_references.has(id)) {
       dispatcher_references.set(id, {
         locations: new Map(),
-        location_counts: []
+        location_counts: [],
       })
     }
     return dispatcher_references.get(id)!
@@ -158,7 +158,7 @@ export function dispatcher_symbol(
 
     fallback_type_name = factory.createTypeReferenceNode(
       unknown_type_name,
-      has_generics ? generic_names : undefined
+      has_generics ? generic_names : undefined,
     )
     if (ts.isTypeAliasDeclaration(result.type)) {
       member_types.push(result.type)
@@ -167,7 +167,7 @@ export function dispatcher_symbol(
         [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
         unknown_type_name,
         undefined,
-        result.type as ts.TypeNode
+        result.type as ts.TypeNode,
       ))
     }
   }
@@ -201,7 +201,7 @@ export function dispatcher_symbol(
         undefined,
         none_type_name,
         undefined,
-        result.type as ts.TypeNode
+        result.type as ts.TypeNode,
       ))
     }
   }
@@ -242,14 +242,14 @@ export function dispatcher_symbol(
         undefined,
         member_type_name,
         undefined,
-        result.type as ts.TypeNode
+        result.type as ts.TypeNode,
       ))
     }
 
     // Create reference to the member type (with generics if present)
     const member_ref = factory.createTypeReferenceNode(
       member_type_name,
-      has_generics ? generic_names : undefined
+      has_generics ? generic_names : undefined,
     )
     member_type_refs.push(member_ref)
 
@@ -259,14 +259,14 @@ export function dispatcher_symbol(
         undefined,
         factory.createStringLiteral(member_key, true),
         undefined,
-        member_ref
+        member_ref,
       ),
       factory.createPropertySignature(
         undefined,
         factory.createStringLiteral(`minecraft:${member_key}`, true),
         undefined,
-        member_ref
-      )
+        member_ref,
+      ),
     )
   }
 
@@ -276,7 +276,7 @@ export function dispatcher_symbol(
     undefined,
     `${name}DispatcherMap`,
     has_generics ? generic_params : undefined,
-    factory.createTypeLiteralNode(map_properties)
+    factory.createTypeLiteralNode(map_properties),
   )
 
   // Create NameKeys type (no generics needed - keys don't depend on type params)
@@ -288,9 +288,9 @@ export function dispatcher_symbol(
       ts.SyntaxKind.KeyOfKeyword,
       factory.createTypeReferenceNode(
         `${name}DispatcherMap`,
-        has_generics ? generic_names.map(() => factory.createTypeReferenceNode('NBTObject')) : undefined
-      )
-    )
+        has_generics ? generic_names.map(() => factory.createTypeReferenceNode('NBTObject')) : undefined,
+      ),
+    ),
   )
 
   // Create NameFallback type (union of all members + fallback type if present)
@@ -301,7 +301,7 @@ export function dispatcher_symbol(
     undefined,
     `${name}Fallback`,
     has_generics ? generic_params : undefined,
-    factory.createParenthesizedType(factory.createUnionTypeNode(fallback_union_members))
+    factory.createParenthesizedType(factory.createUnionTypeNode(fallback_union_members)),
   )
 
   // Create the main Symbol type with CASE generic first, then dispatcher generics
@@ -317,7 +317,7 @@ export function dispatcher_symbol(
       Bind.StringLiteral('%none'),
       Bind.StringLiteral('%unknown'),
     ]),
-    Bind.StringLiteral('map')
+    Bind.StringLiteral('map'),
   ))
 
   // Build conditional chain from innermost to outermost
@@ -330,7 +330,7 @@ export function dispatcher_symbol(
       factory.createTypeReferenceNode('CASE'),
       Bind.StringLiteral('%unknown'),
       factory.createTypeReferenceNode(`${name}FallbackType`, has_generics ? generic_names : undefined),
-      innermost_conditional
+      innermost_conditional,
     )
   }
 
@@ -340,7 +340,7 @@ export function dispatcher_symbol(
       factory.createTypeReferenceNode('CASE'),
       Bind.StringLiteral('%none'),
       factory.createTypeReferenceNode(`${name}NoneType`, has_generics ? generic_names : undefined),
-      innermost_conditional
+      innermost_conditional,
     )
   }
 
@@ -360,10 +360,10 @@ export function dispatcher_symbol(
           factory.createTypeReferenceNode('CASE'),
           Bind.StringLiteral('%fallback'),
           factory.createTypeReferenceNode(`${name}Fallback`, has_generics ? generic_names : undefined),
-          innermost_conditional
-        )
-      )
-    )
+          innermost_conditional,
+        ),
+      ),
+    ),
   )
 
   return {

@@ -1,5 +1,5 @@
 import ts from 'typescript'
-import * as mcdoc from '@spyglassmc/mcdoc'
+import type * as mcdoc from '@spyglassmc/mcdoc'
 import { TypeHandlers, type NonEmptyList, type TypeHandler, type TypeHandlerResult } from '..'
 import { Assert } from '../assert'
 import { add_import, merge_imports } from '../utils'
@@ -26,7 +26,7 @@ function parse_template_args(args: Record<string, unknown>): TemplateArgs {
   }
 
   return {
-    name: args.name as string
+    name: args.name as string,
   }
 }
 
@@ -71,7 +71,7 @@ function mcdoc_template(type: mcdoc.McdocType) {
       generics.push(factory.createTypeParameterDeclaration(
         undefined,
         generic.path.slice(generic.path.lastIndexOf(':') + 1),
-        NBTObject
+        NBTObject,
       ))
     }
 
@@ -98,7 +98,7 @@ function mcdoc_template(type: mcdoc.McdocType) {
       [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
       name,
       generics,
-      child_result.type as ts.TypeNode
+      child_result.type as ts.TypeNode,
     )
 
     return {

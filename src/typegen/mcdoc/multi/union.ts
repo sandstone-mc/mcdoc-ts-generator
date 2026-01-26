@@ -1,5 +1,5 @@
 import ts from 'typescript'
-import * as mcdoc from '@spyglassmc/mcdoc'
+import type * as mcdoc from '@spyglassmc/mcdoc'
 import { TypeHandlers, type NonEmptyList, type TypeHandler } from '..'
 import { Assert } from '../assert'
 import { merge_imports } from '../utils'
@@ -77,14 +77,14 @@ function mcdoc_union(type: mcdoc.McdocType) {
           return [
             ...(i === 0 ? ['*either*', ''] : []),
             (doc === false ? [`*item ${i}*`] : doc),
-            ...(i !== (member_docs.length - 1) ? ['', '*or*', ''] : [])
+            ...(i !== (member_docs.length - 1) ? ['', '*or*', ''] : []),
           ]
         }
       }) : undefined
     ) as unknown as undefined | NonEmptyList<string | [string]>
 
     const result_type = members.length === 1 ? members[0] : factory.createParenthesizedType(
-      factory.createUnionTypeNode(members)
+      factory.createUnionTypeNode(members),
     )
 
     // Propagate non-indexable marker if any member has it
@@ -94,7 +94,7 @@ function mcdoc_union(type: mcdoc.McdocType) {
 
     return {
       type: result_type,
-      ...add({ imports, child_dispatcher, docs })
+      ...add({ imports, child_dispatcher, docs }),
     } as const
   }
 }

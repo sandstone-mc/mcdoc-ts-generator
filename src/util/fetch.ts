@@ -5,7 +5,6 @@ import type streamWeb from 'node:stream/web'
 import os from 'os'
 import { join } from 'node:path'
 
-
 /**
  * A non-spec-compliant, non-complete implementation of the Cache Web API for use in Spyglass.
  * This class stores the cached response on the file system under the cache root.

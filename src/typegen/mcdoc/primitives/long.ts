@@ -1,5 +1,5 @@
 import ts from 'typescript'
-import * as mcdoc from '@spyglassmc/mcdoc'
+import type * as mcdoc from '@spyglassmc/mcdoc'
 import type { NonEmptyList, TypeHandler } from '..'
 import { Assert } from '../assert'
 import { whole_number_generic } from './int'
@@ -12,7 +12,7 @@ function mcdoc_long(type: mcdoc.McdocType) {
   const long = type
   Assert.NumericType<'long'>(long)
 
-  return (args: Record<string, unknown>) => {
+  return (_args: Record<string, unknown>) => {
     if (long.valueRange === undefined) {
       return {
         type: factory.createTypeReferenceNode(NBTLongType),

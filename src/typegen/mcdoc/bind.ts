@@ -9,7 +9,7 @@ export class Bind {
     if (Math.sign(literal) === -1) {
       return factory.createLiteralTypeNode(factory.createPrefixUnaryExpression(
         ts.SyntaxKind.MinusToken,
-        factory.createNumericLiteral(Math.abs(literal))
+        factory.createNumericLiteral(Math.abs(literal)),
       ))
     } else {
       return factory.createLiteralTypeNode(factory.createNumericLiteral(literal))
@@ -30,13 +30,13 @@ export class Bind {
     [
       factory.createTemplateLiteralTypeSpan(
         factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
-        factory.createTemplateMiddle('')
+        factory.createTemplateMiddle(''),
       ),
       factory.createTemplateLiteralTypeSpan(
         factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-        factory.createTemplateTail('')
-      )
-    ]
+        factory.createTemplateTail(''),
+      ),
+    ],
   )
 
   /**
@@ -50,13 +50,13 @@ export class Bind {
     [
       factory.createTemplateLiteralTypeSpan(
         factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-        factory.createTemplateMiddle(':')
+        factory.createTemplateMiddle(':'),
       ),
       factory.createTemplateLiteralTypeSpan(
         factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-        factory.createTemplateTail('')
-      )
-    ]
+        factory.createTemplateTail(''),
+      ),
+    ],
   )
 
   /**
@@ -92,7 +92,7 @@ export class Bind {
       Bind.NonEmptyString
       : factory.createTypeReferenceNode('Extract', [
         key_type,
-        factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
+        factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
       ])
 
     const mapped_type = factory.createMappedTypeNode(
@@ -100,12 +100,12 @@ export class Bind {
       factory.createTypeParameterDeclaration(
         undefined,
         key_name,
-        constraint_type
+        constraint_type,
       ),
       name_type,
       factory.createToken(ts.SyntaxKind.QuestionToken),
       value_type,
-      undefined
+      undefined,
     )
     return parenthesized ? factory.createParenthesizedType(mapped_type) : mapped_type
   }
@@ -118,7 +118,7 @@ export class Bind {
    */
   static readonly EmptyObject = factory.createTypeReferenceNode('Record', [
     factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-    factory.createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
+    factory.createKeywordTypeNode(ts.SyntaxKind.NeverKeyword),
   ])
 
   /**
@@ -141,7 +141,7 @@ export class Bind {
               doc += `\n * ${__doc}`
             }
           }
-        } catch (e) {
+        } catch {
           console.log(node, docs)
         }
       } else {

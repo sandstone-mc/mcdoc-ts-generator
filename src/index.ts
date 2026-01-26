@@ -11,7 +11,7 @@ import {
   fileUtil,
   Service,
   VanillaConfig,
-  MetaRegistry,
+  type MetaRegistry,
   type SymbolRegistrar,
   type ProjectInitializer,
 } from '@spyglassmc/core'
@@ -98,7 +98,7 @@ export async function fetchRegistries(versionId: string) {
     const result = new Map<string, string[]>()
     for (const id in data) {
       /* @ts-ignore */
-      result.set(id, data[id].map((e: string) => 'minecraft:' + e))
+      result.set(id, data[id].map((e: string) => `minecraft:${e}`))
     }
     return [result, etag] as const
   } catch (e) {
@@ -128,10 +128,9 @@ export async function fetchBlockStates(versionId: string) {
 }
 
 export async function fetchTranslationKeys() {
-  console.debug(`[fetchTranslationKeys] latest from github`)
-  const result = new Map<string, string>()
+  console.debug('[fetchTranslationKeys] latest from github')
   try {
-    const req = await fetchWithCache(`https://raw.githubusercontent.com/misode/mcmeta/refs/heads/assets-tiny/assets/minecraft/lang/en_us.json`)
+    const req = await fetchWithCache('https://raw.githubusercontent.com/misode/mcmeta/refs/heads/assets-tiny/assets/minecraft/lang/en_us.json')
 
     const data = await req.json() as Record<string, string>
     return Object.keys(data).map((key) => `minecraft:${key}`)
@@ -170,6 +169,7 @@ function vanillaMcdocRegistrar(vanillaMcdoc: VanillaMcdocSymbols): SymbolRegistr
 }
 
 const initialize: ProjectInitializer = async (ctx) => {
+  /* oxlint-disable-next-line no-unused-vars */
   const { config, logger, meta, externals, cacheRoot } = ctx
 
   const vanillaMcdoc = await fetchVanillaMcdoc()
@@ -262,7 +262,7 @@ export async function generate(options: GeneratorOptions = {}): Promise<void> {
 
     const code = await compile_types([
       ...handle_imports(imports),
-      ...exports
+      ...exports,
     ], out_path)
 
     await mkdir(dirname(out_path), { recursive: true })
@@ -281,8 +281,8 @@ export async function generate(options: GeneratorOptions = {}): Promise<void> {
           'sandstone': ['../sandstone-types/index.ts'],
           'sandstone/arguments': ['../sandstone-types/arguments/index.ts'],
           'sandstone/arguments/generated/*': ['./*'],
-        }
-      }
+        },
+      },
     }, null, 2))
   }
 

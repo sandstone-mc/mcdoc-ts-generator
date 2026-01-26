@@ -13,20 +13,20 @@ const StringKeyword = factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
 
 const static_value = {
   normal: {
-    type: StringKeyword
+    type: StringKeyword,
   },
   not_empty: factory.createTemplateLiteralType(
     factory.createTemplateHead(''),
     [
       factory.createTemplateLiteralTypeSpan(
         factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
-        factory.createTemplateMiddle('')
+        factory.createTemplateMiddle(''),
       ),
       factory.createTemplateLiteralTypeSpan(
         StringKeyword,
-        factory.createTemplateTail('')
-      )
-    ]
+        factory.createTemplateTail(''),
+      ),
+    ],
   ),
   namespaced_tag: {
     type: factory.createTemplateLiteralType(
@@ -34,35 +34,35 @@ const static_value = {
       [
         factory.createTemplateLiteralTypeSpan(
           factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-          factory.createTemplateMiddle(':')
+          factory.createTemplateMiddle(':'),
         ),
         factory.createTemplateLiteralTypeSpan(
           factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-          factory.createTemplateTail('')
-        )
-      ]
-    )
+          factory.createTemplateTail(''),
+        ),
+      ],
+    ),
   },
   namespaced: {
-    type: Bind.Namespaced
+    type: Bind.Namespaced,
   },
   hash: {
     type: factory.createTemplateLiteralType(
       factory.createTemplateHead('#'),
       [factory.createTemplateLiteralTypeSpan(
         factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-        factory.createTemplateTail('')
-      )]
-    )
+        factory.createTemplateTail(''),
+      )],
+    ),
   },
   number: {
     type: factory.createTemplateLiteralType(
       factory.createTemplateHead(''),
       [factory.createTemplateLiteralTypeSpan(
         factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
-        factory.createTemplateTail('')
-      )]
-    )
+        factory.createTemplateTail(''),
+      )],
+    ),
   },
   time: {
     type: factory.createParenthesizedType(factory.createUnionTypeNode([
@@ -71,45 +71,44 @@ const static_value = {
         [
           factory.createTemplateLiteralTypeSpan(
             factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
-            factory.createTemplateMiddle('-')
+            factory.createTemplateMiddle('-'),
           ),
           factory.createTemplateLiteralTypeSpan(
             factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
-            factory.createTemplateMiddle('-')
+            factory.createTemplateMiddle('-'),
           ),
           factory.createTemplateLiteralTypeSpan(
             factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
-            factory.createTemplateTail('')
-          )
-        ]
+            factory.createTemplateTail(''),
+          ),
+        ],
       ),
       factory.createTemplateLiteralType(
         factory.createTemplateHead(''),
         [
           factory.createTemplateLiteralTypeSpan(
             factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
-            factory.createTemplateMiddle(':')
+            factory.createTemplateMiddle(':'),
           ),
           factory.createTemplateLiteralTypeSpan(
             factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
-            factory.createTemplateMiddle(':')
+            factory.createTemplateMiddle(':'),
           ),
           factory.createTemplateLiteralTypeSpan(
             factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
-            factory.createTemplateTail('')
-          )
-        ]
-      )
-    ]))
-  }
+            factory.createTemplateTail(''),
+          ),
+        ],
+      ),
+    ])),
+  },
 } as const
 
 const ResourceClasses = {
   'minecraft:advancement': 'AdvancementClass',
-  'minecraft:function': 'MCFunctionClass'
+  'minecraft:function': 'MCFunctionClass',
   // TODO: IMPORTANT - List out all sandstone resource classes
 } as const
-
 
 /**
  * This only handles strings as value types, not struct keys
@@ -119,9 +118,9 @@ function mcdoc_string(type: mcdoc.McdocType) {
   Assert.StringType(string)
 
   if (string.attributes === undefined && string.lengthRange === undefined) {
-    return (args: Record<string, unknown>) => static_value.normal
+    return (_args: Record<string, unknown>) => static_value.normal
   } else if (string.attributes === undefined) {
-    return (args: Record<string, unknown>) => ({
+    return (_args: Record<string, unknown>) => ({
       type: static_value.not_empty,
       docs: [`String length range: ${mcdoc.NumericRange.toString(string.lengthRange!)}`] as NonEmptyList<string>,
     } as const)
@@ -133,11 +132,11 @@ function mcdoc_string(type: mcdoc.McdocType) {
 
     return match(attribute)
       .with(P.nullish, () => {
-        return (args: Record<string, unknown>) => static_value.normal
+        return (_args: Record<string, unknown>) => static_value.normal
       })
       .with({ name: 'id', value: P.optional(P.nullish) }, () => {
         // #[id] string
-        return (args: Record<string, unknown>) => static_value.namespaced
+        return (_args: Record<string, unknown>) => static_value.namespaced
       })
       .with({ name: 'id', value: P.nonNullable }, ({ value }) => {
         const id_attr = value
@@ -151,7 +150,7 @@ function mcdoc_string(type: mcdoc.McdocType) {
 
           let Resource: string | (() => string | undefined) | undefined = () => registry_id in ResourceClasses ? ResourceClasses[registry_id as keyof typeof ResourceClasses] : undefined
 
-          const registry_import = `::java::registry::Registry`
+          const registry_import = '::java::registry::Registry'
 
           const types: ts.TypeNode[] = []
 
@@ -159,7 +158,7 @@ function mcdoc_string(type: mcdoc.McdocType) {
 
           const imports = {
             ordered: [registry_import] as NonEmptyList<string>,
-            check: new Map([[registry_import, 0]])
+            check: new Map([[registry_import, 0]]),
           }
 
           if (id_attr.kind === 'literal') {
@@ -168,7 +167,7 @@ function mcdoc_string(type: mcdoc.McdocType) {
             if (is_valid_registry(symbols, registry_id)) {
               types.push(exclude(factory.createIndexedAccessTypeNode(
                 factory.createTypeReferenceNode('Registry'),
-                Bind.StringLiteral(registry_id)
+                Bind.StringLiteral(registry_id),
               )))
             } else {
               types.push(static_value.namespaced.type)
@@ -181,7 +180,7 @@ function mcdoc_string(type: mcdoc.McdocType) {
             if (!empty_registry) {
               types.push(exclude(factory.createIndexedAccessTypeNode(
                 factory.createTypeReferenceNode('Registry'),
-                Bind.StringLiteral(registry_id)
+                Bind.StringLiteral(registry_id),
               )))
             } else {
               types.push(static_value.namespaced.type)
@@ -190,21 +189,21 @@ function mcdoc_string(type: mcdoc.McdocType) {
             if ('path' in id_attr.values) {
               return {
                 type: static_value.namespaced.type,
-                docs: ['', `Value: A ${registry_id} ID within a path root of \`(namespace)/textures/${id_attr.values.path!.value.value}\``] as NonEmptyList<string>
+                docs: ['', `Value: A ${registry_id} ID within a path root of \`(namespace)/textures/${id_attr.values.path!.value.value}\``] as NonEmptyList<string>,
               } as const
             }
             if ('definition' in id_attr.values) {
               return {
                 type: static_value.namespaced.type,
-                docs: ['', `Value: Defines a \`${registry_id}\` id.`] as NonEmptyList<string>
+                docs: ['', `Value: Defines a \`${registry_id}\` id.`] as NonEmptyList<string>,
               } as const
             }
             if ('exclude' in id_attr.values) {
               exclude = (reg: ts.TypeNode) => factory.createTypeReferenceNode('Exclude', [
                 reg,
                 factory.createParenthesizedType(factory.createUnionTypeNode(
-                  Object.values(id_attr.values.exclude!.values).map((literal) => Bind.StringLiteral(literal.value.value))
-                ))
+                  Object.values(id_attr.values.exclude!.values).map((literal) => Bind.StringLiteral(literal.value.value)),
+                )),
               ])
             }
             if ('tags' in id_attr.values) {
@@ -220,14 +219,14 @@ function mcdoc_string(type: mcdoc.McdocType) {
                       [factory.createTemplateLiteralTypeSpan(
                         factory.createIndexedAccessTypeNode(
                           factory.createTypeReferenceNode('Registry'),
-                          Bind.StringLiteral(tag_registry_id)
+                          Bind.StringLiteral(tag_registry_id),
                         ),
-                        factory.createTemplateTail('')
-                      )]
+                        factory.createTemplateTail(''),
+                      )],
                     ),
                     factory.createTypeReferenceNode(
                       Tag,
-                      [Bind.StringLiteral(registry_id.split(':')[1])]
+                      [Bind.StringLiteral(registry_id.split(':')[1])],
                     ),
                   )
                   add_import(imports, `sandstone::${Tag}`)
@@ -238,10 +237,10 @@ function mcdoc_string(type: mcdoc.McdocType) {
                     type: empty_tag_registry ? static_value.namespaced.type : factory.createParenthesizedType(factory.createUnionTypeNode([
                       factory.createIndexedAccessTypeNode(
                         factory.createTypeReferenceNode('Registry'),
-                        Bind.StringLiteral(tag_registry_id)
+                        Bind.StringLiteral(tag_registry_id),
                       ),
                     ])),
-                    imports
+                    imports,
                   } as const
                 }
                 case 'required': {
@@ -253,17 +252,17 @@ function mcdoc_string(type: mcdoc.McdocType) {
                         [factory.createTemplateLiteralTypeSpan(
                           factory.createIndexedAccessTypeNode(
                             factory.createTypeReferenceNode('Registry'),
-                            Bind.StringLiteral(tag_registry_id)
+                            Bind.StringLiteral(tag_registry_id),
                           ),
-                          factory.createTemplateTail('')
-                        )]
+                          factory.createTemplateTail(''),
+                        )],
                       ),
                       factory.createTypeReferenceNode(
                         Tag,
-                        [Bind.StringLiteral(registry_id.split(':')[1])]
+                        [Bind.StringLiteral(registry_id.split(':')[1])],
                       ),
                     ])),
-                    imports
+                    imports,
                   } as const
                 }
               }
@@ -292,26 +291,27 @@ function mcdoc_string(type: mcdoc.McdocType) {
 
           return {
             type: result_type,
-            imports
+            imports,
           } as const
         }
       }).narrow()
       .with({ name: 'color' }, ({ value: { value: { value } } }) => {
         Assert.ColorStringType(value)
         // TODO: Implement color abstraction in Sandstone
-        return (args: Record<string, unknown>) => static_value.hash
+        return (_args: Record<string, unknown>) => static_value.hash
       })
+      /* oxlint-disable-next-line no-unused-vars */
       .with({ name: 'command' }, ({ value: { values } }) => {
         // TODO: Implement anonymous command in Sandstone
-        return (args: Record<string, unknown>) => ({ type: static_value.not_empty } as const)
+        return (_args: Record<string, unknown>) => ({ type: static_value.not_empty } as const)
       })
       .with({ name: 'crafting_ingredient' }, () => {
         // TODO: Implement CraftingShaped struct generic
-        return (args: Record<string, unknown>) => ({ type: static_value.not_empty } as const)
+        return (_args: Record<string, unknown>) => ({ type: static_value.not_empty } as const)
       })
       .with({ name: 'criterion', value: P.optional(P.nullish) }, () => {
         // TODO: Implement Advancement generics
-        return (args: Record<string, unknown>) => ({ type: static_value.not_empty } as const)
+        return (_args: Record<string, unknown>) => ({ type: static_value.not_empty } as const)
       })
       .with({ name: 'entity' }, ({ value }) => {
         let Target = 'SingleEntityArgument'
@@ -323,183 +323,185 @@ function mcdoc_string(type: mcdoc.McdocType) {
         } else if (value.values.amount?.value.value === 'single' && value.values.type?.value.value === 'players') {
           Target = 'SinglePlayerArgument'
         }
-        return (args: Record<string, unknown>) => ({
+        return (_args: Record<string, unknown>) => ({
           type: factory.createTypeReferenceNode(Target),
           imports: {
             ordered: [`sandstone::arguments::${Target}`] as NonEmptyList<string>,
-            check: new Map([[`sandstone::arguments::${Target}`, 0]])
-          }
+            check: new Map([[`sandstone::arguments::${Target}`, 0]]),
+          },
         } as const)
       })
       .with({ name: 'integer' }, () => {
-        return (args: Record<string, unknown>) => static_value.number
+        return (_args: Record<string, unknown>) => static_value.number
       })
       .with({ name: 'item_slots' }, () => {
         const ENTITY_SLOTS = 'ENTITY_SLOTS'
         const LiteralUnion = 'LiteralUnion'
 
-        return (args: Record<string, unknown>) => ({
+        return (_args: Record<string, unknown>) => ({
           type: factory.createTypeReferenceNode(LiteralUnion, [
-            factory.createTypeReferenceNode(ENTITY_SLOTS)
+            factory.createTypeReferenceNode(ENTITY_SLOTS),
           ]),
           imports: {
             ordered: [`sandstone::arguments::${ENTITY_SLOTS}`, `sandstone::${LiteralUnion}`] as NonEmptyList<string>,
-            check: new Map([[`sandstone::arguments::${ENTITY_SLOTS}`, 0], [`sandstone::${LiteralUnion}`, 1]])
-          }
+            check: new Map([[`sandstone::arguments::${ENTITY_SLOTS}`, 0], [`sandstone::${LiteralUnion}`, 1]]),
+          },
         } as const)
       })
+      /* oxlint-disable-next-line no-unused-vars */
       .with({ name: 'nbt' }, ({ value }) => {
         // TODO: Add strict typing to NBT in Sandstone
         const NBT = 'NBTClass'
-        return (args: Record<string, unknown>) => ({
+        return (_args: Record<string, unknown>) => ({
           type: factory.createUnionTypeNode([
             static_value.not_empty,
-            factory.createTypeReferenceNode(NBT)
+            factory.createTypeReferenceNode(NBT),
           ]),
           imports: {
             ordered: [`sandstone::${NBT}`] as NonEmptyList<string>,
-            check: new Map([[`sandstone::${NBT}`, 0]])
-          }
+            check: new Map([[`sandstone::${NBT}`, 0]]),
+          },
         } as const)
       })
+      /* oxlint-disable-next-line no-unused-vars */
       .with({ name: 'nbt_path' }, ({ value }) => {
         // TODO: Add strict typing to DataPoint in Sandstone
         const DataPoint = 'DataPointClass'
-        return (args: Record<string, unknown>) => ({
+        return (_args: Record<string, unknown>) => ({
           type: factory.createUnionTypeNode([
             static_value.not_empty,
-            factory.createTypeReferenceNode(DataPoint)
+            factory.createTypeReferenceNode(DataPoint),
           ]),
           imports: {
             ordered: [`sandstone::${DataPoint}`] as NonEmptyList<string>,
-            check: new Map([[`sandstone::${DataPoint}`, 0]])
-          }
+            check: new Map([[`sandstone::${DataPoint}`, 0]]),
+          },
         } as const)
       })
       .with({ name: 'match_regex' }, ({ value: { value: { value } } }) => {
-        return (args: Record<string, unknown>) => ({
+        return (_args: Record<string, unknown>) => ({
           type: static_value.not_empty,
-          docs: [`Must match regex of ${value}`] as NonEmptyList<string>
+          docs: [`Must match regex of ${value}`] as NonEmptyList<string>,
         } as const)
       })
       .with({ name: 'objective' }, () => {
         const Objective = 'ObjectiveClass'
-        return (args: Record<string, unknown>) => ({
+        return (_args: Record<string, unknown>) => ({
           type: factory.createUnionTypeNode([
             static_value.not_empty,
-            factory.createTypeReferenceNode(Objective)
+            factory.createTypeReferenceNode(Objective),
           ]),
           imports: {
             ordered: [`sandstone::${Objective}`] as NonEmptyList<string>,
-            check: new Map([[`sandstone::${Objective}`, 0]])
-          }
+            check: new Map([[`sandstone::${Objective}`, 0]]),
+          },
         } as const)
       })
       .with({ name: 'regex_pattern' }, () => {
-        return (args: Record<string, unknown>) => ({
+        return (_args: Record<string, unknown>) => ({
           type: factory.createUnionTypeNode([
             static_value.not_empty,
-            factory.createTypeReferenceNode('RegExp')
+            factory.createTypeReferenceNode('RegExp'),
           ]),
         } as const)
       })
       .with({ name: 'score_holder' }, () => {
         const Score = 'Score'
-        return (args: Record<string, unknown>) => ({
+        return (_args: Record<string, unknown>) => ({
           type: factory.createUnionTypeNode([
             static_value.not_empty,
-            factory.createTypeReferenceNode(Score)
+            factory.createTypeReferenceNode(Score),
           ]),
           imports: {
             ordered: [`sandstone::${Score}`] as NonEmptyList<string>,
-            check: new Map([[`sandstone::${Score}`, 0]])
-          }
+            check: new Map([[`sandstone::${Score}`, 0]]),
+          },
         } as const)
       })
       .with({ name: 'tag' }, () => {
         const Label = 'LabelClass'
-        return (args: Record<string, unknown>) => ({
+        return (_args: Record<string, unknown>) => ({
           type: factory.createUnionTypeNode([
             static_value.not_empty,
-            factory.createTypeReferenceNode(Label)
+            factory.createTypeReferenceNode(Label),
           ]),
           imports: {
             ordered: [`sandstone::${Label}`] as NonEmptyList<string>,
-            check: new Map([[`sandstone::${Label}`, 0]])
-          }
+            check: new Map([[`sandstone::${Label}`, 0]]),
+          },
         } as const)
       })
       .with({ name: 'team' }, () => {
         // TODO: Implement team abstraction in Sandstone
-        return (args: Record<string, unknown>) => ({ type: static_value.not_empty } as const)
+        return (_args: Record<string, unknown>) => ({ type: static_value.not_empty } as const)
       })
       .with({ name: 'text_component' }, () => {
         // This has been phased out by mojang
-        return (args: Record<string, unknown>) => ({ type: static_value.not_empty } as const)
+        return (_args: Record<string, unknown>) => ({ type: static_value.not_empty } as const)
       })
       .with({ name: 'texture_slot' }, ({ value: { values: { kind: { value: { value } } } } }) => {
         const Texture = 'TextureClass'
         // TODO: Implement Model struct generic, this is `kind="value"` or `kind="reference"`
 
         if (value === 'reference') {
-          return (args: Record<string, unknown>) => static_value.hash
+          return (_args: Record<string, unknown>) => static_value.hash
         }
 
-        return (args: Record<string, unknown>) => ({
+        return (_args: Record<string, unknown>) => ({
           type: factory.createUnionTypeNode([
             static_value.not_empty,
             static_value.hash.type,
-            factory.createTypeReferenceNode(Texture)
+            factory.createTypeReferenceNode(Texture),
           ]),
           imports: {
             ordered: [`sandstone::${Texture}`] as NonEmptyList<string>,
-            check: new Map([[`sandstone::${Texture}`, 0]])
-          }
+            check: new Map([[`sandstone::${Texture}`, 0]]),
+          },
         } as const)
       })
       .with({ name: 'time_pattern' }, () => {
-        return (args: Record<string, unknown>) => static_value.time
+        return (_args: Record<string, unknown>) => static_value.time
       })
       .with({ name: 'translation_key' }, () => {
         // TODO: Add translation key abstraction in Sandstone
         const Registry = '::java::registry::Registry'
 
-        return (args: Record<string, unknown>) => ({
+        return (_args: Record<string, unknown>) => ({
           type: factory.createIndexedAccessTypeNode(
             factory.createTypeReferenceNode('Registry'),
-            Bind.StringLiteral('minecraft:translation_key')
+            Bind.StringLiteral('minecraft:translation_key'),
           ),
           imports: {
-            ordered: [Registry,] as NonEmptyList<string>,
-            check: new Map([[Registry, 0]])
-          }
+            ordered: [Registry] as NonEmptyList<string>,
+            check: new Map([[Registry, 0]]),
+          },
         } as const)
       })
       .with({ name: 'translation_value' }, () => {
         // TODO: Add translation value abstraction in Sandstone
-        return (args: Record<string, unknown>) => static_value.normal
+        return (_args: Record<string, unknown>) => static_value.normal
       })
       .with({ name: 'url' }, () => {
-        return (args: Record<string, unknown>) => ({
+        return (_args: Record<string, unknown>) => ({
           type: factory.createUnionTypeNode([
             static_value.not_empty,
-            factory.createTypeReferenceNode('URL')
+            factory.createTypeReferenceNode('URL'),
           ]),
         } as const)
       })
-      .with({ name: 'vector' }, ({ value: { values } }) => {
+      .with({ name: 'vector' }, () => {
         const Coordinates = 'Coordinates'
-        return (args: Record<string, unknown>) => ({
+        return (_args: Record<string, unknown>) => ({
           type: factory.createTypeReferenceNode(Coordinates),
           imports: {
             ordered: [`sandstone::arguments::${Coordinates}`] as NonEmptyList<string>,
-            check: new Map([[`sandstone::arguments::${Coordinates}`, 0]])
-          }
+            check: new Map([[`sandstone::arguments::${Coordinates}`, 0]]),
+          },
         } as const)
       })
       .with({ name: P.union('game_rule', 'uuid', 'block_predicate') }, () => {
         // old
-        return (args: Record<string, unknown>) => ({ type: static_value.not_empty } as const)
+        return (_args: Record<string, unknown>) => ({ type: static_value.not_empty } as const)
       })
       .otherwise(() => {
         console.log(attribute?.name)

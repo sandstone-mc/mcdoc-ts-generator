@@ -1,5 +1,5 @@
 import ts from 'typescript'
-import * as mcdoc from '@spyglassmc/mcdoc'
+import type * as mcdoc from '@spyglassmc/mcdoc'
 import { TypeHandlers, type NonEmptyList, type TypeHandler, type TypeHandlerResult } from '..'
 import { Assert } from '../assert'
 import { merge_imports } from '../utils'
@@ -59,7 +59,6 @@ function mcdoc_tuple(type: mcdoc.McdocType) {
       }
       if ('docs' in value) {
         has_docs = true
-        const docs: NonEmptyList<string | [string]> = value.docs
         member_docs.push(value.docs)
       } else {
         member_docs.push(false)
@@ -74,7 +73,7 @@ function mcdoc_tuple(type: mcdoc.McdocType) {
         } else {
           return [
             ...(doc === false ? [`*item ${i}*`] : [doc]),
-            ...(i !== (member_docs.length - 1) ? ['', '*or*', ''] : [])
+            ...(i !== (member_docs.length - 1) ? ['', '*or*', ''] : []),
           ]
         }
       }) : undefined

@@ -4,7 +4,7 @@ import { TypeHandlers, type NonEmptyList, type TypeHandler, type TypeHandlerResu
 import { Assert } from '../assert'
 import { Bind } from '../bind'
 import { integer_range_size } from '../primitives/int'
-import { add_import, merge_imports } from '../utils'
+import { add_import } from '../utils'
 import { add } from '../../../util'
 
 const { factory } = ts
@@ -72,7 +72,7 @@ export function length_range_generic(range: mcdoc.NumericRange, label: string): 
   docs: NonEmptyList<string>
 } {
   const docs: NonEmptyList<string> = [
-    `${label} length range: ${mcdoc.NumericRange.toString(range)}`
+    `${label} length range: ${mcdoc.NumericRange.toString(range)}`,
   ]
   const generic: ts.PropertySignature[] = []
 
@@ -90,8 +90,8 @@ export function length_range_generic(range: mcdoc.NumericRange, label: string): 
       factory.createLiteralTypeNode(
         left_exclusive ?
           factory.createTrue() :
-          factory.createFalse()
-      )
+          factory.createFalse(),
+      ),
     ))
     if (left_exclusive) {
       docs.push(`Effective minimum ${label.toLowerCase()} length: ${range.min + 1}`)
@@ -106,8 +106,8 @@ export function length_range_generic(range: mcdoc.NumericRange, label: string): 
       factory.createLiteralTypeNode(
         right_exclusive ?
           factory.createTrue() :
-          factory.createFalse()
-      )
+          factory.createFalse(),
+      ),
     ))
     if (right_exclusive) {
       docs.push(`Effective maximum ${label.toLowerCase()} length: ${range.max - 1}`)
@@ -121,14 +121,14 @@ export function length_range_generic(range: mcdoc.NumericRange, label: string): 
           undefined,
           'min',
           undefined,
-          Bind.NumericLiteral(range.min! + (left_exclusive ? 1 : 0))
+          Bind.NumericLiteral(range.min! + (left_exclusive ? 1 : 0)),
         ),
         factory.createPropertySignature(
           undefined,
           'max',
           undefined,
-          Bind.NumericLiteral(range.max! - (right_exclusive ? 1 : 0))
-        )
+          Bind.NumericLiteral(range.max! - (right_exclusive ? 1 : 0)),
+        ),
       )
     }
   } else if (has_min) {
@@ -141,14 +141,14 @@ export function length_range_generic(range: mcdoc.NumericRange, label: string): 
         undefined,
         'min',
         undefined,
-        Bind.NumericLiteral(number)
+        Bind.NumericLiteral(number),
       ))
     } else if (left_exclusive) {
       generic.push(factory.createPropertySignature(
         undefined,
         'min',
         undefined,
-        Bind.NumericLiteral(range.min!)
+        Bind.NumericLiteral(range.min!),
       ))
     }
   } else {
@@ -157,14 +157,14 @@ export function length_range_generic(range: mcdoc.NumericRange, label: string): 
         undefined,
         'max',
         undefined,
-        Bind.NumericLiteral(-1)
+        Bind.NumericLiteral(-1),
       ))
     } else if (right_exclusive) {
       generic.push(factory.createPropertySignature(
         undefined,
         'max',
         undefined,
-        Bind.NumericLiteral(range.max!)
+        Bind.NumericLiteral(range.max!),
       ))
     }
   }

@@ -12,7 +12,7 @@ function mcdoc_int(type: mcdoc.McdocType) {
   const int = type
   Assert.NumericType<'int'>(int)
 
-  return (args: Record<string, unknown>) => {
+  return (_args: Record<string, unknown>) => {
     if (int.valueRange === undefined) {
       return {
         type: factory.createTypeReferenceNode(NBTIntType),
@@ -29,13 +29,12 @@ function mcdoc_int(type: mcdoc.McdocType) {
 
 export const McdocInt = mcdoc_int satisfies TypeHandler
 
-
 /**
  * 
  */
 export function whole_number_generic<TYPE extends string>(range: mcdoc.NumericRange, type: TYPE) {
   const docs: string[] & { 0: string } = [
-    `Range: ${mcdoc.NumericRange.toString(range)}`
+    `Range: ${mcdoc.NumericRange.toString(range)}`,
   ]
   const generic: ts.PropertySignature[] = []
 
@@ -66,14 +65,14 @@ export function whole_number_generic<TYPE extends string>(range: mcdoc.NumericRa
           undefined,
           'min',
           undefined,
-          Bind.NumericLiteral(range.min! + (left_exclusive ? 1 : 0))
+          Bind.NumericLiteral(range.min! + (left_exclusive ? 1 : 0)),
         ),
         factory.createPropertySignature(
           undefined,
           'max',
           undefined,
-          Bind.NumericLiteral(range.max! - (right_exclusive ? 1 : 0))
-        )
+          Bind.NumericLiteral(range.max! - (right_exclusive ? 1 : 0)),
+        ),
       )
     } else if (range.min! >= 0) {
       let number = 0
@@ -84,7 +83,7 @@ export function whole_number_generic<TYPE extends string>(range: mcdoc.NumericRa
         undefined,
         'min',
         undefined,
-        Bind.NumericLiteral(number)
+        Bind.NumericLiteral(number),
       ))
     }
   } else if (has_min) {
@@ -97,14 +96,14 @@ export function whole_number_generic<TYPE extends string>(range: mcdoc.NumericRa
         undefined,
         'min',
         undefined,
-        Bind.NumericLiteral(number)
+        Bind.NumericLiteral(number),
       ))
     } else if (left_exclusive) {
       generic.push(factory.createPropertySignature(
         undefined,
         'min',
         undefined,
-        Bind.NumericLiteral(range.min!)
+        Bind.NumericLiteral(range.min!),
       ))
     }
   } else {
@@ -113,14 +112,14 @@ export function whole_number_generic<TYPE extends string>(range: mcdoc.NumericRa
         undefined,
         'max',
         undefined,
-        Bind.NumericLiteral(-1)
+        Bind.NumericLiteral(-1),
       ))
     } else if (right_exclusive) {
       generic.push(factory.createPropertySignature(
         undefined,
         'max',
         undefined,
-        Bind.NumericLiteral(range.max!)
+        Bind.NumericLiteral(range.max!),
       ))
     }
   }
@@ -130,7 +129,7 @@ export function whole_number_generic<TYPE extends string>(range: mcdoc.NumericRa
    */
   return {
     type: factory.createTypeReferenceNode(type, [
-      factory.createTypeLiteralNode(generic)
+      factory.createTypeLiteralNode(generic),
     ]),
     docs: docs as NonEmptyList<string>,
     imports: {

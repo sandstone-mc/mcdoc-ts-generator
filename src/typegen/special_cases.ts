@@ -41,8 +41,8 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
     const key_type = factory.createTypeReferenceNode('LiteralUnion', [
       factory.createTypeOperatorNode(
         ts.SyntaxKind.KeyOfKeyword,
-        factory.createTypeReferenceNode('SymbolEntityEffect')
-      )
+        factory.createTypeReferenceNode('SymbolEntityEffect'),
+      ),
     ])
 
     const value_type = factory.createParenthesizedType(factory.createIntersectionTypeNode([
@@ -51,21 +51,21 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
           undefined,
           'type',
           undefined,
-          factory.createTypeReferenceNode('S')
-        )
+          factory.createTypeReferenceNode('S'),
+        ),
       ]),
       factory.createParenthesizedType(factory.createConditionalTypeNode(
         factory.createTypeReferenceNode('S'),
         factory.createTypeOperatorNode(
           ts.SyntaxKind.KeyOfKeyword,
-          factory.createTypeReferenceNode('SymbolEntityEffect')
+          factory.createTypeReferenceNode('SymbolEntityEffect'),
         ),
         factory.createIndexedAccessTypeNode(
           factory.createTypeReferenceNode('SymbolEntityEffect'),
-          factory.createTypeReferenceNode('S')
+          factory.createTypeReferenceNode('S'),
         ),
-        factory.createTypeReferenceNode('RootNBT')
-      ))
+        factory.createTypeReferenceNode('RootNBT'),
+      )),
     ]))
 
     const mapped_type = Bind.MappedType(key_type, value_type, { key_name: 'S', parenthesized: false })
@@ -73,9 +73,9 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
     return {
       type: factory.createParenthesizedType(factory.createIndexedAccessTypeNode(
         factory.createParenthesizedType(mapped_type),
-        key_type
+        key_type,
       )) as ts.TypeNode,
-      imports
+      imports,
     }
   }],
 
@@ -98,19 +98,19 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
           undefined,
           factory.createIndexedAccessTypeNode(
             factory.createTypeReferenceNode('Registry'),
-            Bind.StringLiteral('minecraft:block')
-          )
+            Bind.StringLiteral('minecraft:block'),
+          ),
         ),
         factory.createPropertySignature(
           undefined,
           'properties',
           factory.createToken(ts.SyntaxKind.QuestionToken),
           factory.createTypeReferenceNode('SymbolMcdocBlockStates', [
-            Bind.StringLiteral('%none')
-          ])
-        )
+            Bind.StringLiteral('%none'),
+          ]),
+        ),
       ]) as ts.TypeNode,
-      imports
+      imports,
     }
   }],
 
@@ -130,16 +130,16 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
     // )
     const keyof_symbol = factory.createTypeOperatorNode(
       ts.SyntaxKind.KeyOfKeyword,
-      factory.createTypeReferenceNode('SymbolDataComponent')
+      factory.createTypeReferenceNode('SymbolDataComponent'),
     )
 
     const base_mapped_type = Bind.MappedType(
       keyof_symbol,
       factory.createParenthesizedType(factory.createIndexedAccessTypeNode(
         factory.createTypeReferenceNode('SymbolDataComponent'),
-        factory.createTypeReferenceNode('Key')
+        factory.createTypeReferenceNode('Key'),
       )),
-      { parenthesized: false }
+      { parenthesized: false },
     )
 
     // Negation mapped type: [Key in keyof SymbolDataComponent as `!${Extract<Key, string>}`]?: Record<string, never>
@@ -148,24 +148,24 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
       [factory.createTemplateLiteralTypeSpan(
         factory.createTypeReferenceNode('Extract', [
           factory.createTypeReferenceNode('Key'),
-          factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
+          factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
         ]),
-        factory.createTemplateTail('')
-      )]
+        factory.createTemplateTail(''),
+      )],
     )
 
     const negation_mapped_type = Bind.MappedType(
       keyof_symbol,
       Bind.EmptyObject,
-      { name_type: negation_name_type, parenthesized: false }
+      { name_type: negation_name_type, parenthesized: false },
     )
 
     return {
       type: factory.createParenthesizedType(factory.createIntersectionTypeNode([
         factory.createParenthesizedType(base_mapped_type),
-        factory.createParenthesizedType(negation_mapped_type)
+        factory.createParenthesizedType(negation_mapped_type),
       ])) as ts.TypeNode,
-      imports
+      imports,
     }
   }],
 
@@ -182,7 +182,7 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
     // }>)
     const text_content = factory.createParenthesizedType(factory.createUnionTypeNode([
       factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-      factory.createTypeReferenceNode('TextObject')
+      factory.createTypeReferenceNode('TextObject'),
     ]))
 
     return {
@@ -196,18 +196,18 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
               undefined,
               'leftExclusive',
               undefined,
-              factory.createLiteralTypeNode(factory.createFalse())
+              factory.createLiteralTypeNode(factory.createFalse()),
             ),
             factory.createPropertySignature(
               undefined,
               'min',
               undefined,
-              Bind.NumericLiteral(1)
-            )
-          ])
-        ])
+              Bind.NumericLiteral(1),
+            ),
+          ]),
+        ]),
       ])) as ts.TypeNode,
-      imports
+      imports,
     }
   }],
 ])

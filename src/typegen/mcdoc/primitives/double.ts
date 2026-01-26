@@ -12,12 +12,12 @@ function mcdoc_double(type: mcdoc.McdocType) {
   const double = type
   Assert.NumericType<'double'>(double)
 
-  return (args: Record<string, unknown>) => {
+  return (_args: Record<string, unknown>) => {
     if (double.valueRange === undefined) {
       return {
         type: factory.createParenthesizedType(factory.createUnionTypeNode([
           factory.createTypeReferenceNode(NBTDoubleType),
-          factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword)
+          factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
         ])),
         imports: {
           ordered: [`sandstone::${NBTDoubleType}`] as NonEmptyList<string>,
@@ -32,10 +32,9 @@ function mcdoc_double(type: mcdoc.McdocType) {
 
 export const McdocDouble = mcdoc_double satisfies TypeHandler
 
-
 export function non_integral_generic<TYPE extends string, JS_NUMBER_ALLOWED extends (true | undefined)>(range: mcdoc.NumericRange, type: TYPE, allow_js_number?: JS_NUMBER_ALLOWED) {
   const docs: string[] & { 0: string } = [
-    `Range: ${mcdoc.NumericRange.toString(range)}`
+    `Range: ${mcdoc.NumericRange.toString(range)}`,
   ]
   const generic: ts.PropertySignature[] = []
   // This code still sucks and I still need to rewrite it again
@@ -53,8 +52,8 @@ export function non_integral_generic<TYPE extends string, JS_NUMBER_ALLOWED exte
       factory.createLiteralTypeNode(
         left_exclusive ?
           factory.createTrue() :
-          factory.createFalse()
-      )
+          factory.createFalse(),
+      ),
     ))
     if (left_exclusive) {
       docs.push(`Minimum is exclusive; must be higher than ${range.min}`)
@@ -69,8 +68,8 @@ export function non_integral_generic<TYPE extends string, JS_NUMBER_ALLOWED exte
       factory.createLiteralTypeNode(
         right_exclusive ?
           factory.createTrue() :
-          factory.createFalse()
-      )
+          factory.createFalse(),
+      ),
     ))
     if (right_exclusive) {
       docs.push(`Maximum is exclusive; must be lower than ${range.max}`)
@@ -83,13 +82,13 @@ export function non_integral_generic<TYPE extends string, JS_NUMBER_ALLOWED exte
         undefined,
         'min',
         undefined,
-        Bind.NumericLiteral(0)
+        Bind.NumericLiteral(0),
       ))
       generic.push(factory.createPropertySignature(
         undefined,
         'max',
         undefined,
-        Bind.NumericLiteral(1)
+        Bind.NumericLiteral(1),
       ))
     } else if (range.min! >= 0) {
       let number = 0
@@ -100,14 +99,14 @@ export function non_integral_generic<TYPE extends string, JS_NUMBER_ALLOWED exte
         undefined,
         'min',
         undefined,
-        Bind.NumericLiteral(number)
+        Bind.NumericLiteral(number),
       ))
       if (right_exclusive) {
         generic.push(factory.createPropertySignature(
           undefined,
           'max',
           undefined,
-          Bind.NumericLiteral(range.max!)
+          Bind.NumericLiteral(range.max!),
         ))
       }
     } else if (left_exclusive) {
@@ -115,14 +114,14 @@ export function non_integral_generic<TYPE extends string, JS_NUMBER_ALLOWED exte
         undefined,
         'min',
         undefined,
-        Bind.NumericLiteral(range.min!)
+        Bind.NumericLiteral(range.min!),
       ))
       if (right_exclusive) {
         generic.push(factory.createPropertySignature(
           undefined,
           'max',
           undefined,
-          Bind.NumericLiteral(range.max!)
+          Bind.NumericLiteral(range.max!),
         ))
       }
     }
@@ -136,14 +135,14 @@ export function non_integral_generic<TYPE extends string, JS_NUMBER_ALLOWED exte
         undefined,
         'min',
         undefined,
-        Bind.NumericLiteral(number)
+        Bind.NumericLiteral(number),
       ))
     } else if (left_exclusive) {
       generic.push(factory.createPropertySignature(
         undefined,
         'min',
         undefined,
-        Bind.NumericLiteral(range.min!)
+        Bind.NumericLiteral(range.min!),
       ))
     }
   } else {
@@ -152,14 +151,14 @@ export function non_integral_generic<TYPE extends string, JS_NUMBER_ALLOWED exte
         undefined,
         'max',
         undefined,
-        Bind.NumericLiteral(-1)
+        Bind.NumericLiteral(-1),
       ))
     } else if (right_exclusive) {
       generic.push(factory.createPropertySignature(
         undefined,
         'max',
         undefined,
-        Bind.NumericLiteral(range.max!)
+        Bind.NumericLiteral(range.max!),
       ))
     }
   }
@@ -167,15 +166,15 @@ export function non_integral_generic<TYPE extends string, JS_NUMBER_ALLOWED exte
   const returned_type = allow_js_number ?
     factory.createParenthesizedType(factory.createUnionTypeNode([
       factory.createTypeReferenceNode(type, [
-        factory.createTypeLiteralNode(generic)
+        factory.createTypeLiteralNode(generic),
       ]),
       /** 
        * Yes this could be made more type-safe using the same conditional types that are being used in NBTDouble, but generally speaking if people want higher type-safety they should be using the NBT types anyway.
        */
-      factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword)
+      factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
     ])) :
     factory.createTypeReferenceNode(type, [
-      factory.createTypeLiteralNode(generic)
+      factory.createTypeLiteralNode(generic),
     ])
 
   return {

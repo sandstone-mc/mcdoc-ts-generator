@@ -1,5 +1,5 @@
 import ts from 'typescript'
-import * as mcdoc from '@spyglassmc/mcdoc'
+import type * as mcdoc from '@spyglassmc/mcdoc'
 import type { TypeHandler } from '..'
 import { Assert } from '../assert'
 import { Bind } from '../bind'
@@ -32,7 +32,7 @@ function mcdoc_enum(type: mcdoc.McdocType) {
   const enum_type = type
   Assert.EnumType(enum_type)
 
-  return (args: Record<string, unknown>) => {
+  return (_args: Record<string, unknown>) => {
     const bind_value = (() => enum_type.enumKind === 'string'
       ? (value: string | number) => Bind.StringLiteral(value as string)
       : (value: number | string) => Bind.NumericLiteral(value as number))()

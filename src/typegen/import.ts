@@ -10,10 +10,10 @@ function BindImports(module_path: string, modules: string[], is_type_only = true
       is_type_only,
       undefined,
       factory.createNamedImports(
-        modules.map((name) => factory.createImportSpecifier(false, undefined, factory.createIdentifier(name)))
-      )
+        modules.map((name) => factory.createImportSpecifier(false, undefined, factory.createIdentifier(name))),
+      ),
     ),
-    factory.createStringLiteral(module_path, true)
+    factory.createStringLiteral(module_path, true),
   )
 }
 

@@ -127,8 +127,8 @@ export async function compile_types(nodes: ts.Node[], file = 'code.ts') {
       '',
       ts.ScriptTarget.Latest,
       false,
-      ts.ScriptKind.TS
-    )
+      ts.ScriptKind.TS,
+    ),
   )
 
   const results = await eslint.lintText(printed, { filePath: file })

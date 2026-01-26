@@ -1,7 +1,6 @@
-import * as mcdoc from '@spyglassmc/mcdoc'
+import type * as mcdoc from '@spyglassmc/mcdoc'
 import ts from 'typescript'
 import { Assert } from '../assert'
-import { Bind } from '../bind'
 import type { NonEmptyList, TypeHandler } from '..'
 import { non_integral_generic } from './double'
 
@@ -13,7 +12,7 @@ function mcdoc_float(type: mcdoc.McdocType) {
   const float = type
   Assert.NumericType<'float'>(float)
 
-  return (args: Record<string, unknown>) => {
+  return (_args: Record<string, unknown>) => {
     if (float.valueRange === undefined) {
       return {
         type: factory.createTypeReferenceNode(NBTFloatType),

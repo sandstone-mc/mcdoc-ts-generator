@@ -1,5 +1,5 @@
 import { AllCategories, type SymbolMap, type SymbolUtil } from '@spyglassmc/core'
-import * as mcdoc from '@spyglassmc/mcdoc'
+import type * as mcdoc from '@spyglassmc/mcdoc'
 import ts from 'typescript'
 import { add, pascal_case, pluralize } from '../util'
 import { get_type_handler, type TypeHandlerResult } from './mcdoc'
@@ -64,8 +64,6 @@ export class TypesGenerator {
   /** Pre-computed dispatcher info for use during type resolution */
   readonly dispatcher_info = new Map<string, DispatcherInfo>()
 
-  constructor() { }
-
   resolve_types(symbols: SymbolUtil, translation_keys: string[]) {
     console.log('registries')
     this.resolve_registry_symbols(symbols, translation_keys)
@@ -123,13 +121,13 @@ export class TypesGenerator {
         symbol_name,
         generic_count,
         has_fallback_type: '%unknown' in members,
-        supports_none: '%none' in members
+        supports_none: '%none' in members,
       })
     }
   }
 
   private resolve_registry_symbols(registries: SymbolUtil, translation_keys: string[]) {
-    for (const registry_name of [...AllCategories]) {
+    for (const registry_name of AllCategories) {
       if (registry_name === 'mcdoc' || registry_name === 'mcdoc/dispatcher') {
         continue
       }
@@ -163,19 +161,19 @@ export class TypesGenerator {
                   literal_union_type,
                   [factory.createTypeReferenceNode(
                     factory.createIdentifier('SetType'),
-                    [factory.createTypeQueryNode(factory.createIdentifier(`${type_name}_SET`))]
-                  )]
+                    [factory.createTypeQueryNode(factory.createIdentifier(`${type_name}_SET`))],
+                  )],
                 ),
                 factory.createTemplateLiteralType(
                   factory.createTemplateHead('minecraft:'),
                   [factory.createTemplateLiteralTypeSpan(
                     factory.createTypeReferenceNode(
                       factory.createIdentifier('SetType'),
-                      [factory.createTypeQueryNode(factory.createIdentifier(`${type_name}_SET`))]
+                      [factory.createTypeQueryNode(factory.createIdentifier(`${type_name}_SET`))],
                     ),
-                    factory.createTemplateTail('')
-                  )]
-                )
+                    factory.createTemplateTail(''),
+                  )],
+                ),
               ])),
             ),
             factory.createVariableStatement(
@@ -191,18 +189,18 @@ export class TypesGenerator {
                     [factory.createAsExpression(
                       factory.createArrayLiteralExpression(
                         registry.map((s) => factory.createStringLiteral(s.split(':')[1], true)),
-                        true
+                        true,
                       ),
-                      factory.createTypeReferenceNode('const')
-                    )]
-                  )
+                      factory.createTypeReferenceNode('const'),
+                    )],
+                  ),
                 )],
-                ts.NodeFlags.Const
-              )
+                ts.NodeFlags.Const,
+              ),
             ),
           ],
-          paths: new Set()
-        }
+          paths: new Set(),
+        },
       )
 
       this.resolved_registries.set(registry_name, {
@@ -245,7 +243,7 @@ export class TypesGenerator {
               return this.resolved_symbols.set(module_path, {
                 paths: new Set([_path]),
                 exports: [],
-                ...(special_case.imports !== undefined ? { imports: special_case.imports } : {})
+                ...(special_case.imports !== undefined ? { imports: special_case.imports } : {}),
               }).get(module_path)!
             }
             const mod = this.resolved_symbols.get(module_path)!
@@ -263,7 +261,7 @@ export class TypesGenerator {
             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             name,
             undefined,
-            special_case.type
+            special_case.type,
           ))
           continue
         }
@@ -292,7 +290,7 @@ export class TypesGenerator {
             return this.resolved_symbols.set(module_path, {
               paths: new Set([_path]),
               exports: [],
-              ...('imports' in resolved_member ? { imports: resolved_member.imports } : {})
+              ...('imports' in resolved_member ? { imports: resolved_member.imports } : {}),
             }).get(module_path)!
           }
           const mod = this.resolved_symbols.get(module_path)!
@@ -313,7 +311,7 @@ export class TypesGenerator {
             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             name,
             undefined,
-            resolved_member.type as ts.TypeNode
+            resolved_member.type as ts.TypeNode,
           ), resolved_member.docs))
         }
       }
@@ -354,7 +352,7 @@ export class TypesGenerator {
       dispatcher_symbol_paths.set(symbol_path, {
         symbol_name: `Symbol${name}`,
         base_name: name,
-        has_fallback_type: info.has_fallback_type
+        has_fallback_type: info.has_fallback_type,
       })
 
       // Store dispatcher reference for the Dispatcher export type
@@ -363,19 +361,13 @@ export class TypesGenerator {
         import_path: `${symbol_path}::${dispatcher_type_name}`,
         type: factory.createTypeReferenceNode(dispatcher_type_name),
         generic_count,
-        symbol_name: dispatcher_type_name
+        symbol_name: dispatcher_type_name,
       })
 
       if (in_module && this.resolved_symbols.has(symbol_path)) {
         const mod = this.resolved_symbols.get(symbol_path)!
 
         mod.exports.push(...types)
-
-        let module_has_imports = false
-
-        if (mod.imports !== undefined) {
-          module_has_imports = true
-        }
 
         if (imports !== undefined) {
           // @ts-ignore
@@ -399,7 +391,7 @@ export class TypesGenerator {
           if (filtered_ordered.length > 0) {
             filtered_imports = {
               ordered: filtered_ordered as typeof imports.ordered,
-              check: new Map(filtered_ordered.map((imp, i) => [imp, i]))
+              check: new Map(filtered_ordered.map((imp, i) => [imp, i])),
             }
           } else {
             filtered_imports = undefined
@@ -408,7 +400,7 @@ export class TypesGenerator {
         this.resolved_symbols.set(symbol_path, {
           exports: types,
           paths: new Set(),
-          ...add({ imports: filtered_imports })
+          ...add({ imports: filtered_imports }),
         })
       }
     }

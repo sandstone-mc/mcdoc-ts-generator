@@ -1,5 +1,5 @@
 import ts from 'typescript'
-import * as mcdoc from '@spyglassmc/mcdoc'
+import type * as mcdoc from '@spyglassmc/mcdoc'
 import type { NonEmptyList, TypeHandler } from '../..'
 import { Assert } from '../../assert'
 import { length_range_generic } from '../list'
@@ -12,7 +12,7 @@ const NBTByteArrayImport = `sandstone::${NBTByteArrayType}`
 function mcdoc_byte_array(type: mcdoc.McdocType) {
   Assert.ArrayType<'byte_array'>(type)
 
-  return (args: Record<string, unknown>) => {
+  return (_args: Record<string, unknown>) => {
     const imports = {
       ordered: [NBTByteArrayImport] as NonEmptyList<string>,
       check: new Map<string, number>([[NBTByteArrayImport, 0]]),

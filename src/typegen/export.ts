@@ -19,12 +19,12 @@ export function export_dispatchers(paths: Map<string, { symbol_name: string, bas
 
     // Build the list of named exports
     const export_specifiers: ts.ExportSpecifier[] = [
-      factory.createExportSpecifier(false, undefined, info.symbol_name)
+      factory.createExportSpecifier(false, undefined, info.symbol_name),
     ]
 
     if (info.has_fallback_type) {
       export_specifiers.push(
-        factory.createExportSpecifier(false, undefined, `${info.base_name}FallbackType`)
+        factory.createExportSpecifier(false, undefined, `${info.base_name}FallbackType`),
       )
     }
 
@@ -32,7 +32,7 @@ export function export_dispatchers(paths: Map<string, { symbol_name: string, bas
       undefined,
       false,
       factory.createNamedExports(export_specifiers),
-      factory.createStringLiteral(relative_path, true)
+      factory.createStringLiteral(relative_path, true),
     ))
   }
 
@@ -62,7 +62,7 @@ export function export_registry(resolved_registries: Map<string, ResolvedRegistr
       undefined,
       factory.createStringLiteral(registry_id),
       undefined,
-      factory.createTypeReferenceNode(registry)
+      factory.createTypeReferenceNode(registry),
     ))
   }
 
@@ -71,7 +71,7 @@ export function export_registry(resolved_registries: Map<string, ResolvedRegistr
     [factory.createToken(ts.SyntaxKind.ExportKeyword)],
     'Registry',
     undefined,
-    factory.createTypeLiteralNode(properties)
+    factory.createTypeLiteralNode(properties),
   )
 
   // Create: export const REGISTRIES_SET = new Set([...] as const)
@@ -88,16 +88,16 @@ export function export_registry(resolved_registries: Map<string, ResolvedRegistr
           [factory.createAsExpression(
             factory.createArrayLiteralExpression(
               TaggableResourceLocationCategories.map((category) =>
-                factory.createStringLiteral(category, true)
+                factory.createStringLiteral(category, true),
               ),
-              true
+              true,
             ),
-            factory.createTypeReferenceNode('const')
-          )]
-        )
+            factory.createTypeReferenceNode('const'),
+          )],
+        ),
       )],
-      ts.NodeFlags.Const
-    )
+      ts.NodeFlags.Const,
+    ),
   )
 
   // Create: export type REGISTRIES = SetType<typeof REGISTRIES_SET>
@@ -107,13 +107,13 @@ export function export_registry(resolved_registries: Map<string, ResolvedRegistr
     undefined,
     factory.createTypeReferenceNode(
       'SetType',
-      [factory.createTypeQueryNode(factory.createIdentifier('REGISTRIES_SET'))]
-    )
+      [factory.createTypeQueryNode(factory.createIdentifier('REGISTRIES_SET'))],
+    ),
   )
 
   return {
     exports: [registry_type, registries_set, registries_type] as (ts.TypeAliasDeclaration | ts.VariableStatement)[],
     paths: new Set<string>(),
-    ...add({ imports })
+    ...add({ imports }),
   } as const
 }

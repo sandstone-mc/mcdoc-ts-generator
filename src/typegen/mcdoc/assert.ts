@@ -1,7 +1,6 @@
-import * as mcdoc from '@spyglassmc/mcdoc'
+import type * as mcdoc from '@spyglassmc/mcdoc'
 import { Set } from './utils'
 import { match, P } from 'ts-pattern'
-
 
 type ReferenceType = {
   kind: 'reference',
@@ -557,7 +556,7 @@ export class Assert {
             .with('color', () => {
               if (attribute.value === undefined) {
                 // @author Claude - #[color] requires a value specifying the color format
-                throw new Error(`[mcdoc_assert] #[color] attribute must have a value`)
+                throw new Error('[mcdoc_assert] #[color] attribute must have a value')
               }
               if (attribute.value.kind !== 'literal' || attribute.value.value.kind !== 'string') {
                 // @author Claude - #[color] value must be a string literal
@@ -571,7 +570,7 @@ export class Assert {
             .with('command', () => {
               if (attribute.value === undefined) {
                 // @author Claude - #[command] requires configuration values
-                throw new Error(`[mcdoc_assert] #[command] attribute must have a value`)
+                throw new Error('[mcdoc_assert] #[command] attribute must have a value')
               }
               if (attribute.value.kind === 'tree') {
                 const invalid_argument = Object.keys(attribute.value.values).find((argument) => !AssertKinds.CommandAttributeArgument.has(argument))
@@ -602,7 +601,7 @@ export class Assert {
                   }
                 } else {
                   // @author Claude - #[command] requires either macro or slash argument
-                  throw new Error(`[mcdoc_assert] #[command] attribute must have either 'macro' or 'slash' argument`)
+                  throw new Error('[mcdoc_assert] #[command] attribute must have either \'macro\' or \'slash\' argument')
                 }
                 if ('empty' in attribute.value.values) {
                   if (attribute.value.values.empty.kind === 'literal') {
@@ -657,7 +656,7 @@ export class Assert {
             .with('dispatcher_key', () => {
               if (attribute.value === undefined) {
                 // @author Claude - #[dispatcher_key] requires a namespaced ID value
-                throw new Error(`[mcdoc_assert] #[dispatcher_key] attribute must have a value`)
+                throw new Error('[mcdoc_assert] #[dispatcher_key] attribute must have a value')
               }
               if (attribute.value.kind !== 'literal' || !/^[\w_]+:[\w_]+$/.test(`${attribute.value.value.value}`)) {
                 // @author Claude - must be a valid namespaced ID like 'namespace:path'
@@ -667,7 +666,7 @@ export class Assert {
             .with('divisible_by', () => {
               if (attribute.value === undefined) {
                 // @author Claude - #[divisible_by] requires an integer divisor value
-                throw new Error(`[mcdoc_assert] #[divisible_by] attribute must have a value`)
+                throw new Error('[mcdoc_assert] #[divisible_by] attribute must have a value')
               }
               if (attribute.value.kind !== 'literal' || !Number.isInteger(Number(attribute.value.value.value))) {
                 // @author Claude - divisor must be an integer literal
@@ -678,7 +677,7 @@ export class Assert {
               // Mojang why
               if (attribute.value === undefined) {
                 // @author Claude - #[integer] requires a value with min constraint
-                throw new Error(`[mcdoc_assert] #[integer] attribute must have a value`)
+                throw new Error('[mcdoc_assert] #[integer] attribute must have a value')
               }
               // I know this is bad, but hopefully this doesn't get used again
               if (attribute.value.kind !== 'tree' || !('min' in attribute.value.values) || attribute.value.values.min.kind !== 'literal' || attribute.value.values.min.value.value !== 1) {
@@ -697,7 +696,7 @@ export class Assert {
               }
               if (attribute.value?.kind === 'reference' && attribute.value.path === undefined) {
                 // @author Claude - #[nbt] reference must have a valid path
-                throw new Error(`[mcdoc_assert] #[nbt] attribute reference value must have a defined path`)
+                throw new Error('[mcdoc_assert] #[nbt] attribute reference value must have a defined path')
               }
             })
             .with('nbt_path', () => {
@@ -722,7 +721,7 @@ export class Assert {
             .with('permutation', () => {
               if (attribute.value === undefined) {
                 // @author Claude - #[permutation] requires a value
-                throw new Error(`[mcdoc_assert] #[permutation] attribute must have a value`)
+                throw new Error('[mcdoc_assert] #[permutation] attribute must have a value')
               }
               if (!(attribute.value.kind === 'tree' && 'definition' in attribute.value.values && attribute.value.values.definition.kind === 'literal' && attribute.value.values.definition.value.value === true)) {
                 // @author Claude - #[permutation] value must be {definition: true}
@@ -733,7 +732,7 @@ export class Assert {
                 throw new Error(`[mcdoc_assert] #[permutation] attribute tree has unexpected extra arguments: ${Object.keys(attribute.value.values).filter(k => k !== 'definition').join(', ')}`)
               }
             })
-            .with('entity', (entity) => {
+            .with('entity', () => {
               if (attribute.value !== undefined) {
                 if (attribute.value.kind !== 'tree') {
                   throw new Error(`[mcdoc_assert] #[entity] attribute value must contain arguments, received a ${attribute.value.kind}`)
@@ -773,7 +772,7 @@ export class Assert {
             .with('texture_slot', () => {
               if (attribute.value === undefined) {
                 // @author Claude - #[texture_slot] requires a value with kind
-                throw new Error(`[mcdoc_assert] #[texture_slot] attribute must have a value`)
+                throw new Error('[mcdoc_assert] #[texture_slot] attribute must have a value')
               }
               if (attribute.value.kind !== 'tree' || !('kind' in attribute.value.values) || attribute.value.values.kind.kind !== 'literal' || !AssertKinds.TextureSlotAttributeKind.has(attribute.value.values.kind.value.value)) {
                 // @author Claude - #[texture_slot] must have a valid kind value
@@ -788,7 +787,7 @@ export class Assert {
               // Mojang why
               if (attribute.value === undefined) {
                 // @author Claude - #[vector] requires dimension and integer values
-                throw new Error(`[mcdoc_assert] #[vector] attribute must have a value`)
+                throw new Error('[mcdoc_assert] #[vector] attribute must have a value')
               }
               if (attribute.value.kind !== 'tree' || !('dimension' in attribute.value.values) || !('integer' in attribute.value.values)) {
                 // @author Claude - #[vector] must have both dimension and integer arguments

@@ -23,7 +23,7 @@ export function add_import(imports: TypeHandlerResult['imports'], add_import: st
   if (imports === undefined) {
     return {
       ordered: [add_import] as NonEmptyList<string>,
-      check: new Map<string, number>([[add_import, 0]])
+      check: new Map<string, number>([[add_import, 0]]),
     } as const
   }
   if (imports.check.has(add_import)) {
@@ -89,11 +89,7 @@ export function merge_imports(
 }
 
 // Thanks TypeScript
-type GetConstructorArgs<T> = T extends new (...args: infer U) => any ? U : never
 export class Set<T> extends global.Set<T> {
-  constructor(...args: GetConstructorArgs<typeof global.Set<T>>) {
-    super(...args)
-  }
   has(value: unknown) {
     return super.has(value as any)
   }

@@ -1,11 +1,9 @@
-import ts from 'typescript'
-import * as mcdoc from '@spyglassmc/mcdoc'
+import type ts from 'typescript'
+import type * as mcdoc from '@spyglassmc/mcdoc'
 import { TypeHandlers, type NonEmptyList, type TypeHandler, type TypeHandlerResult } from '..'
 import { Assert } from '../assert'
 import { merge_imports } from '../utils'
 import { add } from '../../../util'
-
-const { factory } = ts
 
 /**
  * Handles `concrete` types which are type references with generic arguments.
@@ -56,7 +54,7 @@ function mcdoc_concrete(type: mcdoc.McdocType) {
 
     return {
       type: child.type,
-      ...add({ imports, child_dispatcher })
+      ...add({ imports, child_dispatcher }),
     } as const
   }
 }

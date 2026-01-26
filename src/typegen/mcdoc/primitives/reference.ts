@@ -1,5 +1,5 @@
 import ts from 'typescript'
-import * as mcdoc from '@spyglassmc/mcdoc'
+import type * as mcdoc from '@spyglassmc/mcdoc'
 import type { NonEmptyList, TypeHandler } from '..'
 import { Assert } from '../assert'
 import type { DispatcherReferenceCounter } from '../dispatcher_symbol'
@@ -9,7 +9,7 @@ import { add } from '../../../util'
 
 const { factory } = ts
 
-function ReferenceArgs(args: Record<string, unknown>): asserts args is ({
+function ReferenceArgs(_args: Record<string, unknown>): asserts args is ({
   dispatcher_symbol?: () => DispatcherReferenceCounter
   generic_types?: ts.TypeNode[]
   generics?: Set<string>
@@ -87,9 +87,9 @@ function mcdoc_reference(type: mcdoc.McdocType) {
                   factory.createTemplateHead('minecraft:', 'minecraft:'),
                   [factory.createTemplateLiteralTypeSpan(
                     ref,
-                    factory.createTemplateTail('')
-                  )]
-                )
+                    factory.createTemplateTail(''),
+                  )],
+                ),
               ]))
               // lol
               Object.assign(id_ref, {
@@ -101,11 +101,11 @@ function mcdoc_reference(type: mcdoc.McdocType) {
                       factory.createTemplateHead('minecraft:', 'minecraft:'),
                       [factory.createTemplateLiteralTypeSpan(
                         factory.createTypeReferenceNode('S'),
-                        factory.createTemplateTail('')
-                      )]
-                    )
-                  ]))
-                }
+                        factory.createTemplateTail(''),
+                      )],
+                    ),
+                  ])),
+                },
               })
 
               return id_ref
@@ -118,7 +118,7 @@ function mcdoc_reference(type: mcdoc.McdocType) {
           (f) => f.type.kind === 'dispatcher'
             && f.type.parallelIndices[0].kind === 'dynamic'
             && typeof f.type.parallelIndices[0].accessor[0] === 'string'
-            && ((key: string) => referenced_type.fields.findIndex((_f) => _f.kind === 'pair' && _f.key === key))(f.type.parallelIndices[0].accessor[0]) === -1
+            && ((key: string) => referenced_type.fields.findIndex((_f) => _f.kind === 'pair' && _f.key === key))(f.type.parallelIndices[0].accessor[0]) === -1,
         ) as undefined | (mcdoc.StructFieldNode & { type: { kind: 'dispatcher', parallelIndices: [{ kind: 'dynamic', accessor: [string] }] } }))?.type.parallelIndices[0].accessor[0]
 
         if (generic_field !== undefined) {
@@ -134,18 +134,18 @@ function mcdoc_reference(type: mcdoc.McdocType) {
     if ('generic_types' in args) {
       return {
         type: factory.createTypeReferenceNode(type_name, args.generic_types),
-        ...add({ imports, child_dispatcher, docs })
+        ...add({ imports, child_dispatcher, docs }),
       } as const
     }
     if ('generics' in args && args.generics.has(reference.path)) {
       return {
         type: factory.createTypeReferenceNode(type_name),
-        ...add({ docs })
+        ...add({ docs }),
       } as const
     }
     return {
       type: id_wrap(factory.createTypeReferenceNode(type_name)),
-      ...add({ imports, child_dispatcher, docs })
+      ...add({ imports, child_dispatcher, docs }),
     } as const
   }
 }

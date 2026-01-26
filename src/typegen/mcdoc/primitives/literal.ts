@@ -1,18 +1,18 @@
 import ts from 'typescript'
-import * as mcdoc from '@spyglassmc/mcdoc'
+import type * as mcdoc from '@spyglassmc/mcdoc'
 import type { NonEmptyList, TypeHandler } from '..'
 import { Assert } from '../assert'
-import { match, P } from 'ts-pattern'
+import { match } from 'ts-pattern'
 import { Bind } from '../bind'
 
 const { factory } = ts
 
 const boolean_static = {
   true: {
-    type: factory.createLiteralTypeNode(factory.createTrue())
+    type: factory.createLiteralTypeNode(factory.createTrue()),
   },
   false: {
-    type: factory.createLiteralTypeNode(factory.createFalse())
+    type: factory.createLiteralTypeNode(factory.createFalse()),
   },
 } as const
 
@@ -20,18 +20,18 @@ function mcdoc_literal(type: mcdoc.McdocType) {
   const literal = type
   Assert.LiteralType(literal)
 
-  return (args: Record<string, unknown>) => match(literal.value)
+  return (_args: Record<string, unknown>) => match(literal.value)
     .with({ kind: 'boolean' }, (boolean) => match(boolean.value)
       .with(true, () => boolean_static.true)
       .with(false, () => boolean_static.false)
-      .exhaustive()
+      .exhaustive(),
     )
     .with({ kind: 'byte' }, (byte) => {
       const type = 'NBTByte'
 
       return {
         type: factory.createTypeReferenceNode(type, [
-          Bind.NumericLiteral(byte.value)
+          Bind.NumericLiteral(byte.value),
         ]),
         imports: {
           ordered: [`sandstone::${type}`] as NonEmptyList<string>,
@@ -47,7 +47,7 @@ function mcdoc_literal(type: mcdoc.McdocType) {
 
       return {
         type: factory.createTypeReferenceNode(type, [
-          Bind.NumericLiteral(float.value)
+          Bind.NumericLiteral(float.value),
         ]),
         imports: {
           ordered: [`sandstone::${type}`] as NonEmptyList<string>,
@@ -60,7 +60,7 @@ function mcdoc_literal(type: mcdoc.McdocType) {
 
       return {
         type: factory.createTypeReferenceNode(type, [
-          Bind.StringLiteral(`${long.value}`)
+          Bind.StringLiteral(`${long.value}`),
         ]),
         imports: {
           ordered: [`sandstone::${type}`] as NonEmptyList<string>,
@@ -73,7 +73,7 @@ function mcdoc_literal(type: mcdoc.McdocType) {
 
       return {
         type: factory.createTypeReferenceNode(type, [
-          Bind.NumericLiteral(short.value)
+          Bind.NumericLiteral(short.value),
         ]),
         imports: {
           ordered: [`sandstone::${type}`] as NonEmptyList<string>,

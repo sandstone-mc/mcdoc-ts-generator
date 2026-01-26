@@ -1,7 +1,7 @@
 import ts from 'typescript'
 import { match, P } from 'ts-pattern'
-import * as mcdoc from '@spyglassmc/mcdoc'
-import type { SymbolUtil } from '@spyglassmc/core'
+import type * as mcdoc from '@spyglassmc/mcdoc'
+import { SymbolUtil } from '@spyglassmc/core'
 import { TypeHandlers, type NonEmptyList, type TypeHandler, type TypeHandlerResult } from '..'
 import { Assert } from '../assert'
 import { add_import, is_valid_registry, merge_imports } from '../utils'
@@ -13,7 +13,7 @@ const { factory } = ts
 /**
  * Validates and extracts struct args from the unknown TypeHandler args.
  */
-function StructArgs(args: Record<string, unknown>): asserts args is {
+function StructArgs(_args: Record<string, unknown>): asserts args is {
   root_type: boolean,
   name: string,
   spread?: true
@@ -41,8 +41,8 @@ function mcdoc_struct(type: mcdoc.McdocType) {
 
     const { name } = args
 
-    const spread = args.spread ? true : false
-    const root_type = args.root_type ? true : false
+    const spread = !!args.spread
+    const root_type = !!args.root_type
 
     delete args.spread
     args.root_type = false
@@ -154,7 +154,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                     Bind.NonEmptyString
                     : factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
                   ),
-                  value.type
+                  value.type,
                 ))
               } else {
                 Assert.Attributes(pair.key.attributes, true)
@@ -170,7 +170,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                     if (id_attr === undefined) {
                       inherit.push(Bind.MappedType(
                         Bind.NonEmptyString,
-                        value.type
+                        value.type,
                       ))
                       return
                     }
@@ -186,13 +186,13 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                     if (!is_valid_registry(symbols, registry_id)) {
                       inherit.push(Bind.MappedType(
                         Bind.Namespaced,
-                        value.type
+                        value.type,
                       ))
                       return
                     }
 
                     // Import the central Registry type and index by registry ID
-                    const registry_import = `::java::registry::Registry`
+                    const registry_import = '::java::registry::Registry'
 
                     imports = add_import(imports, registry_import)
 
@@ -200,9 +200,9 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                     inherit.push(Bind.MappedType(
                       factory.createIndexedAccessTypeNode(
                         factory.createTypeReferenceNode('Registry'),
-                        Bind.StringLiteral(registry_id)
+                        Bind.StringLiteral(registry_id),
                       ),
-                      value.type
+                      value.type,
                     ))
                   })
                   .with({ name: 'item_slots' }, () => {
@@ -213,9 +213,9 @@ function mcdoc_struct(type: mcdoc.McdocType) {
 
                     inherit.push(Bind.MappedType(
                       factory.createTypeReferenceNode(LiteralUnion, [
-                        factory.createTypeReferenceNode(ENTITY_SLOTS)
+                        factory.createTypeReferenceNode(ENTITY_SLOTS),
                       ]),
-                      value.type
+                      value.type,
                     ))
                   })
                   .with({ name: 'objective' }, () => {
@@ -225,23 +225,23 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                     inherit.push(Bind.MappedType(
                       factory.createUnionTypeNode([
                         factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                        factory.createTypeReferenceNode(Objective)
+                        factory.createTypeReferenceNode(Objective),
                       ]),
-                      value.type
+                      value.type,
                     ))
                   })
                   .with({ name: 'texture_slot' }, () => {
                     // TODO: Implement Model struct generic, this is `kind="definition"`
                     inherit.push(Bind.MappedType(
                       factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                      value.type
+                      value.type,
                     ))
                   })
                   .with({ name: 'criterion' }, () => {
                     // TODO: Implement Advancement struct generic, this is `definition=true`
                     inherit.push(Bind.MappedType(
                       factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                      value.type
+                      value.type,
                     ))
                   })
                   .with({ name: 'crafting_ingredient' }, () => {
@@ -251,14 +251,14 @@ function mcdoc_struct(type: mcdoc.McdocType) {
 
                     inherit.push(Bind.MappedType(
                       factory.createTypeReferenceNode(CRAFTING_INGREDIENT),
-                      value.type
+                      value.type,
                     ))
                   })
                   .with({ name: P.union('dispatcher_key', 'translation_key', 'permutation') }, () => {
                     // Permutation will be implemented as an abstracted mode of the Atlas class
                     inherit.push(Bind.MappedType(
                       factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                      value.type
+                      value.type,
                     ))
                   })
                   .otherwise(() => {
@@ -311,7 +311,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                 [factory.createToken(ts.SyntaxKind.ExportKeyword)],
                 args.name,
                 [factory.createTypeParameterDeclaration(undefined, 'S', undefined, factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword))],
-                type_node
+                type_node,
               )
               return []
             }
@@ -330,7 +330,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                 [factory.createToken(ts.SyntaxKind.ExportKeyword)],
                 args.name,
                 [factory.createTypeParameterDeclaration(undefined, 'S', undefined, factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword))],
-                type_node
+                type_node,
               )
             }
           } else if ('--mcdoc_id_ref' in indexed_access_type!) {
@@ -349,7 +349,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
             [factory.createToken(ts.SyntaxKind.ExportKeyword)],
             args.name,
             [factory.createTypeParameterDeclaration(undefined, 'S', undefined, factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword))],
-            type_node
+            type_node,
           )
         }
         return [[parent_count - 1, property]]
@@ -387,7 +387,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
       // Create the indexed access type: ({ [S in ...]?: ... }[...])
       const indexed_access_node = factory.createParenthesizedType(factory.createIndexedAccessTypeNode(
         Bind.MappedType(indexed_access_type!, inner_type, { key_name: 'S', parenthesized: false }),
-        indexed_access_type!
+        indexed_access_type!,
       ))
 
       // Wrap in NonNullable when this is a root type (top-level export)

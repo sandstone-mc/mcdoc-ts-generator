@@ -1,5 +1,5 @@
-import ts from 'typescript'
-import * as mcdoc from '@spyglassmc/mcdoc'
+import type ts from 'typescript'
+import type * as mcdoc from '@spyglassmc/mcdoc'
 
 import {
   McdocList, McdocByteArray, McdocIntArray, McdocLongArray,

@@ -1,5 +1,5 @@
 import ts from 'typescript'
-import * as mcdoc from '@spyglassmc/mcdoc'
+import type * as mcdoc from '@spyglassmc/mcdoc'
 import type { NonEmptyList, TypeHandler } from '../..'
 import { Assert } from '../../assert'
 import { length_range_generic } from '../list'
@@ -12,7 +12,7 @@ const NBTLongArrayImport = `sandstone::${NBTLongArrayType}`
 function mcdoc_long_array(type: mcdoc.McdocType) {
   Assert.ArrayType<'long_array'>(type)
 
-  return (args: Record<string, unknown>) => {
+  return (_args: Record<string, unknown>) => {
     const imports = {
       ordered: [NBTLongArrayImport] as NonEmptyList<string>,
       check: new Map<string, number>([[NBTLongArrayImport, 0]]),
