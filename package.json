@@ -1,6 +1,6 @@
 {
   "name": "@sandstone-mc/mcdoc-ts-generator",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "description": "Generate TypeScript types from Minecraft mcdoc definitions",
   "type": "module",
   "main": "./dist/index.js",
@@ -41,7 +41,9 @@
     "url": "https://github.com/sandstone-mc/mcdoc-ts-generator"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@typescript-eslint/eslint-plugin": "^8.54.0",
+    "typescript-eslint": "^8.54.0"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"

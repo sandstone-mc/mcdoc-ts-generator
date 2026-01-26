@@ -10,22 +10,22 @@ const { factory } = ts
 const NBTFloatType = 'NBTFloat'
 
 function mcdoc_float(type: mcdoc.McdocType) {
-    const float = type
-    Assert.NumericType<'float'>(float)
+  const float = type
+  Assert.NumericType<'float'>(float)
 
-    return (args: Record<string, unknown>) => {
-        if (float.valueRange === undefined) {
-            return {
-                type: factory.createTypeReferenceNode(NBTFloatType),
-                imports: {
-                    ordered: [`sandstone::${NBTFloatType}`] as NonEmptyList<string>,
-                    check: new Map([[`sandstone::${NBTFloatType}`, 0]]) as Map<string, number>,
-                },
-            } as const
-        } else {
-            return non_integral_generic(float.valueRange, NBTFloatType)
-        }
+  return (args: Record<string, unknown>) => {
+    if (float.valueRange === undefined) {
+      return {
+        type: factory.createTypeReferenceNode(NBTFloatType),
+        imports: {
+          ordered: [`sandstone::${NBTFloatType}`] as NonEmptyList<string>,
+          check: new Map([[`sandstone::${NBTFloatType}`, 0]]) as Map<string, number>,
+        },
+      } as const
+    } else {
+      return non_integral_generic(float.valueRange, NBTFloatType)
     }
+  }
 }
 
 export const McdocFloat = mcdoc_float satisfies TypeHandler
