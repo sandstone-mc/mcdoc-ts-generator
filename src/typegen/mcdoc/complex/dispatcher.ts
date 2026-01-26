@@ -13,7 +13,7 @@ const Unknown = Bind.StringLiteral('%unknown')
 const RootNBT = factory.createTypeReferenceNode('RootNBT')
 const RootNBTImport = 'sandstone::arguments::nbt::RootNBT'
 
-function DispatcherArgs(_args: Record<string, unknown>): asserts args is {
+function DispatcherArgs(_args: Record<string, unknown>): asserts _args is {
   /**
    * Property keys to chain as indexed access types after the dispatcher access.
    * Used by the `indexed` type handler to access nested properties.

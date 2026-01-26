@@ -1,7 +1,7 @@
 import ts from 'typescript'
 import { match, P } from 'ts-pattern'
 import type * as mcdoc from '@spyglassmc/mcdoc'
-import { SymbolUtil } from '@spyglassmc/core'
+import type { SymbolUtil } from '@spyglassmc/core'
 import { TypeHandlers, type NonEmptyList, type TypeHandler, type TypeHandlerResult } from '..'
 import { Assert } from '../assert'
 import { add_import, is_valid_registry, merge_imports } from '../utils'
@@ -13,7 +13,7 @@ const { factory } = ts
 /**
  * Validates and extracts struct args from the unknown TypeHandler args.
  */
-function StructArgs(_args: Record<string, unknown>): asserts args is {
+function StructArgs(_args: Record<string, unknown>): asserts _args is {
   root_type: boolean,
   name: string,
   spread?: true

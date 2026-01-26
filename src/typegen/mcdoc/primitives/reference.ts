@@ -9,7 +9,7 @@ import { add } from '../../../util'
 
 const { factory } = ts
 
-function ReferenceArgs(_args: Record<string, unknown>): asserts args is ({
+function ReferenceArgs(_args: Record<string, unknown>): asserts _args is ({
   dispatcher_symbol?: () => DispatcherReferenceCounter
   generic_types?: ts.TypeNode[]
   generics?: Set<string>

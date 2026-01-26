@@ -44,6 +44,7 @@
     "@typescript-eslint/no-unsafe-declaration-merging": "error",
     "@typescript-eslint/array-type": "off",
     "@typescript-eslint/consistent-type-imports": ["error", { "fixStyle": "inline-type-imports" }],
+    "@typescript-eslint/no-import-type-side-effects": "error",
 
     "prefer-const": "error",
     "prefer-exponentiation-operator": "error",
