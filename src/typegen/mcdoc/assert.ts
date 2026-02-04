@@ -263,7 +263,15 @@ type ImplementedAttributes = {
       value: string
     }
   },
-  deprecated: undefined,
+  deprecated: (undefined | {
+    attributes: never,
+    kind: 'literal',
+    value: {
+      attributes: never,
+      kind: 'string',
+      value: `${number}.${number}.${number}`
+    }
+  }),
   command: {
     attributes: never,
     kind: 'tree',
@@ -480,12 +488,14 @@ export class Assert {
 
           match(attribute_type)
             .with('since', 'until', 'deprecated', () => {
-              if (attribute.value === undefined) {
-                // @author Claude - versioned attributes require a value
+              if (attribute.value === undefined && attribute_type !== 'deprecated') {
+                // @author Claude - versioned attributes besides `deprecated` require a value
                 throw new Error(`[mcdoc_assert] Versioned attribute '${attribute_type}' must have a value`)
               }
-              if (attribute.value.kind !== 'literal' || attribute.value.value.kind !== 'string' || !/^\d+\.\d+(?:\.\d+)?$/.test(attribute.value.value.value)) {
-                throw new Error(`[mcdoc_assert] Versioned Attribute Type value is invalid ${attribute.value}`)
+              if (attribute.value !== undefined) {
+                if (attribute.value.kind !== 'literal' || attribute.value.value.kind !== 'string' || !/^\d+\.\d+(?:\.\d+)?$/.test(attribute.value.value.value)) {
+                  throw new Error(`[mcdoc_assert] Versioned Attribute Type value is invalid ${attribute.value}`)
+                }
               }
             })
             .with('id', () => {
