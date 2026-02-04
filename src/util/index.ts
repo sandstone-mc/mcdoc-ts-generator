@@ -23,9 +23,24 @@ export function camel_case(name: string) {
 }
 
 export function pluralize(name: string) {
-  if (name.endsWith('ey')) return `${name}s`
-  if (name.endsWith('y')) return `${name.slice(0, -1)}ies`
-  if (name.endsWith('s') || name.endsWith('ch') || name.endsWith('sh') || name.endsWith('x') || name.endsWith('z')) return `${name}es`
+  // Words ending in vowel + y get 's' (e.g., display -> displays, key -> keys)
+  if (/[aeiou]y$/i.test(name)) {
+    return `${name}s`
+  }
+  // Words ending in consonant + y get 'ies' (e.g., entity -> entities)
+  if (name.endsWith('y')) {
+    return `${name.slice(0, -1)}ies`
+  }
+  // Words ending in common plural consonant + s are likely already plural
+  // e.g., methods (ds), patterns (ns), events (ts), fonts (ts), items (ms)
+  // Excludes ss, which needs -es (boss -> bosses)
+  if (/[bdfgklmnprtvw]s$/i.test(name)) {
+    return name
+  }
+  // Words ending in s, ch, sh, x, z get 'es'
+  if (name.endsWith('s') || name.endsWith('ch') || name.endsWith('sh') || name.endsWith('x') || name.endsWith('z')) {
+    return `${name}es`
+  }
   return `${name}s`
 }
 

@@ -169,6 +169,95 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
     }
   }],
 
+  // ComponentStrings: Use keyof SymbolDataComponent instead of Registry pattern
+  // Avoids TypeScript error where conditional type can't satisfy NBTObject constraint
+  ['::java::assets::item_definition::ComponentStrings', (): SpecialCaseResult => {
+    let imports: TypeHandlerResult['imports'] = undefined as unknown as TypeHandlerResult['imports']
+    imports = add_import(imports, '::java::dispatcher::SymbolDataComponent')
+    imports = add_import(imports, '::java::assets::item_definition::SelectCases')
+    imports = add_import(imports, 'sandstone::arguments::nbt::RootNBT')
+
+    // (NonNullable<({
+    //   [S in keyof SymbolDataComponent]?: ({
+    //     component: S,
+    //   } & SelectCases<SymbolDataComponent[S]>)
+    // }[keyof SymbolDataComponent])> | (RootNBT & {
+    //   component: `${string}${string}`
+    // }))
+    const keyof_symbol = factory.createTypeOperatorNode(
+      ts.SyntaxKind.KeyOfKeyword,
+      factory.createTypeReferenceNode('SymbolDataComponent'),
+    )
+
+    const component_property = factory.createPropertySignature(
+      undefined,
+      'component',
+      undefined,
+      factory.createTypeReferenceNode('S'),
+    )
+
+    // Add JSDoc to the component property
+    const component_property_with_doc = Bind.Doc(component_property, [
+      'The component type to check the values of.',
+      'If the selected value comes from a registry that the client doesn\'t have access to,',
+      'the entry will be silently ignored.',
+    ])
+
+    const value_type = factory.createParenthesizedType(factory.createIntersectionTypeNode([
+      factory.createTypeLiteralNode([component_property_with_doc]),
+      factory.createTypeReferenceNode('SelectCases', [
+        factory.createIndexedAccessTypeNode(
+          factory.createTypeReferenceNode('SymbolDataComponent'),
+          factory.createTypeReferenceNode('S'),
+        ),
+      ]),
+    ]))
+
+    const mapped_type = Bind.MappedType(keyof_symbol, value_type, { key_name: 'S', parenthesized: false })
+
+    const indexed_access = factory.createIndexedAccessTypeNode(
+      factory.createParenthesizedType(mapped_type),
+      keyof_symbol,
+    )
+
+    const non_nullable = factory.createTypeReferenceNode('NonNullable', [
+      factory.createParenthesizedType(indexed_access),
+    ])
+
+    // Fallback: (RootNBT & { component: `${string}${string}` })
+    const fallback_type = factory.createParenthesizedType(factory.createIntersectionTypeNode([
+      factory.createTypeReferenceNode('RootNBT'),
+      factory.createTypeLiteralNode([
+        factory.createPropertySignature(
+          undefined,
+          'component',
+          undefined,
+          factory.createTemplateLiteralType(
+            factory.createTemplateHead(''),
+            [
+              factory.createTemplateLiteralTypeSpan(
+                factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                factory.createTemplateMiddle(':'),
+              ),
+              factory.createTemplateLiteralTypeSpan(
+                factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                factory.createTemplateTail(''),
+              ),
+            ],
+          ),
+        ),
+      ]),
+    ]))
+
+    return {
+      type: factory.createParenthesizedType(factory.createUnionTypeNode([
+        non_nullable,
+        fallback_type,
+      ])) as ts.TypeNode,
+      imports,
+    }
+  }],
+
   // Text: Use NBTList<(string | TextObject), ...> instead of NBTList<Text, ...>
   // Recursive type causes issues, need non-recursive alternative
   ['::java::util::text::Text', (): SpecialCaseResult => {
