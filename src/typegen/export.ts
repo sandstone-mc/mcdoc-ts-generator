@@ -17,14 +17,14 @@ export function export_dispatchers(paths: Map<string, { symbol_name: string, bas
     // Convert `::java::_dispatcher::entity_effect` to `./_dispatcher/entity_effect.ts`
     const relative_path = `./${path.split('::').slice(2).join('/')}.ts`
 
-    // Build the list of named exports
+    // Build the list of named exports (all are types, so use type-only exports)
     const export_specifiers: ts.ExportSpecifier[] = [
-      factory.createExportSpecifier(false, undefined, info.symbol_name),
+      factory.createExportSpecifier(true, undefined, info.symbol_name),
     ]
 
     if (info.has_fallback_type) {
       export_specifiers.push(
-        factory.createExportSpecifier(false, undefined, `${info.base_name}FallbackType`),
+        factory.createExportSpecifier(true, undefined, `${info.base_name}FallbackType`),
       )
     }
 
