@@ -24,6 +24,7 @@ import { fetchWithCache } from './util/fetch'
 import { TypesGenerator } from './typegen'
 import { compile_types } from './typegen/compile'
 import { handle_imports } from './typegen/import'
+import { export_resources } from './typegen/resources'
 
 export interface GeneratorOptions {
   /** Output directory for generated types (default: "types") */
@@ -242,8 +243,13 @@ export async function generate(options: GeneratorOptions = {}): Promise<void> {
     },
   })
 
+  await service.project.init()
   await service.project.ready()
   await service.project.cacheService.save()
+
+  // Fetch latest version for resources export
+  const version = (await (await fetch('https://api.spyglassmc.com/mcje/versions')).json())[0]
+  const release = version.id as ReleaseVersion
 
   const type_gen = new TypesGenerator()
 
@@ -268,6 +274,13 @@ export async function generate(options: GeneratorOptions = {}): Promise<void> {
     await mkdir(dirname(out_path), { recursive: true })
     await writeFile(out_path, code)
   }
+
+  // Generate resources.ts with path and class mappings
+  console.log('resources')
+  const resources_export = export_resources(release)
+  const resources_path = join(out_dir, 'resources.ts')
+  const resources_code = await compile_types(resources_export.exports, resources_path)
+  await writeFile(resources_path, resources_code)
 
   if (tsconfig) {
     const tsconfig_path = join(out_dir, 'tsconfig.json')

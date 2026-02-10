@@ -138,7 +138,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
             .with('reference', 'concrete', (kind) => {
               const key = TypeHandlers[kind](pair.key)(args)
 
-              // TODO: Handle #[id]
+              // TODO !: Handle #[id]
 
               if ('imports' in key) {
                 imports = merge_imports(imports, key.imports)
@@ -196,7 +196,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
 
                     imports = add_import(imports, registry_import)
 
-                    // TODO: IMPORTANT - Handle #[id()] key arguments; path, exclude, and prefix="!"
+                    // TODO !: IMPORTANT - Handle #[id()] key arguments; path, exclude
                     inherit.push(Bind.MappedType(
                       factory.createIndexedAccessTypeNode(
                         factory.createTypeReferenceNode('Registry'),
@@ -245,7 +245,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                     ))
                   })
                   .with({ name: 'crafting_ingredient' }, () => {
-                    // TODO: Implement CraftingShaped struct generic, this is `definition=true`
+                    // TODO !: Implement CraftingShaped struct generic, this is `definition=true`
                     const CRAFTING_INGREDIENT = 'CRAFTING_INGREDIENT'
                     imports = add_import(imports, `sandstone::arguments::${CRAFTING_INGREDIENT}`) // 'A' | 'B' | 'C' ...
 

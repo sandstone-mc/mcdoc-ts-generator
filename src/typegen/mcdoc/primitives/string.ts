@@ -6,6 +6,7 @@ import type { NonEmptyList, TypeHandler } from '..'
 import { Assert } from '../assert'
 import { Bind } from '../bind'
 import { add_import, is_valid_registry } from '../utils'
+import { RESOURCE_CLASSES, VARIANT_RESOURCES } from '../../resources'
 
 const { factory } = ts
 
@@ -104,12 +105,6 @@ const static_value = {
   },
 } as const
 
-const ResourceClasses = {
-  'minecraft:advancement': 'AdvancementClass',
-  'minecraft:function': 'MCFunctionClass',
-  // TODO: IMPORTANT - List out all sandstone resource classes
-} as const
-
 /**
  * This only handles strings as value types, not struct keys
  */
@@ -144,11 +139,11 @@ function mcdoc_string(type: mcdoc.McdocType) {
         return (args: Record<string, unknown>) => {
           const symbols = args.symbols as SymbolUtil | undefined
 
-          let registry_id: string
+          let registry_id: keyof typeof RESOURCE_CLASSES
 
           let exclude = (reg: ts.TypeNode) => reg
 
-          let Resource: string | (() => string | undefined) | undefined = () => registry_id in ResourceClasses ? ResourceClasses[registry_id as keyof typeof ResourceClasses] : undefined
+          let Resource: typeof RESOURCE_CLASSES[typeof registry_id] | (() => typeof RESOURCE_CLASSES[typeof registry_id]) = () => RESOURCE_CLASSES[registry_id]
 
           const registry_import = '::java::registry::Registry'
 
@@ -162,7 +157,7 @@ function mcdoc_string(type: mcdoc.McdocType) {
           }
 
           if (id_attr.kind === 'literal') {
-            registry_id = `minecraft:${id_attr.value.value}`
+            registry_id = `minecraft:${id_attr.value.value}` as typeof registry_id
 
             if (is_valid_registry(symbols, registry_id)) {
               types.push(exclude(factory.createIndexedAccessTypeNode(
@@ -173,7 +168,7 @@ function mcdoc_string(type: mcdoc.McdocType) {
               types.push(static_value.namespaced.type)
             }
           } else {
-            registry_id = `minecraft:${id_attr.values.registry.value.value}`
+            registry_id = `minecraft:${id_attr.values.registry.value.value}` as typeof registry_id
 
             let empty_registry = !is_valid_registry(symbols, registry_id)
 
@@ -280,6 +275,14 @@ function mcdoc_string(type: mcdoc.McdocType) {
           if (Resource !== undefined) {
             types.push(factory.createTypeReferenceNode(Resource))
             add_import(imports, `sandstone::${Resource}`)
+            has_non_indexable = true
+          } else if (registry_id in VARIANT_RESOURCES) {
+            // Handle variant resources with VariantClass<'variant_type'>
+            const variant_type = VARIANT_RESOURCES[registry_id as keyof typeof VARIANT_RESOURCES]
+            types.push(factory.createTypeReferenceNode('VariantClass', [
+              factory.createLiteralTypeNode(factory.createStringLiteral(variant_type)),
+            ]))
+            add_import(imports, 'sandstone::VariantClass')
             has_non_indexable = true
           }
 
