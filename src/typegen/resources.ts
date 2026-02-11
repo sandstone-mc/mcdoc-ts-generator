@@ -29,10 +29,12 @@ export const RESOURCE_CLASSES = {
   'minecraft:test_environment': 'TestEnvironmentClass',
   'minecraft:test_instance': 'TestInstanceClass',
   'minecraft:timeline': 'TimelineClass',
+  'minecraft:trade_set': 'TradeSetClass',
   'minecraft:trial_spawner': 'TrialSpawnerClass',
   'minecraft:trim_material': 'TrimMaterialClass',
   'minecraft:trim_pattern': 'TrimPatternClass',
   'minecraft:villager_trade': 'VillagerTradeClass',
+  'minecraft:world_clock': 'WorldClockClass',
 
   // Resourcepack resources
   'minecraft:atlas': 'AtlasClass',
@@ -42,29 +44,11 @@ export const RESOURCE_CLASSES = {
   'minecraft:item_definition': 'ItemModelDefinitionClass',
   'minecraft:lang': 'LanguageClass',
   'minecraft:model': 'ModelClass',
+  'minecraft:particle': 'ParticleClass',
   'minecraft:post_effect': 'PostEffectClass',
   'minecraft:texture': 'TextureClass',
 
 } as const
-
-/**
- * Maps variant resource type IDs to their VariantType string.
- * These use VariantClass<T> where T is the variant type literal.
- */
-export const VARIANT_RESOURCES = {
-  'minecraft:cat_variant': 'cat',
-  'minecraft:chicken_variant': 'chicken',
-  'minecraft:cow_variant': 'cow',
-  'minecraft:frog_variant': 'frog',
-  'minecraft:painting_variant': 'painting',
-  'minecraft:pig_variant': 'pig',
-  'minecraft:wolf_variant': 'wolf',
-  'minecraft:wolf_sound_variant': 'wolf_sound',
-  'minecraft:zombie_nautilus_variant': 'zombie_nautilus',
-} as const
-
-export type VariantResourceType = keyof typeof VARIANT_RESOURCES
-export type VariantType = typeof VARIANT_RESOURCES[VariantResourceType]
 
 export type ResourceClassName = typeof RESOURCE_CLASSES[keyof typeof RESOURCE_CLASSES]
 
@@ -141,13 +125,9 @@ export function export_resources(release: ReleaseVersion): ResolvedSymbol {
         'RESOURCE_PATHS',
         undefined,
         undefined,
-        factory.createNewExpression(
-          factory.createIdentifier('Map'),
-          undefined,
-          [factory.createAsExpression(
-            factory.createArrayLiteralExpression(resource_path_entries, true),
-            factory.createTypeReferenceNode('const'),
-          )],
+        factory.createAsExpression(
+          factory.createArrayLiteralExpression(resource_path_entries, true),
+          factory.createTypeReferenceNode('const'),
         ),
       )],
       ts.NodeFlags.Const,
@@ -177,16 +157,12 @@ export function export_resources(release: ReleaseVersion): ResolvedSymbol {
     [factory.createToken(ts.SyntaxKind.ExportKeyword)],
     factory.createVariableDeclarationList(
       [factory.createVariableDeclaration(
-        'CLASS_TO_RESOURCE_TYPE',
+        'RESOURCE_CLASS_TYPES',
         undefined,
         undefined,
-        factory.createNewExpression(
-          factory.createIdentifier('Map'),
-          undefined,
-          [factory.createAsExpression(
-            factory.createArrayLiteralExpression(class_entries, true),
-            factory.createTypeReferenceNode('const'),
-          )]
+        factory.createAsExpression(
+          factory.createArrayLiteralExpression(class_entries, true),
+          factory.createTypeReferenceNode('const'),
         ),
       )],
       ts.NodeFlags.Const,

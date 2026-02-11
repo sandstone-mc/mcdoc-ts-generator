@@ -6,7 +6,7 @@ import type { NonEmptyList, TypeHandler } from '..'
 import { Assert } from '../assert'
 import { Bind } from '../bind'
 import { add_import, is_valid_registry } from '../utils'
-import { RESOURCE_CLASSES, VARIANT_RESOURCES } from '../../resources'
+import { RESOURCE_CLASSES } from '../../resources'
 
 const { factory } = ts
 
@@ -276,9 +276,9 @@ function mcdoc_string(type: mcdoc.McdocType) {
             types.push(factory.createTypeReferenceNode(Resource))
             add_import(imports, `sandstone::${Resource}`)
             has_non_indexable = true
-          } else if (registry_id in VARIANT_RESOURCES) {
+          } else if (registry_id.endsWith('_variant')) {
             // Handle variant resources with VariantClass<'variant_type'>
-            const variant_type = VARIANT_RESOURCES[registry_id as keyof typeof VARIANT_RESOURCES]
+            const variant_type = registry_id.match(/^minecraft:([\w_]+)_variant$/)![1]
             types.push(factory.createTypeReferenceNode('VariantClass', [
               factory.createLiteralTypeNode(factory.createStringLiteral(variant_type)),
             ]))
