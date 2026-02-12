@@ -1,6 +1,6 @@
 import { TaggableResourceLocationCategories } from '@spyglassmc/core'
 import ts from 'typescript'
-import { add_import, type NonEmptyList } from './mcdoc/utils'
+import { add_import, Set, type NonEmptyList } from './mcdoc/utils'
 import { add } from '../util'
 import type { ResolvedRegistry, ResolvedSymbol } from '.'
 

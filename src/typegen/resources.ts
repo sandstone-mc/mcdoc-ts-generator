@@ -1,7 +1,7 @@
 import ts from 'typescript'
 import * as je from '@spyglassmc/java-edition'
-import { ReleaseVersion } from '@spyglassmc/java-edition/lib/dependency/index.js'
 import type { ResolvedSymbol } from '.'
+import { Set, type NormalNonTagResource } from './mcdoc/utils'
 
 const { factory } = ts
 
@@ -11,44 +11,45 @@ const { factory } = ts
  */
 export const RESOURCE_CLASSES = {
   // Datapack resources
-  'minecraft:advancement': 'AdvancementClass',
-  'minecraft:banner_pattern': 'BannerPatternClass',
-  'minecraft:chat_type': 'ChatTypeClass',
-  'minecraft:damage_type': 'DamageTypeClass',
-  'minecraft:dialog': 'DialogClass',
-  'minecraft:enchantment': 'EnchantmentClass',
-  'minecraft:enchantment_provider': 'EnchantmentProviderClass',
-  'minecraft:function': 'MCFunctionClass',
-  'minecraft:instrument': 'InstrumentClass',
-  'minecraft:item_modifier': 'ItemModifierClass',
-  'minecraft:jukebox_song': 'JukeboxSongClass',
-  'minecraft:loot_table': 'LootTableClass',
-  'minecraft:predicate': 'PredicateClass',
-  'minecraft:recipe': 'RecipeClass',
-  'minecraft:structure': 'StructureClass',
-  'minecraft:test_environment': 'TestEnvironmentClass',
-  'minecraft:test_instance': 'TestInstanceClass',
-  'minecraft:timeline': 'TimelineClass',
-  'minecraft:trade_set': 'TradeSetClass',
-  'minecraft:trial_spawner': 'TrialSpawnerClass',
-  'minecraft:trim_material': 'TrimMaterialClass',
-  'minecraft:trim_pattern': 'TrimPatternClass',
-  'minecraft:villager_trade': 'VillagerTradeClass',
-  'minecraft:world_clock': 'WorldClockClass',
+  'advancement': 'AdvancementClass',
+  'banner_pattern': 'BannerPatternClass',
+  'chat_type': 'ChatTypeClass',
+  'damage_type': 'DamageTypeClass',
+  'dialog': 'DialogClass',
+  'enchantment': 'EnchantmentClass',
+  'enchantment_provider': 'EnchantmentProviderClass',
+  'function': 'MCFunctionClass',
+  'instrument': 'InstrumentClass',
+  'item_modifier': 'ItemModifierClass',
+  'jukebox_song': 'JukeboxSongClass',
+  'loot_table': 'LootTableClass',
+  'predicate': 'PredicateClass',
+  'recipe': 'RecipeClass',
+  'structure': 'StructureClass',
+  'test_environment': 'TestEnvironmentClass',
+  'test_instance': 'TestInstanceClass',
+  'timeline': 'TimelineClass',
+  'trade_set': 'TradeSetClass',
+  'trial_spawner': 'TrialSpawnerClass',
+  'trim_material': 'TrimMaterialClass',
+  'trim_pattern': 'TrimPatternClass',
+  'villager_trade': 'VillagerTradeClass',
+  'world_clock': 'WorldClockClass',
 
   // Resourcepack resources
-  'minecraft:atlas': 'AtlasClass',
-  'minecraft:block_definition': 'BlockStateClass',
-  'minecraft:equipment': 'EquipmentClass',
-  'minecraft:font': 'FontClass',
-  'minecraft:item_definition': 'ItemModelDefinitionClass',
-  'minecraft:lang': 'LanguageClass',
-  'minecraft:model': 'ModelClass',
-  'minecraft:particle': 'ParticleClass',
-  'minecraft:post_effect': 'PostEffectClass',
-  'minecraft:texture': 'TextureClass',
-
-} as const
+  'atlas': 'AtlasClass',
+  'block_definition': 'BlockStateClass',
+  'equipment': 'EquipmentClass',
+  'font': 'FontClass',
+  'item_definition': 'ItemModelDefinitionClass',
+  'lang': 'LanguageClass',
+  'model': 'ModelClass',
+  'particle': 'ParticleClass',
+  'post_effect': 'PostEffectClass',
+  'sound': 'SoundEventClass',
+  'texture': 'TextureClass',
+  'waypoint_style': 'WaypointStyleClass',
+} as const satisfies Record<NormalNonTagResource, string>
 
 export type ResourceClassName = typeof RESOURCE_CLASSES[keyof typeof RESOURCE_CLASSES]
 
@@ -60,7 +61,7 @@ export type ResourceClassName = typeof RESOURCE_CLASSES[keyof typeof RESOURCE_CL
  * - RESOURCE_CLASS_TYPES: Object mapping class names to resource type IDs (reversed)
  * - CLASS_TO_RESOURCE_TYPE: Runtime Map with class imports
  */
-export function export_resources(release: ReleaseVersion): ResolvedSymbol {
+export function export_resources(): ResolvedSymbol {
   // Collect resources that are valid for the current release (excluding tag/* entries)
   const resources: Array<{
     category: string
@@ -70,16 +71,11 @@ export function export_resources(release: ReleaseVersion): ResolvedSymbol {
   }> = []
 
   for (const resource of je.binder.getResources()) {
-    // Filter by version: include if since is undefined OR release >= since
-    if (resource.since !== undefined && ReleaseVersion.cmp(release, resource.since) < 0) {
+    if (resource.until !== undefined) {
       continue
     }
-    // Filter by version: include if until is undefined OR release < until
-    if (resource.until !== undefined && ReleaseVersion.cmp(release, resource.until) >= 0) {
-      continue
-    }
-    // Skip individual tag/* entries - we add a single minecraft:tag entry instead
-    if (resource.category.startsWith('tag/')) {
+    // Skip individual tag/* entries - we add a single tag entry instead
+    if (resource.category.startsWith('tag/') || resource.category.startsWith('worldgen/')) {
       continue
     }
 
@@ -91,23 +87,23 @@ export function export_resources(release: ReleaseVersion): ResolvedSymbol {
     })
   }
 
-  // --- Generate RESOURCE_PATHS Map (with minecraft: namespace) ---
+  // --- Generate RESOURCE_PATHS map ---
   const resource_path_entries = resources.map((r) =>
-    factory.createArrayLiteralExpression([
-      factory.createStringLiteral(`minecraft:${r.category}`, true),
+    factory.createPropertyAssignment(
+      factory.createStringLiteral(r.category, true),
       factory.createObjectLiteralExpression([
         factory.createPropertyAssignment('path', factory.createArrayLiteralExpression(
-          r.path.map((p) => factory.createStringLiteral(p, true)),
+          r.path.length === 1 && r.path[0] === '' ? [] : r.path.map((p) => factory.createStringLiteral(p, true)),
         )),
         factory.createPropertyAssignment('pack', factory.createStringLiteral(r.pack, true)),
         factory.createPropertyAssignment('ext', factory.createStringLiteral(r.ext, true)),
       ], false),
-    ]),
+    ),
   )
 
-  // Add special minecraft:tag entry with path: ['tags', true]
-  resource_path_entries.push(factory.createArrayLiteralExpression([
-    factory.createStringLiteral('minecraft:tag', true),
+  // Add special tag entry with path: ['tags', true]
+  resource_path_entries.push(factory.createPropertyAssignment(
+    factory.createStringLiteral('tag', true),
     factory.createObjectLiteralExpression([
       factory.createPropertyAssignment('path', factory.createArrayLiteralExpression([
         factory.createStringLiteral('tags', true),
@@ -116,7 +112,7 @@ export function export_resources(release: ReleaseVersion): ResolvedSymbol {
       factory.createPropertyAssignment('pack', factory.createStringLiteral('data', true)),
       factory.createPropertyAssignment('ext', factory.createStringLiteral('.json', true)),
     ], false),
-  ]))
+  ))
 
   const resource_paths_var = factory.createVariableStatement(
     [factory.createToken(ts.SyntaxKind.ExportKeyword)],
@@ -126,7 +122,7 @@ export function export_resources(release: ReleaseVersion): ResolvedSymbol {
         undefined,
         undefined,
         factory.createAsExpression(
-          factory.createArrayLiteralExpression(resource_path_entries, true),
+          factory.createObjectLiteralExpression(resource_path_entries, true),
           factory.createTypeReferenceNode('const'),
         ),
       )],
@@ -150,7 +146,7 @@ export function export_resources(release: ReleaseVersion): ResolvedSymbol {
   // Add TagClass (maps to generic tag resource type)
   class_entries.push(factory.createArrayLiteralExpression([
     factory.createIdentifier('TagClass'),
-    factory.createStringLiteral('minecraft:tag', true),
+    factory.createStringLiteral('tag', true),
   ]))
 
   const class_to_resource_type_var = factory.createVariableStatement(

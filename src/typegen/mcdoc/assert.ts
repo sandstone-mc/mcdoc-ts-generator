@@ -1,5 +1,5 @@
 import type * as mcdoc from '@spyglassmc/mcdoc'
-import { Set } from './utils'
+import { Set, type SetType } from './utils'
 import { match, P } from 'ts-pattern'
 
 type ReferenceType = {
@@ -124,7 +124,7 @@ type ImplementedAttributes = {
           value: {
             attributes: never,
             kind: 'string',
-            value: KindType<typeof AssertKinds.RegistryAttributeTagsArgument>
+            value: SetType<typeof AssertKinds.RegistryAttributeTagsArgument>
           }
         },
         empty?: {
@@ -190,7 +190,7 @@ type ImplementedAttributes = {
         value: {
           attributes: never,
           kind: 'string',
-          value: KindType<typeof AssertKinds.TextureSlotAttributeKind>
+          value: SetType<typeof AssertKinds.TextureSlotAttributeKind>
         }
       }
     }
@@ -233,7 +233,7 @@ type ImplementedAttributes = {
     value: {
       attributes: never,
       kind: 'string',
-      value: KindType<typeof AssertKinds.ColorAttributeKind>
+      value: SetType<typeof AssertKinds.ColorAttributeKind>
     }
   },
   time_pattern: undefined,
@@ -294,7 +294,7 @@ type ImplementedAttributes = {
           value: {
             attributes: never,
             kind: 'string',
-            value: KindType<typeof AssertKinds.CommandAttributeSlashKind>
+            value: SetType<typeof AssertKinds.CommandAttributeSlashKind>
           }
         },
       } & CommandAttributeExtras)
@@ -410,8 +410,6 @@ export type ImplementedAttributeType<KIND extends (keyof ImplementedAttributes |
     )
   )
 )
-
-export type KindType<T> = T extends Set<infer U> ? U : never
 export class AssertKinds {
   static readonly AttributeRootValueKind = new Set(['dispatcher', 'reference', 'literal', 'tree'] as const)
   static readonly AttributeTreeChildKind = new Set(['reference', 'literal', 'tree'] as const)
@@ -484,7 +482,7 @@ export class Assert {
           if (!AssertKinds.ImplementedAttributes.has(attribute.name)) {
             throw new Error(`[mcdoc_assert] Attribute Type is unsupported ${attribute.name}`)
           }
-          const attribute_type = attribute.name as KindType<typeof AssertKinds.ImplementedAttributes>
+          const attribute_type = attribute.name as SetType<typeof AssertKinds.ImplementedAttributes>
 
           match(attribute_type)
             .with('since', 'until', 'deprecated', () => {
@@ -508,7 +506,7 @@ export class Assert {
                     if (invalid_argument !== undefined) {
                       throw new Error(`[mcdoc_assert] Invalid Registry Attribute Type argument ${invalid_argument}`)
                     }
-                    const args = tree.values as Record<KindType<typeof AssertKinds.RegistryAttributeArgument>, AttributeTreeChildType | undefined>
+                    const args = tree.values as Record<SetType<typeof AssertKinds.RegistryAttributeArgument>, AttributeTreeChildType | undefined>
 
                     if (args.exclude !== undefined) {
                       if (args.exclude.kind === 'tree') {
@@ -970,7 +968,7 @@ export class Assert {
       throw new Error(`[mcdoc_assert] Type is not a StringType: ${type.kind}`)
     }
   }
-  static ColorStringType(type: KindType<typeof AssertKinds.ColorAttributeKind>): asserts type is ('hex_argb' | 'hex_rgb') {
+  static ColorStringType(type: SetType<typeof AssertKinds.ColorAttributeKind>): asserts type is ('hex_argb' | 'hex_rgb') {
     if (type !== 'hex_argb' && type !== 'hex_rgb') {
       throw new Error(`[mcdoc_assert] String color type is not valid ${type}`)
     }

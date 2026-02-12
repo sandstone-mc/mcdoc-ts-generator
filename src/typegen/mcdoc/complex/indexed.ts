@@ -25,7 +25,7 @@ import { McdocDispatcher } from './dispatcher'
  *
  * Symbol structure:
  * ```json
- * {"kind":"indexed","child":{"kind":"dispatcher","parallelIndices":[{"kind":"dynamic","accessor":[{"keyword":"key"}]}],"registry":"minecraft:environment_attribute"},"parallelIndices":[{"kind":"static","value":"attribute_track"}]}
+ * {"kind": "indexed", "child": {"kind": "dispatcher", "parallelIndices": [{"kind": "dynamic", "accessor": [{"keyword": "key"}]}], "registry": "minecraft:environment_attribute"}, "parallelIndices": [{"kind": "static", "value": "attribute_track"}]}
  * ```
  *
  * The index keys are passed through to the dispatcher handler via args.

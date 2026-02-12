@@ -1,21 +1,91 @@
-import type { SymbolUtil } from '@spyglassmc/core'
+import {
+  type SymbolUtil,
+  type AssetsFileCategory,
+  TaggableResourceLocationCategories,
+  type RegistryCategory,
+  type NormalFileCategory,
+  type WorldgenFileCategory,
+  type TaggableResourceLocationCategory,
+  NormalFileCategories,
+  AssetsFileCategories,
+  type TagFileCategory,
+} from '@spyglassmc/core'
 import type { TypeHandlerResult } from '.'
 
 export type NonEmptyList<T> = T[] & { 0: T }
 
+// Thanks TypeScript
+export class Set<T> extends global.Set<T> {
+  has(value: unknown): value is T {
+    return super.has(value as any)
+  }
+}
+
+export type SetType<T> = T extends Set<infer U> ? U : never
+
+type UnionToIntersection<U> = ((U extends any ? (k: U) => void : never) extends ((k: infer I) => void) ? I : never)
+
+type LastOf<T> = (UnionToIntersection<T extends any ? () => T : never> extends () => (infer R) ? R : never)
+
+type UnionToTuple<T, L = LastOf<T>, N = [T] extends [never] ? true : false> = true extends N ? [] : [...UnionToTuple<Exclude<T, L>>, L]
+
+export type NonTagResource = NormalFileCategory | WorldgenFileCategory | AssetsFileCategory
+
+const NonNormalAssetsResources = new Set([
+  'font/otf',
+  'font/ttf',
+  'font/unihex',
+  'gpu_warnlist',
+  'lang/deprecated',
+  'regional_compliancies',
+  'shader',
+  'shader/fragment',
+  'shader/vertex',
+  'sounds',
+  'texture_meta',
+] as const)
+
+export type NormalNonTagResource = (
+  | Exclude<NormalFileCategory,
+    | `${string}_variant`
+    | 'dimension'
+    | 'dimension_type'
+  >
+  | Exclude<AssetsFileCategory,
+    | `font/${string}`
+    | 'gpu_warnlist'
+    | 'lang/deprecated'
+    | 'regional_compliancies'
+    | `shader${string}`
+    | 'sounds'
+    | 'texture_meta'
+  >
+)
+
+export const NormalNonTagResources = new Set([
+  ...NormalFileCategories.filter(
+    (cat) => !cat.endsWith('_variant') && cat !== 'dimension' && cat !== 'dimension_type',
+  ),
+  ...AssetsFileCategories.filter(
+    (cat) => !NonNormalAssetsResources.has(cat),
+  ),
+] as UnionToTuple<NormalNonTagResource>)
+
+export type NonTagRegistry = RegistryCategory | NormalFileCategory | WorldgenFileCategory | AssetsFileCategory
+
+export const TaggableRegistry = new Set(TaggableResourceLocationCategories)
+
 /**
  * Check if a registry has entries in the symbol table.
  * @param symbols The symbol utility
- * @param registry_id The registry ID with minecraft: prefix (e.g., 'minecraft:block')
+ * @param registry_id The registry ID (e.g., 'block')
  * @returns true if the registry is non-empty
  */
-export function is_valid_registry(symbols: SymbolUtil | undefined, registry_id: string): boolean {
+export function is_valid_registry(symbols: SymbolUtil | undefined, registry_id: NonTagRegistry | TaggableResourceLocationCategory | TagFileCategory): boolean {
   if (symbols === undefined) {
-    return true // Fall back to assuming valid if no symbols available
+    return false // Fall back to assuming invalid if no symbols available
   }
-  // Remove 'minecraft:' prefix to get the registry category name
-  const registry_name = registry_id.replace(/^minecraft:/, '')
-  const registry = symbols.getVisibleSymbols(registry_name as any)
+  const registry = symbols.getVisibleSymbols(registry_id)
   return Object.keys(registry).length > 0
 }
 
@@ -86,11 +156,4 @@ export function merge_imports(
     }
   }
   return imports!
-}
-
-// Thanks TypeScript
-export class Set<T> extends global.Set<T> {
-  has(value: unknown) {
-    return super.has(value as any)
-  }
 }

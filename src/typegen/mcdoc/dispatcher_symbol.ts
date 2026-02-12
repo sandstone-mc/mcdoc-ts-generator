@@ -3,7 +3,7 @@ import type { SymbolMap, SymbolUtil } from '@spyglassmc/core'
 import type * as mcdoc from '@spyglassmc/mcdoc'
 import { get_type_handler, type NonEmptyList, type TypeHandlerResult } from '.'
 import type { DispatcherInfo } from '..'
-import { add_import, merge_imports } from './utils'
+import { add_import, merge_imports, Set } from './utils'
 import { Bind } from './bind'
 import { add, pascal_case } from '../../util'
 

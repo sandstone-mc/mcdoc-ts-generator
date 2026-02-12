@@ -1,10 +1,10 @@
 import ts from 'typescript'
 import { match, P } from 'ts-pattern'
 import type * as mcdoc from '@spyglassmc/mcdoc'
-import type { SymbolUtil } from '@spyglassmc/core'
+import type { SymbolUtil, TaggableResourceLocationCategory } from '@spyglassmc/core'
 import { TypeHandlers, type NonEmptyList, type TypeHandler, type TypeHandlerResult } from '..'
 import { Assert } from '../assert'
-import { add_import, is_valid_registry, merge_imports } from '../utils'
+import { add_import, is_valid_registry, merge_imports, type NonTagRegistry } from '../utils'
 import { add, pascal_case } from '../../../util'
 import { Bind } from '../bind'
 
@@ -166,7 +166,8 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                   .with({ name: 'id' }, (attr) => {
                     const id_attr = attr.value
 
-                    let registry_id: string
+                    let registry_id: NonTagRegistry
+
                     if (id_attr === undefined) {
                       inherit.push(Bind.MappedType(
                         Bind.NonEmptyString,
@@ -175,9 +176,9 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                       return
                     }
                     if (id_attr.kind === 'literal') {
-                      registry_id = `minecraft:${id_attr.value.value}`
+                      registry_id = id_attr.value.value as NonTagRegistry
                     } else {
-                      registry_id = `minecraft:${id_attr.values.registry.value.value}`
+                      registry_id = id_attr.values.registry.value.value as TaggableResourceLocationCategory
                     }
 
                     const symbols = 'symbols' in args ? (args.symbols as SymbolUtil | undefined) : undefined
@@ -200,7 +201,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                     inherit.push(Bind.MappedType(
                       factory.createIndexedAccessTypeNode(
                         factory.createTypeReferenceNode('Registry'),
-                        Bind.StringLiteral(registry_id),
+                        Bind.StringLiteral(`minecraft:${registry_id}`),
                       ),
                       value.type,
                     ))

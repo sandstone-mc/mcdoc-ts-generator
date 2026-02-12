@@ -247,10 +247,6 @@ export async function generate(options: GeneratorOptions = {}): Promise<void> {
   await service.project.ready()
   await service.project.cacheService.save()
 
-  // Fetch latest version for resources export
-  const version = (await (await fetch('https://api.spyglassmc.com/mcje/versions')).json())[0]
-  const release = version.id as ReleaseVersion
-
   const type_gen = new TypesGenerator()
 
   type_gen.resolve_types(service.project.symbols, await fetchTranslationKeys())
@@ -275,9 +271,9 @@ export async function generate(options: GeneratorOptions = {}): Promise<void> {
     await writeFile(out_path, code)
   }
 
-  // Generate resources.ts with path and class mappings
+  // TODO: Move this over to TypesGenerator#resolve_types since this doesn't require the version
   console.log('resources')
-  const resources_export = export_resources(release)
+  const resources_export = export_resources()
   const resources_path = join(out_dir, 'resources.ts')
   const resources_code = await compile_types(resources_export.exports, resources_path)
   await writeFile(resources_path, resources_code)

@@ -114,22 +114,32 @@ const eslint = new ESLint({
   overrideConfigFile: true,
   // ESLint's types are incompatible with typescript-eslint's FlatConfig types
   overrideConfig: eslint_config as ESLint.Options['overrideConfig'],
+  warnIgnored: true,
 })
 
 export async function compile_types(nodes: ts.Node[], file = 'code.ts') {
   const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed, omitTrailingSemicolon: true })
 
-  const printed = printer.printList(
-    ts.ListFormat.MultiLine,
-    ts.factory.createNodeArray(nodes),
-    ts.createSourceFile(
-      file,
-      '',
-      ts.ScriptTarget.Latest,
-      false,
-      ts.ScriptKind.TS,
-    ),
-  )
+  let printed: string
+
+  try {
+    printed = printer.printList(
+      ts.ListFormat.MultiLine,
+      ts.factory.createNodeArray(nodes),
+      ts.createSourceFile(
+        file,
+        '',
+        ts.ScriptTarget.Latest,
+        false,
+        ts.ScriptKind.TS,
+      ),
+    )
+  } catch (e) {
+    console.log(nodes.length, 'nodes')
+    console.log(file)
+    console.error(e)
+    throw e
+  }
 
   const results = await eslint.lintText(printed, { filePath: file })
 

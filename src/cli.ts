@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import { generate, type GeneratorOptions } from './index'
 
 function print_help(): void {

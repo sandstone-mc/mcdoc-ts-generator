@@ -5,7 +5,7 @@ import type { SymbolUtil } from '@spyglassmc/core'
 import type { NonEmptyList, TypeHandler } from '..'
 import { Assert } from '../assert'
 import { Bind } from '../bind'
-import { add_import, is_valid_registry } from '../utils'
+import { add_import, is_valid_registry, NormalNonTagResources, TaggableRegistry, type NonTagRegistry, type NormalNonTagResource } from '../utils'
 import { RESOURCE_CLASSES } from '../../resources'
 
 const { factory } = ts
@@ -139,11 +139,16 @@ function mcdoc_string(type: mcdoc.McdocType) {
         return (args: Record<string, unknown>) => {
           const symbols = args.symbols as SymbolUtil | undefined
 
-          let registry_id: keyof typeof RESOURCE_CLASSES
+          let registry_id: NonTagRegistry
 
           let exclude = (reg: ts.TypeNode) => reg
 
-          let Resource: typeof RESOURCE_CLASSES[typeof registry_id] | (() => typeof RESOURCE_CLASSES[typeof registry_id]) = () => RESOURCE_CLASSES[registry_id]
+          let Resource: undefined | typeof RESOURCE_CLASSES[NormalNonTagResource] | (() => typeof RESOURCE_CLASSES[NormalNonTagResource] | undefined) = () => {
+            if (NormalNonTagResources.has(registry_id)) {
+              return RESOURCE_CLASSES[registry_id]
+            }
+            return undefined
+          }
 
           const registry_import = '::java::registry::Registry'
 
@@ -157,25 +162,23 @@ function mcdoc_string(type: mcdoc.McdocType) {
           }
 
           if (id_attr.kind === 'literal') {
-            registry_id = `minecraft:${id_attr.value.value}` as typeof registry_id
+            registry_id = id_attr.value.value as typeof registry_id
 
             if (is_valid_registry(symbols, registry_id)) {
               types.push(exclude(factory.createIndexedAccessTypeNode(
                 factory.createTypeReferenceNode('Registry'),
-                Bind.StringLiteral(registry_id),
+                Bind.StringLiteral(`minecraft:${registry_id}`),
               )))
             } else {
               types.push(static_value.namespaced.type)
             }
           } else {
-            registry_id = `minecraft:${id_attr.values.registry.value.value}` as typeof registry_id
+            registry_id = id_attr.values.registry.value.value as typeof registry_id
 
-            let empty_registry = !is_valid_registry(symbols, registry_id)
-
-            if (!empty_registry) {
+            if (is_valid_registry(symbols, registry_id)) {
               types.push(exclude(factory.createIndexedAccessTypeNode(
                 factory.createTypeReferenceNode('Registry'),
-                Bind.StringLiteral(registry_id),
+                Bind.StringLiteral(`minecraft:${registry_id}`),
               )))
             } else {
               types.push(static_value.namespaced.type)
@@ -201,9 +204,9 @@ function mcdoc_string(type: mcdoc.McdocType) {
                 )),
               ])
             }
-            if ('tags' in id_attr.values) {
+            if ('tags' in id_attr.values && TaggableRegistry.has(registry_id)) {
               const Tag = 'TagClass'
-              const tag_registry_id = registry_id.replace(':', ':tag/')
+              const tag_registry_id = `tag/${registry_id}` as `tag/${typeof registry_id}`
               const empty_tag_registry = !is_valid_registry(symbols, tag_registry_id)
 
               switch (id_attr.values.tags.value.value) {
@@ -214,14 +217,14 @@ function mcdoc_string(type: mcdoc.McdocType) {
                       [factory.createTemplateLiteralTypeSpan(
                         factory.createIndexedAccessTypeNode(
                           factory.createTypeReferenceNode('Registry'),
-                          Bind.StringLiteral(tag_registry_id),
+                          Bind.StringLiteral(`minecraft:${tag_registry_id}`),
                         ),
                         factory.createTemplateTail(''),
                       )],
                     ),
                     factory.createTypeReferenceNode(
                       Tag,
-                      [Bind.StringLiteral(registry_id.split(':')[1])],
+                      [Bind.StringLiteral(registry_id)],
                     ),
                   )
                   add_import(imports, `sandstone::${Tag}`)
@@ -232,7 +235,7 @@ function mcdoc_string(type: mcdoc.McdocType) {
                     type: empty_tag_registry ? static_value.namespaced.type : factory.createParenthesizedType(factory.createUnionTypeNode([
                       factory.createIndexedAccessTypeNode(
                         factory.createTypeReferenceNode('Registry'),
-                        Bind.StringLiteral(tag_registry_id),
+                        Bind.StringLiteral(`minecraft:${tag_registry_id}`),
                       ),
                     ])),
                     imports,
@@ -247,14 +250,14 @@ function mcdoc_string(type: mcdoc.McdocType) {
                         [factory.createTemplateLiteralTypeSpan(
                           factory.createIndexedAccessTypeNode(
                             factory.createTypeReferenceNode('Registry'),
-                            Bind.StringLiteral(tag_registry_id),
+                            Bind.StringLiteral(`minecraft:${tag_registry_id}`),
                           ),
                           factory.createTemplateTail(''),
                         )],
                       ),
                       factory.createTypeReferenceNode(
                         Tag,
-                        [Bind.StringLiteral(registry_id.split(':')[1])],
+                        [Bind.StringLiteral(registry_id)],
                       ),
                     ])),
                     imports,
@@ -278,7 +281,7 @@ function mcdoc_string(type: mcdoc.McdocType) {
             has_non_indexable = true
           } else if (registry_id.endsWith('_variant')) {
             // Handle variant resources with VariantClass<'variant_type'>
-            const variant_type = registry_id.match(/^minecraft:([\w_]+)_variant$/)![1]
+            const variant_type = registry_id.match(/^([\w_]+)_variant$/)![1]
             types.push(factory.createTypeReferenceNode('VariantClass', [
               factory.createLiteralTypeNode(factory.createStringLiteral(variant_type)),
             ]))
