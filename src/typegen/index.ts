@@ -260,7 +260,7 @@ export class TypesGenerator {
           module.exports.push(factory.createTypeAliasDeclaration(
             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             name,
-            undefined,
+            special_case.typeParameters,
             special_case.type,
           ))
           continue

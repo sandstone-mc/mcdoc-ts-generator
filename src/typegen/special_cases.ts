@@ -17,6 +17,8 @@ const { factory } = ts
 export type SpecialCaseResult = {
   type: ts.TypeNode
   imports: TypeHandlerResult['imports'] | undefined
+  /** Optional type parameters for generic type aliases */
+  typeParameters?: ts.TypeParameterDeclaration[]
 }
 
 /**
@@ -297,6 +299,84 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
         ]),
       ])) as ts.TypeNode,
       imports,
+    }
+  }],
+
+  // CraftingShaped: Generic type that derives `key` from `pattern` characters
+  // This enables compile-time validation that key entries match characters used in the pattern
+  ['::java::data::recipe::CraftingShaped', (): SpecialCaseResult => {
+    let imports: TypeHandlerResult['imports'] = undefined as unknown as TypeHandlerResult['imports']
+    imports = add_import(imports, '::java::data::recipe::NotificationInfo')
+    imports = add_import(imports, '::java::data::recipe::CraftingBookInfo')
+    imports = add_import(imports, '::java::data::recipe::Ingredient')
+    imports = add_import(imports, '::java::world::item::ItemStackTemplate')
+    imports = add_import(imports, 'sandstone::arguments::StringSmallerThan4')
+    imports = add_import(imports, 'sandstone::arguments::PatternKeys')
+
+    // Type parameter: PATTERN extends readonly [StringSmallerThan4<string>, StringSmallerThan4<string>?, StringSmallerThan4<string>?]
+    //                       = readonly [string, string?, string?]
+    const stringSmallerThan4String = factory.createTypeReferenceNode('StringSmallerThan4', [
+      factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+    ])
+
+    const patternConstraint = factory.createTypeOperatorNode(
+      ts.SyntaxKind.ReadonlyKeyword,
+      factory.createTupleTypeNode([
+        stringSmallerThan4String,
+        factory.createOptionalTypeNode(stringSmallerThan4String),
+        factory.createOptionalTypeNode(stringSmallerThan4String),
+      ]),
+    )
+
+    const patternDefault = factory.createTypeOperatorNode(
+      ts.SyntaxKind.ReadonlyKeyword,
+      factory.createTupleTypeNode([
+        factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+        factory.createOptionalTypeNode(factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)),
+        factory.createOptionalTypeNode(factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)),
+      ]),
+    )
+
+    const patternTypeParam = factory.createTypeParameterDeclaration(
+      undefined,
+      'PATTERN',
+      patternConstraint,
+      patternDefault,
+    )
+
+    // Build the type body: (NotificationInfo & CraftingBookInfo & { pattern: PATTERN, key: PatternKeys<PATTERN, Ingredient>, result: ItemStackTemplate })
+    const typeBody = factory.createParenthesizedType(factory.createIntersectionTypeNode([
+      factory.createTypeReferenceNode('NotificationInfo'),
+      factory.createTypeReferenceNode('CraftingBookInfo'),
+      factory.createTypeLiteralNode([
+        factory.createPropertySignature(
+          undefined,
+          'pattern',
+          undefined,
+          factory.createTypeReferenceNode('PATTERN'),
+        ),
+        factory.createPropertySignature(
+          undefined,
+          'key',
+          undefined,
+          factory.createTypeReferenceNode('PatternKeys', [
+            factory.createTypeReferenceNode('PATTERN'),
+            factory.createTypeReferenceNode('Ingredient'),
+          ]),
+        ),
+        factory.createPropertySignature(
+          undefined,
+          'result',
+          undefined,
+          factory.createTypeReferenceNode('ItemStackTemplate'),
+        ),
+      ]),
+    ]))
+
+    return {
+      type: typeBody,
+      imports,
+      typeParameters: [patternTypeParam],
     }
   }],
 ])
