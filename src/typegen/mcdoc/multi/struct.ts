@@ -138,7 +138,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
             .with('reference', 'concrete', (kind) => {
               const key = TypeHandlers[kind](pair.key)(args)
 
-              // TODO !: Handle #[id]
+              // TODO: Handle #[id]. As of 1.21.5, this no longer exists outside of FeatureFlag
 
               if ('imports' in key) {
                 imports = merge_imports(imports, key.imports)
@@ -175,10 +175,29 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                       ))
                       return
                     }
+                    let exclude = (reg: ts.IndexedAccessTypeNode): ts.TypeReferenceNode | ts.IndexedAccessTypeNode => reg
                     if (id_attr.kind === 'literal') {
                       registry_id = id_attr.value.value as NonTagRegistry
                     } else {
                       registry_id = id_attr.values.registry.value.value as TaggableResourceLocationCategory
+
+                      if ('exclude' in id_attr.values) {
+                        exclude = (reg: ts.TypeNode) => factory.createTypeReferenceNode('Exclude', [
+                          reg,
+                          factory.createParenthesizedType(factory.createUnionTypeNode(
+                            Object.values(id_attr.values.exclude!.values).map((literal) => Bind.StringLiteral(literal.value.value)),
+                          )),
+                        ])
+                      }
+
+                      if ('path' in id_attr.values) {
+                        // Sadly typescript doesn't support JSDoc on Parameter Declarations
+                        inherit.push(Bind.MappedType(
+                          Bind.Namespaced,
+                          value.type,
+                        ))
+                        return
+                      }
                     }
 
                     const symbols = 'symbols' in args ? (args.symbols as SymbolUtil | undefined) : undefined
@@ -197,12 +216,11 @@ function mcdoc_struct(type: mcdoc.McdocType) {
 
                     imports = add_import(imports, registry_import)
 
-                    // TODO !: IMPORTANT - Handle #[id()] key arguments; path, exclude
                     inherit.push(Bind.MappedType(
-                      factory.createIndexedAccessTypeNode(
+                      exclude(factory.createIndexedAccessTypeNode(
                         factory.createTypeReferenceNode('Registry'),
                         Bind.StringLiteral(`minecraft:${registry_id}`),
-                      ),
+                      )),
                       value.type,
                     ))
                   })
