@@ -303,7 +303,7 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
   }],
 
   // CraftingShaped: Generic type that derives `key` from `pattern` characters
-  // This enables compile-time validation that key entries match characters used in the pattern
+  // Uses three generic parameters (P1, P2, P3) for each pattern row to enable inference
   ['::java::data::recipe::CraftingShaped', (): SpecialCaseResult => {
     let imports: TypeHandlerResult['imports'] = undefined as unknown as TypeHandlerResult['imports']
     imports = add_import(imports, '::java::data::recipe::NotificationInfo')
@@ -313,57 +313,48 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
     imports = add_import(imports, 'sandstone::arguments::StringSmallerThan4')
     imports = add_import(imports, 'sandstone::arguments::PatternKeys')
 
-    // Type parameter: PATTERN extends readonly [StringSmallerThan4<string>, StringSmallerThan4<string>?, StringSmallerThan4<string>?]
-    //                       = readonly [string, string?, string?]
-    const stringSmallerThan4String = factory.createTypeReferenceNode('StringSmallerThan4', [
-      factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+    // Three type parameters: P1, P2, P3 - one for each pattern row
+    const stringKeyword = factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
+
+    const createPatternRowParam = (name: string) => factory.createTypeParameterDeclaration(
+      undefined,
+      name,
+      stringKeyword,
+      stringKeyword,
+    )
+
+    const p1Param = createPatternRowParam('P1')
+    const p2Param = createPatternRowParam('P2')
+    const p3Param = createPatternRowParam('P3')
+
+    // pattern: [StringSmallerThan4<P1>, StringSmallerThan4<P2>?, StringSmallerThan4<P3>?]
+    const patternType = factory.createTupleTypeNode([
+      factory.createTypeReferenceNode('StringSmallerThan4', [factory.createTypeReferenceNode('P1')]),
+      factory.createOptionalTypeNode(
+        factory.createTypeReferenceNode('StringSmallerThan4', [factory.createTypeReferenceNode('P2')]),
+      ),
+      factory.createOptionalTypeNode(
+        factory.createTypeReferenceNode('StringSmallerThan4', [factory.createTypeReferenceNode('P3')]),
+      ),
     ])
 
-    const patternConstraint = factory.createTypeOperatorNode(
-      ts.SyntaxKind.ReadonlyKeyword,
+    // key: PatternKeys<[P1, P2, P3], Ingredient>
+    const keyType = factory.createTypeReferenceNode('PatternKeys', [
       factory.createTupleTypeNode([
-        stringSmallerThan4String,
-        factory.createOptionalTypeNode(stringSmallerThan4String),
-        factory.createOptionalTypeNode(stringSmallerThan4String),
+        factory.createTypeReferenceNode('P1'),
+        factory.createTypeReferenceNode('P2'),
+        factory.createTypeReferenceNode('P3'),
       ]),
-    )
+      factory.createTypeReferenceNode('Ingredient'),
+    ])
 
-    const patternDefault = factory.createTypeOperatorNode(
-      ts.SyntaxKind.ReadonlyKeyword,
-      factory.createTupleTypeNode([
-        factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-        factory.createOptionalTypeNode(factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)),
-        factory.createOptionalTypeNode(factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)),
-      ]),
-    )
-
-    const patternTypeParam = factory.createTypeParameterDeclaration(
-      undefined,
-      'PATTERN',
-      patternConstraint,
-      patternDefault,
-    )
-
-    // Build the type body: (NotificationInfo & CraftingBookInfo & { pattern: PATTERN, key: PatternKeys<PATTERN, Ingredient>, result: ItemStackTemplate })
+    // Build the type body
     const typeBody = factory.createParenthesizedType(factory.createIntersectionTypeNode([
       factory.createTypeReferenceNode('NotificationInfo'),
       factory.createTypeReferenceNode('CraftingBookInfo'),
       factory.createTypeLiteralNode([
-        factory.createPropertySignature(
-          undefined,
-          'pattern',
-          undefined,
-          factory.createTypeReferenceNode('PATTERN'),
-        ),
-        factory.createPropertySignature(
-          undefined,
-          'key',
-          undefined,
-          factory.createTypeReferenceNode('PatternKeys', [
-            factory.createTypeReferenceNode('PATTERN'),
-            factory.createTypeReferenceNode('Ingredient'),
-          ]),
-        ),
+        factory.createPropertySignature(undefined, 'pattern', undefined, patternType),
+        factory.createPropertySignature(undefined, 'key', undefined, keyType),
         factory.createPropertySignature(
           undefined,
           'result',
@@ -376,7 +367,7 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
     return {
       type: typeBody,
       imports,
-      typeParameters: [patternTypeParam],
+      typeParameters: [p1Param, p2Param, p3Param],
     }
   }],
 ])
