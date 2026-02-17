@@ -13,34 +13,34 @@ This is a TypeScript code generator that converts Minecraft mcdoc type definitio
 bun install
 
 # Run the generator (outputs to types/ directory for inspection)
-bun run compile
+bun compile
 # or directly:
 bun run ./src/index.ts
 
 # Type check
-bun run typecheck
+bun typecheck
 
 # Build the package (for linking to sandstone)
-bun run build
+bun dev:build
 ```
 
 ## Updating Sandstone Types
 
 The generator has two output modes:
 
-1. **`bun run compile`** - Outputs to local `types/` directory for inspection/testing
-2. **In sandstone project: `bun run update-from-mcdoc`** - Outputs directly to `sandstone/src/arguments/generated/`
+1. **`bun compile`** - Outputs to local `types/` directory for inspection/testing
+2. **In sandstone project: `bun update-from-mcdoc`** - Outputs directly to `sandstone/src/arguments/generated/`
 
 When making changes to type generation:
 1. Make changes in this project
-2. (Optional) Run `bun run compile` to verify changes in local `types/` directory first
-3. Run `bun run build` to build the generator package
-4. In the sandstone project, run `bun run update-from-mcdoc` to regenerate types
-5. In the sandstone project, run `bun run dev:build` to rebuild sandstone
+2. (Optional) Run `bun compile` to verify changes in local `types/` directory first
+3. Run `bun dev:build` to build the generator package
+4. In the sandstone project, run `bun update-from-mcdoc` to regenerate types
+5. In the sandstone project, run `bun dev:build` to rebuild sandstone
 
-**Tip:** Use `bun run compile` to quickly inspect generated output before committing to rebuild sandstone.
+**Tip:** Use `bun compile` to quickly inspect generated output before committing to rebuild sandstone.
 
-If packages are linked via the workspace `bun run dev:link`, the sandstone project will use the local version of mcdoc-ts-generator.
+If packages are linked via the workspace `bun dev:link`, the sandstone project will use the local version of mcdoc-ts-generator.
 
 ## Architecture
 
