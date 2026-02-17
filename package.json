@@ -21,10 +21,10 @@
   "scripts": {
     "compile": "rm -rf types/ && bun run ./src/cli.ts",
     "typecheck": "bun tsc --emitDeclarationOnly false --noEmit",
-    "build": "bun run build:bundle && bun run build:types",
+    "dev:build": "bun run build:bundle && bun run build:types",
     "build:bundle": "bun build ./src/cli.ts --outfile ./dist/cli.js --target node --format esm --packages external && bun build ./src/index.ts --outfile ./dist/index.js --target node --format esm --packages external",
     "build:types": "bun tsc --emitDeclarationOnly --declaration --outDir ./dist",
-    "prepublishOnly": "bun run build",
+    "prepublishOnly": "bun run dev:build",
     "format": "bun oxlint src --fix",
     "lint": "bun oxlint src"
   },
