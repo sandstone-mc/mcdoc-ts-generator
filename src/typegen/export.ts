@@ -42,6 +42,36 @@ export function export_dispatchers(paths: Map<string, { symbol_name: string, bas
   }
 }
 
+/**
+ * Generates re-exports for all registry SET constants.
+ * Creates: `export { BLOCKS_SET } from './_registry/blocks'` etc.
+ */
+export function export_registry_sets(resolved_registries: Map<string, ResolvedRegistry>): ResolvedSymbol {
+  const exports: ts.ExportDeclaration[] = []
+
+  for (const [_registry_name, { import_path }] of resolved_registries) {
+    // import_path is like `::java::_registry::blocks::BLOCKS`
+    const parts = import_path.split('::')
+    const type_name = parts.at(-1)! // e.g., 'BLOCKS'
+    const set_name = `${type_name}_SET` // e.g., 'BLOCKS_SET'
+    const relative_path = `./${parts.slice(2, -1).join('/')}.ts` // e.g., './_registry/blocks.ts'
+
+    exports.push(factory.createExportDeclaration(
+      undefined,
+      false,
+      factory.createNamedExports([
+        factory.createExportSpecifier(false, undefined, set_name),
+      ]),
+      factory.createStringLiteral(relative_path, true),
+    ))
+  }
+
+  return {
+    exports: exports as unknown as ResolvedSymbol['exports'],
+    paths: new Set<string>(),
+  }
+}
+
 export function export_registry(resolved_registries: Map<string, ResolvedRegistry>) {
   let imports: undefined | { readonly ordered: NonEmptyList<string>, readonly check: Map<string, number> }
 

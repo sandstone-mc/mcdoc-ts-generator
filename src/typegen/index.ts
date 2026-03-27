@@ -7,7 +7,7 @@ import { merge_imports, Set } from './mcdoc/utils'
 import { Bind } from './mcdoc/bind'
 import { DispatcherSymbol, dispatcher_symbol_paths } from './mcdoc/dispatcher_symbol'
 import { mcdoc_raw } from '..'
-import { export_dispatchers, export_registry } from './export'
+import { export_dispatchers, export_registry, export_registry_sets } from './export'
 import { get_special_case } from './special_cases'
 
 /**
@@ -69,6 +69,9 @@ export class TypesGenerator {
     this.resolve_registry_symbols(symbols, translation_keys)
     const registry_exports = export_registry(this.resolved_registries)
     this.resolved_symbols.set('::java::registry', registry_exports)
+
+    const registry_sets_exports = export_registry_sets(this.resolved_registries)
+    this.resolved_symbols.set('::java::registry-sets', registry_sets_exports)
 
     const dispatchers = symbols.getVisibleSymbols('mcdoc/dispatcher')
 
