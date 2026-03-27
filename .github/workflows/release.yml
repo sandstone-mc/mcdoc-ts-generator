@@ -34,7 +34,7 @@ jobs:
         run: bun dev:build
 
       - name: Publish to npm
-        run: npm publish --provenance --access public
+        run: npm publish --provenance
 
       - name: Prepare release metadata
         id: release
