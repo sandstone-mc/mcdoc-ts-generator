@@ -15,7 +15,7 @@ import type { TypeHandlerResult } from '.'
 export type NonEmptyList<T> = T[] & { 0: T }
 
 // Thanks TypeScript
-export class Set<T> extends global.Set<T> {
+export class Set<T> extends globalThis.Set<T> {
   has(value: unknown): value is T {
     return super.has(value as any)
   }

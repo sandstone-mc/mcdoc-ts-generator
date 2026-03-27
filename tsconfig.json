@@ -26,7 +26,8 @@
     "exactOptionalPropertyTypes": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "noPropertyAccessFromIndexSignature": false
+    "noPropertyAccessFromIndexSignature": false,
+    "types": [ "bun" ]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "types", "sandstone-types"]
