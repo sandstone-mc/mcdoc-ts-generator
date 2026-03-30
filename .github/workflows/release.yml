@@ -79,7 +79,7 @@ jobs:
               echo ""
               echo "</details>"
               echo ""
-              echo "**Full Changelog**: [${PREV_TAG}...${TAG}](compare/${PREV_TAG}...${TAG})"
+              echo "**Full Changelog**: [${PREV_TAG}...${TAG}](https://github.com/sandstone-mc/mcdoc-ts-generator/compare/${PREV_TAG}...${TAG})"
             fi
           } > release_body.md
 
