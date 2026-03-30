@@ -1,6 +1,6 @@
 {
   "name": "@sandstone-mc/mcdoc-ts-generator",
-  "version": "0.1.28",
+  "version": "0.1.29",
   "description": "Generate TypeScript types from Minecraft mcdoc definitions",
   "type": "module",
   "main": "./dist/index.js",
@@ -40,7 +40,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sandstone-mc/mcdoc-ts-generator"
+    "url": "git+https://github.com/sandstone-mc/mcdoc-ts-generator.git"
   },
   "devDependencies": {
     "@types/bun": "latest",

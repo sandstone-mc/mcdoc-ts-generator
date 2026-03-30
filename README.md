@@ -1,6 +1,6 @@
 # @sandstone/mcdoc-ts-generator
 
-To be used in Sandstone with:
+To be used as a dev dependency in Sandstone with:
 ```bash
-bunx @sandstone-mc/mcdoc-ts-generator@latest --out-dir "src/arguments/generated/" --no-tsconfig
+bun mcdoc-ts-generator --out-dir "src/arguments/generated/" --no-tsconfig
 ```
