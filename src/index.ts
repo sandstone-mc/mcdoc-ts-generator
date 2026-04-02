@@ -181,7 +181,11 @@ const initialize: ProjectInitializer = async (ctx) => {
 
   meta.registerUriBinder(je.binder.uriBinder)
 
-  const version = (await (await fetch('https://api.spyglassmc.com/mcje/versions')).json())[0]
+  const versions: { id: ReleaseVersion, type: 'release' | 'snapshot' }[] = (await (await fetch('https://api.spyglassmc.com/mcje/versions')).json())
+
+  // TODO: We need an option for this when Sandstone 1.1.0 mc 26.2 snapshot alphas start
+  const version = versions.find((v) => v.type === 'release')!
+
   const release = version.id
 
   const [registries, registriesETag] = await fetchRegistries(version.id)
