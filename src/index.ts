@@ -1,3 +1,5 @@
+#!/usr/bin/env bun
+
 import { dirname, resolve } from 'path'
 import { pathToFileURL } from 'url'
 import { promisify } from 'util'
@@ -36,13 +38,6 @@ export interface GeneratorOptions {
 const cache_root = join(process.cwd(), 'cache')
 
 function registerAttributes(meta: MetaRegistry, release: ReleaseVersion) {
-  // We always generate for the latest version
-  mcdoc.runtime.registerAttribute(meta, 'since', mcdoc.runtime.attribute.validator.string, {
-    filterElement: () => false,
-  })
-  mcdoc.runtime.registerAttribute(meta, 'until', mcdoc.runtime.attribute.validator.string, {
-    filterElement: () => true,
-  })
   mcdoc.runtime.registerAttribute(
     meta,
     'deprecated',

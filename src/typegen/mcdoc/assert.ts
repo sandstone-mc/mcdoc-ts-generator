@@ -154,7 +154,7 @@ type ImplementedAttributes = {
     value: {
       attributes: never,
       kind: 'string',
-      value: `${number}.${number}.${number}`
+      value: `${number}.${number}.${number}` | `${number}.${number}`
     }
   },
   until: {
@@ -163,7 +163,7 @@ type ImplementedAttributes = {
     value: {
       attributes: never,
       kind: 'string',
-      value: `${number}.${number}.${number}`
+      value: `${number}.${number}.${number}` | `${number}.${number}`
     }
   },
   permutation: {
@@ -269,7 +269,7 @@ type ImplementedAttributes = {
     value: {
       attributes: never,
       kind: 'string',
-      value: `${number}.${number}.${number}`
+      value: `${number}.${number}.${number}` | `${number}.${number}`
     }
   }),
   command: {
@@ -935,6 +935,7 @@ export class Assert {
   }
   static NumericType<KIND extends (mcdoc.NumericTypeKind | undefined) = undefined>(type: mcdoc.McdocType): asserts type is (
     KIND extends undefined ? never :
+    KIND extends 'long' ? mcdoc.LongType :
     mcdoc.NumericType & { kind: KIND }
   ) {
     if (!AssertKinds.NumericKind.has(type.kind)) {

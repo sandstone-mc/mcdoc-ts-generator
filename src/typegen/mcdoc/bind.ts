@@ -1,18 +1,20 @@
 import ts from 'typescript'
+import { abs, sign } from './utils'
 
 const { factory } = ts
 
 type NonEmptyList<T> = T[] & { 0: T }
 
 export class Bind {
-  static NumericLiteral(literal: number) {
-    if (Math.sign(literal) === -1) {
+  static NumericLiteral(literal: number | bigint) {
+    const innerLiteral = (num: number | bigint) => typeof num === 'number' ? factory.createNumericLiteral(num) : factory.createBigIntLiteral(`${literal}n`)
+    if (sign(literal) === -1) {
       return factory.createLiteralTypeNode(factory.createPrefixUnaryExpression(
         ts.SyntaxKind.MinusToken,
-        factory.createNumericLiteral(Math.abs(literal)),
+        innerLiteral(abs(literal)),
       ))
     } else {
-      return factory.createLiteralTypeNode(factory.createNumericLiteral(literal))
+      return factory.createLiteralTypeNode(innerLiteral(literal))
     }
   }
   static StringLiteral(literal: string) {

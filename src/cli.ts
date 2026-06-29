@@ -1,3 +1,5 @@
+#!/usr/bin/env bun
+
 import { generate, type GeneratorOptions } from './index'
 
 function print_help(): void {

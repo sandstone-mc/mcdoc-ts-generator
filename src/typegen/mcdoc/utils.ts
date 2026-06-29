@@ -157,3 +157,42 @@ export function merge_imports(
   }
   return imports!
 }
+
+export function op(num: number | bigint, op: '+' | '-' | '*', operand: number | bigint): number | bigint {
+  if (op === '*') {
+    if (typeof num === 'number' && typeof operand === 'number') {
+      return num * operand
+    }
+    return BigInt(num) * BigInt(operand)
+  }
+  if (op === '+') {
+    if (typeof num === 'number' && typeof operand === 'number') {
+      return num + operand
+    }
+    return BigInt(num) + BigInt(operand)
+  }
+  if (typeof num === 'number' && typeof operand === 'number') {
+    return num - operand
+  }
+  return BigInt(num) - BigInt(operand)
+}
+
+export function sign(num: number | bigint) {
+  if (typeof num === 'number') {
+    return Math.sign(num)
+  }
+  if (num >= 0n) {
+    return 1
+  }
+  return -1
+}
+
+export function abs(num: number | bigint) {
+  if (typeof num === 'number') {
+    return Math.abs(num)
+  }
+  if (num >= 0n) {
+    return num
+  }
+  return -1n * num
+}

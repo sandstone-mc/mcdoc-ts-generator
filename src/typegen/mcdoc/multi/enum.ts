@@ -34,8 +34,8 @@ function mcdoc_enum(type: mcdoc.McdocType) {
 
   return (_args: Record<string, unknown>) => {
     const bind_value = (() => enum_type.enumKind === 'string'
-      ? (value: string | number) => Bind.StringLiteral(value as string)
-      : (value: number | string) => Bind.NumericLiteral(value as number))()
+      ? (value: string | number | bigint) => Bind.StringLiteral(value as string)
+      : (value: number | bigint | string) => Bind.NumericLiteral(value as number | bigint))()
 
     const members: ts.LiteralTypeNode[] = enum_type.values.map(({ value }) => bind_value(value))
 

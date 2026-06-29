@@ -3,6 +3,7 @@ import ts from 'typescript'
 import { Assert } from '../assert'
 import { Bind } from '../bind'
 import type { NonEmptyList, TypeHandler } from '..'
+import { op } from '../utils';
 
 const { factory } = ts
 
@@ -48,13 +49,13 @@ export function whole_number_generic<TYPE extends string>(range: mcdoc.NumericRa
   if (range.min !== undefined) {
     has_min = true
     if (left_exclusive) {
-      docs.push(`Effective minimum: ${range.min + 1}`)
+      docs.push(`Effective minimum: ${op(range.min, '+', 1)}`)
     }
   }
   if (range.max !== undefined) {
     has_max = true
     if (right_exclusive) {
-      docs.push(`Effective maximum: ${range.max - 1}`)
+      docs.push(`Effective maximum: ${op(range.max, '-', 1)}`)
     }
   }
 
@@ -65,13 +66,13 @@ export function whole_number_generic<TYPE extends string>(range: mcdoc.NumericRa
           undefined,
           'min',
           undefined,
-          Bind.NumericLiteral(range.min! + (left_exclusive ? 1 : 0)),
+          Bind.NumericLiteral(op(range.min!, '+', left_exclusive ? 1 : 0)),
         ),
         factory.createPropertySignature(
           undefined,
           'max',
           undefined,
-          Bind.NumericLiteral(range.max! - (right_exclusive ? 1 : 0)),
+          Bind.NumericLiteral(op(range.max!, '-', right_exclusive ? 1 : 0)),
         ),
       )
     } else if (range.min! >= 0) {
@@ -143,16 +144,16 @@ export function whole_number_generic<TYPE extends string>(range: mcdoc.NumericRa
  * Returns the number of valid values within the range.
  * Lower value must actually be lower than the upper
  */
-export function integer_range_size(lower: number, upper: number) {
+export function integer_range_size(lower: number | bigint, upper: number | bigint) {
   if (lower > upper) {
     // @author Claude - lower bound must not exceed upper bound
     throw new Error(`[mcdoc_int] Invalid integer range: lower bound (${lower}) must be <= upper bound (${upper})`)
   }
   if (upper < 0) {
-    return lower * -1 - upper * -1
+    return op(op(lower, '*', -1), '-', op(upper, '*', -1))
   }
   if (lower < 0) {
-    return lower * -1 + upper
+    return op(op(lower, '*', -1), '+', upper)
   }
-  return upper - lower
+  return op(upper, '-', lower)
 }

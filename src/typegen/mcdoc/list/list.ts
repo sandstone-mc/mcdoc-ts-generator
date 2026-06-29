@@ -4,7 +4,7 @@ import { TypeHandlers, type NonEmptyList, type TypeHandler, type TypeHandlerResu
 import { Assert } from '../assert'
 import { Bind } from '../bind'
 import { integer_range_size } from '../primitives/int'
-import { add_import } from '../utils'
+import { add_import, op } from '../utils'
 import { add } from '../../../util'
 
 const { factory } = ts
@@ -94,7 +94,7 @@ export function length_range_generic(range: mcdoc.NumericRange, label: string): 
       ),
     ))
     if (left_exclusive) {
-      docs.push(`Effective minimum ${label.toLowerCase()} length: ${range.min + 1}`)
+      docs.push(`Effective minimum ${label.toLowerCase()} length: ${op(range.min, '+', 1)}`)
     }
   }
   if (range.max !== undefined) {
@@ -110,7 +110,7 @@ export function length_range_generic(range: mcdoc.NumericRange, label: string): 
       ),
     ))
     if (right_exclusive) {
-      docs.push(`Effective maximum ${label.toLowerCase()} length: ${range.max - 1}`)
+      docs.push(`Effective maximum ${label.toLowerCase()} length: ${op(range.max, '-', 1)}`)
     }
   }
 
@@ -121,13 +121,13 @@ export function length_range_generic(range: mcdoc.NumericRange, label: string): 
           undefined,
           'min',
           undefined,
-          Bind.NumericLiteral(range.min! + (left_exclusive ? 1 : 0)),
+          Bind.NumericLiteral(op(range.min!, '+', left_exclusive ? 1 : 0)),
         ),
         factory.createPropertySignature(
           undefined,
           'max',
           undefined,
-          Bind.NumericLiteral(range.max! - (right_exclusive ? 1 : 0)),
+          Bind.NumericLiteral(op(range.max!, '-', right_exclusive ? 1 : 0)),
         ),
       )
     }

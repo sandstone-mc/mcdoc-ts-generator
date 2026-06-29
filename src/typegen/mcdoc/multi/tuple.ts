@@ -31,7 +31,15 @@ function mcdoc_tuple(type: mcdoc.McdocType) {
         const attributes = item.attributes
 
         for (const attribute of attributes) {
-          if (attribute.name === 'until' || attribute.name === 'deprecated') {
+          if (attribute.name === 'until' && attribute.value.value.value !== '26.3') {
+            unsupported = true
+            break
+          }
+          if (attribute.name === 'deprecated') {
+            unsupported = true
+            break
+          }
+          if (attribute.name === 'since' && attribute.value.value.value === '26.3') {
             unsupported = true
             break
           }

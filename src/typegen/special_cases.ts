@@ -370,6 +370,18 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
       typeParameters: [p1Param, p2Param, p3Param],
     }
   }],
+  ['::java::data::advancement::predicate::BlockPredicateState', (): SpecialCaseResult => {
+    let imports: TypeHandlerResult['imports'] = undefined as unknown as TypeHandlerResult['imports']
+    imports = add_import(imports, '::java::dispatcher::SymbolMcdocBlockStates')
+
+    return {
+      type: factory.createTypeReferenceNode(
+        factory.createIdentifier('SymbolMcdocBlockStates'),
+        [Bind.StringLiteral('%unknown')]
+      ),
+      imports,
+    }
+  }]
 ])
 
 /**
