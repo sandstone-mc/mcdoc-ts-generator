@@ -286,6 +286,7 @@ export class TypesGenerator {
           module_path,
           module_map,
           symbols,
+          current_path: _path,
         })
 
         // Skip symbols that contain unresolved references (e.g. a `struct` that

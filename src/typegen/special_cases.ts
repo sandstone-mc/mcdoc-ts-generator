@@ -260,43 +260,22 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
     }
   }],
 
-  // Text: Use NBTList<(string | TextObject), ...> instead of NBTList<Text, ...>
-  // Recursive type causes issues, need non-recursive alternative
+  // Text: Recursive union with ComponentClass and Text[] arm.
+  // The recursive `Text[]` arm lets nested arrays be assigned without forcing
+  // TS to fully re-evaluate TextObject (which would hit TS2859 via the
+  // `extra?: NBTList<Text, ...>` intersection in TextBase).
   ['::java::util::text::Text', (): SpecialCaseResult => {
     let imports: TypeHandlerResult['imports'] = undefined as unknown as TypeHandlerResult['imports']
     imports = add_import(imports, '::java::util::text::TextObject')
-    imports = add_import(imports, 'sandstone::NBTList')
+    imports = add_import(imports, 'sandstone::variables::ComponentClass')
 
-    // (string | TextObject | NBTList<(string | TextObject), {
-    //   leftExclusive: false
-    //   min: 1
-    // }>)
-    const text_content = factory.createParenthesizedType(factory.createUnionTypeNode([
-      factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-      factory.createTypeReferenceNode('TextObject'),
-    ]))
-
+    // (string | TextObject | ComponentClass | Text[])
     return {
       type: factory.createParenthesizedType(factory.createUnionTypeNode([
         factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
         factory.createTypeReferenceNode('TextObject'),
-        factory.createTypeReferenceNode('NBTList', [
-          text_content,
-          factory.createTypeLiteralNode([
-            factory.createPropertySignature(
-              undefined,
-              'leftExclusive',
-              undefined,
-              factory.createLiteralTypeNode(factory.createFalse()),
-            ),
-            factory.createPropertySignature(
-              undefined,
-              'min',
-              undefined,
-              Bind.NumericLiteral(1),
-            ),
-          ]),
-        ]),
+        factory.createTypeReferenceNode('ComponentClass'),
+        factory.createArrayTypeNode(factory.createTypeReferenceNode('Text')),
       ])) as ts.TypeNode,
       imports,
     }

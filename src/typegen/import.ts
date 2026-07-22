@@ -39,6 +39,8 @@ export function handle_imports(imports?: { readonly ordered: NonEmptyList<string
         file = 'sandstone'
       } else if (path[1] === 'arguments' && path.length === 2) {
         file = 'sandstone/arguments'
+      } else if (path[1] === 'variables' && path.length === 2) {
+        file = 'sandstone/variables'
       } else {
         file = `${path.join('/')}.ts`
       }

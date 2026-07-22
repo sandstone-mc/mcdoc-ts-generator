@@ -373,16 +373,23 @@ function mcdoc_string(type: mcdoc.McdocType) {
       .with({ name: 'nbt_path' }, ({ value }) => {
         // TODO: Add strict typing to DataPoint in Sandstone
         const DataPoint = 'DataPointClass'
-        return (_args: Record<string, unknown>) => ({
-          type: factory.createUnionTypeNode([
-            static_value.not_empty,
-            factory.createTypeReferenceNode(DataPoint),
-          ]),
-          imports: {
-            ordered: [`sandstone::${DataPoint}`] as NonEmptyList<string>,
-            check: new Map([[`sandstone::${DataPoint}`, 0]]),
-          },
-        } as const)
+        return (args: Record<string, unknown>) => {
+          // DataPointClass is not valid for nbt_path fields inside text components —
+          // it triggers TS2859 when mixed into the recursive Text union.
+          if (typeof args.current_path === 'string' && args.current_path.startsWith('::java::util::text::')) {
+            return { type: static_value.not_empty } as const
+          }
+          return {
+            type: factory.createUnionTypeNode([
+              static_value.not_empty,
+              factory.createTypeReferenceNode(DataPoint),
+            ]),
+            imports: {
+              ordered: [`sandstone::${DataPoint}`] as NonEmptyList<string>,
+              check: new Map([[`sandstone::${DataPoint}`, 0]]),
+            },
+          } as const
+        }
       })
       .with({ name: 'match_regex' }, ({ value: { value: { value } } }) => {
         return (_args: Record<string, unknown>) => ({
@@ -413,16 +420,23 @@ function mcdoc_string(type: mcdoc.McdocType) {
       })
       .with({ name: 'score_holder' }, () => {
         const Score = 'Score'
-        return (_args: Record<string, unknown>) => ({
-          type: factory.createUnionTypeNode([
-            static_value.not_empty,
-            factory.createTypeReferenceNode(Score),
-          ]),
-          imports: {
-            ordered: [`sandstone::${Score}`] as NonEmptyList<string>,
-            check: new Map([[`sandstone::${Score}`, 0]]),
-          },
-        } as const)
+        return (args: Record<string, unknown>) => {
+          // Score is not valid for score_holder fields inside text components —
+          // it triggers TS2859 when mixed into the recursive Text union.
+          if (typeof args.current_path === 'string' && args.current_path.startsWith('::java::util::text::')) {
+            return { type: static_value.not_empty } as const
+          }
+          return {
+            type: factory.createUnionTypeNode([
+              static_value.not_empty,
+              factory.createTypeReferenceNode(Score),
+            ]),
+            imports: {
+              ordered: [`sandstone::${Score}`] as NonEmptyList<string>,
+              check: new Map([[`sandstone::${Score}`, 0]]),
+            },
+          } as const
+        }
       })
       .with({ name: 'tag' }, () => {
         const Label = 'LabelClass'
