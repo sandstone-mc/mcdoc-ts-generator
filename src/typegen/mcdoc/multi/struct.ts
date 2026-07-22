@@ -6,6 +6,7 @@ import { TypeHandlers, type NonEmptyList, type TypeHandler, type TypeHandlerResu
 import { Assert } from '../assert'
 import { add_import, is_valid_registry, merge_imports, type NonTagRegistry } from '../utils'
 import { add, pascal_case } from '../../../util'
+import { ReleaseVersion, TARGET_VERSION } from '../version'
 import { Bind } from '../bind'
 
 const { factory } = ts
@@ -60,6 +61,8 @@ function mcdoc_struct(type: mcdoc.McdocType) {
 
     let child_dispatcher: NonEmptyList<[parent_count: number, property: string]> | undefined
 
+    let unresolved = false
+
     for (const field of struct.fields) {
       let unsupported = false
 
@@ -69,7 +72,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
         const attributes = field.attributes
 
         for (const attribute of attributes) {
-          if (attribute.name === 'until' && attribute.value.value.value !== '26.3') {
+          if (attribute.name === 'until' && ReleaseVersion.cmp(attribute.value.value.value as ReleaseVersion, TARGET_VERSION) < 0) {
             unsupported = true
             break
           }
@@ -77,7 +80,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
             unsupported = true
             break
           }
-          if (attribute.name === 'since' && attribute.value.value.value === '26.3') {
+          if (attribute.name === 'since' && ReleaseVersion.cmp(attribute.value.value.value as ReleaseVersion, TARGET_VERSION) > 0) {
             unsupported = true
             break
           }
@@ -90,6 +93,10 @@ function mcdoc_struct(type: mcdoc.McdocType) {
       match(field)
         .with({ kind: 'pair', key: P.string, ...FieldProperties }, (pair) => {
           const value = TypeHandlers[pair.type.kind](pair.type)({ ...args, name: `${name}${pascal_case(pair.key)}` })
+
+          if ((value as TypeHandlerResult).unresolved === true) {
+            unresolved = true
+          }
 
           if ('imports' in value) {
             imports = merge_imports(imports, value.imports)
@@ -133,6 +140,10 @@ function mcdoc_struct(type: mcdoc.McdocType) {
 
           const value = TypeHandlers[pair.type.kind](pair.type)({ ...args, name: `${name}IndexSignature` })
 
+          if ((value as TypeHandlerResult).unresolved === true) {
+            unresolved = true
+          }
+
           if ('imports' in value) {
             imports = merge_imports(imports, value.imports)
           }
@@ -147,6 +158,10 @@ function mcdoc_struct(type: mcdoc.McdocType) {
               const key = TypeHandlers[kind](pair.key)(args)
 
               // TODO: Handle #[id]. As of 1.21.5, this no longer exists outside of FeatureFlag
+
+              if ((key as TypeHandlerResult).unresolved === true) {
+                unresolved = true
+              }
 
               if ('imports' in key) {
                 imports = merge_imports(imports, key.imports)
@@ -299,6 +314,10 @@ function mcdoc_struct(type: mcdoc.McdocType) {
           Assert.StructSpreadType(_spread.type)
           const spread = TypeHandlers[_spread.type.kind](_spread.type)({ spread: true, ...args })
 
+          if ((spread as TypeHandlerResult).unresolved === true) {
+            unresolved = true
+          }
+
           if ('imports' in spread) {
             imports = merge_imports(imports, spread.imports)
           }
@@ -402,6 +421,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
       return {
         type: template(inner_type),
         ...add({ imports, child_dispatcher }),
+        ...(unresolved ? { unresolved: true as const } : {}),
       } as const
     } else if ('--mcdoc_has_non_indexable' in indexed_access_type!) {
       // Skip mapped type pattern - just use inner_type directly
@@ -409,12 +429,21 @@ function mcdoc_struct(type: mcdoc.McdocType) {
       return {
         type: template(inner_type),
         ...add({ imports, child_dispatcher }),
+        ...(unresolved ? { unresolved: true as const } : {}),
       } as const
     } else {
       // Create the indexed access type: ({ [S in ...]?: ... }[...])
-      const indexed_access_node = factory.createParenthesizedType(factory.createIndexedAccessTypeNode(
-        Bind.MappedType(indexed_access_type!, inner_type, { key_name: 'S', parenthesized: false }),
+      // Constrain both the mapped key set and the indexed-access key to
+      // `Extract<X, string>`. The dispatcher key union often contains class
+      // constructors (e.g. `TagClass<'entity_type'>`) which aren't valid
+      // index types — using the full union produces TS2538 at the consumer.
+      const string_keys = factory.createTypeReferenceNode('Extract', [
         indexed_access_type!,
+        factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+      ])
+      const indexed_access_node = factory.createParenthesizedType(factory.createIndexedAccessTypeNode(
+        Bind.MappedType(string_keys, inner_type, { key_name: 'S', parenthesized: false }),
+        string_keys,
       ))
 
       // Wrap in NonNullable when this is a root type (top-level export)
@@ -426,6 +455,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
       return {
         type: template(result_type),
         ...add({ imports, child_dispatcher }),
+        ...(unresolved ? { unresolved: true as const } : {}),
       } as const
     }
   }

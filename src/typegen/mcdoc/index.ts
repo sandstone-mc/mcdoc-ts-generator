@@ -33,7 +33,13 @@ export type TypeHandlerResult = {
     readonly check: Map<string, number>,
   },
   readonly docs?: NonEmptyList<string | [string]>,
-  readonly child_dispatcher?: NonEmptyList<[parent_count: number, property: string]>
+  readonly child_dispatcher?: NonEmptyList<[parent_count: number, property: string]>,
+  /**
+   * Set when a child reference couldn't be resolved (e.g. a struct references a
+   * generic placeholder like `T` that isn't a declared template parameter).
+   * Propagates up to the top-level alias so it can be dropped from output.
+   */
+  readonly unresolved?: true,
 }
 
 export type TypeHandler<RESULT = TypeHandlerResult> = (type: mcdoc.McdocType) => (

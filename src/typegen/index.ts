@@ -288,6 +288,13 @@ export class TypesGenerator {
           symbols,
         })
 
+        // Skip symbols that contain unresolved references (e.g. a `struct` that
+        // references a generic placeholder without being wrapped in `template`).
+        if (resolved_member.unresolved === true) {
+          console.warn(`[mcdoc-ts-generator] Skipping ${_path} - contains unresolved references`)
+          continue
+        }
+
         const module = (() => {
           if (!this.resolved_symbols.has(module_path)) {
             return this.resolved_symbols.set(module_path, {

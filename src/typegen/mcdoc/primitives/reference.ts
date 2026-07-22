@@ -37,6 +37,22 @@ function mcdoc_reference(type: mcdoc.McdocType) {
       }
     }
 
+    // If this path doesn't resolve to any registered symbol and isn't a known
+    // generic parameter, it's an unresolved placeholder (e.g. a `struct` that
+    // references `T` without being wrapped in a `template`). Bubble up so the
+    // enclosing type can be dropped from output.
+    if (args.module_map[import_path] === undefined) {
+      const is_generic = 'generics' in args && args.generics !== undefined && args.generics.has(import_path)
+      if (!is_generic) {
+        const type_name_point = import_path.lastIndexOf(':')
+        const type_name = import_path.slice(type_name_point + 1)
+        return {
+          type: factory.createTypeReferenceNode(type_name),
+          unresolved: true,
+        } as const
+      }
+    }
+
     const type_name_point = import_path.lastIndexOf(':')
     const type_name = import_path.slice(type_name_point + 1)
     const base_path = import_path.slice(0, type_name_point - 1)

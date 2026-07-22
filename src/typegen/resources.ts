@@ -2,6 +2,7 @@ import ts from 'typescript'
 import * as je from '@spyglassmc/java-edition'
 import type { ResolvedSymbol } from '.'
 import { Set, type NormalNonTagResource } from './mcdoc/utils'
+import { ReleaseVersion, TARGET_VERSION } from './mcdoc/version'
 
 const { factory } = ts
 
@@ -57,15 +58,42 @@ export const RESOURCE_CLASSES = {
 export type ResourceClassName = typeof RESOURCE_CLASSES[keyof typeof RESOURCE_CLASSES]
 
 /**
- * Generates resource path mappings from Spyglass binder.
+ * Returns true when the resource is available in the target Minecraft version.
  *
- * Produces:
- * - RESOURCE_PATHS: Map from resource category to path info
- * - RESOURCE_CLASS_TYPES: Object mapping class names to resource type IDs (reversed)
- * - CLASS_TO_RESOURCE_TYPE: Runtime Map with class imports
+ * A resource is supported when its `since` (if any) is at or before TARGET
+ * AND its `until` (if any) is at or after TARGET.
  */
-export function export_resources(): ResolvedSymbol {
-  // Collect resources that are valid for the current release (excluding tag/* entries)
+function is_resource_supported(resource: { since?: ReleaseVersion, until?: ReleaseVersion }): boolean {
+  if (resource.since !== undefined && ReleaseVersion.cmp(resource.since, TARGET_VERSION) > 0) {
+    return false
+  }
+  if (resource.until !== undefined && ReleaseVersion.cmp(resource.until, TARGET_VERSION) < 0) {
+    return false
+  }
+  return true
+}
+
+/**
+ * Builds a set of resource categories from the Spyglass binder that are valid
+ * for the target Minecraft version.
+ */
+function get_supported_resource_categories(): Set<string> {
+  const categories = new Set<string>()
+  for (const resource of je.binder.getResources()) {
+    if (!is_resource_supported(resource)) {
+      continue
+    }
+    categories.add(resource.category)
+  }
+  return categories
+}
+
+/**
+ * Collects resource metadata from Spyglass binder, excluding tag/* and worldgen/*
+ * entries (which get special handling) and resources that aren't supported in
+ * the target Minecraft version. Also appends the synthetic `tag` entry.
+ */
+function collect_resources() {
   const resources: Array<{
     category: string
     path: string[]
@@ -74,7 +102,7 @@ export function export_resources(): ResolvedSymbol {
   }> = []
 
   for (const resource of je.binder.getResources()) {
-    if (resource.until !== undefined) {
+    if (!is_resource_supported(resource)) {
       continue
     }
     // Skip individual tag/* entries - we add a single tag entry instead
@@ -90,7 +118,17 @@ export function export_resources(): ResolvedSymbol {
     })
   }
 
-  // --- Generate RESOURCE_PATHS map ---
+  return resources
+}
+
+/**
+ * Generates `RESOURCE_PATHS` for `resource-paths.ts`.
+ *
+ * Maps resource category -> { path, pack, ext }, plus a synthetic `tag` entry.
+ */
+export function export_resource_paths(): ResolvedSymbol {
+  const resources = collect_resources()
+
   const resource_path_entries = resources.map((r) =>
     factory.createPropertyAssignment(
       factory.createStringLiteral(r.category, true),
@@ -133,13 +171,32 @@ export function export_resources(): ResolvedSymbol {
     ),
   )
 
-  // --- Generate CLASS_TO_RESOURCE_TYPE Map with imports ---
-  // Includes: regular resource classes, TagClass
-  const class_names = [...Object.values(RESOURCE_CLASSES), 'TagClass']
+  return {
+    exports: [resource_paths_var] as ResolvedSymbol['exports'],
+    paths: new Set<string>(),
+  }
+}
+
+/**
+ * Generates `RESOURCE_CLASS_TYPES` for `resources.ts`, plus the runtime class
+ * import declaration. RESOURCE_PATHS lives in resource-paths.ts now.
+ *
+ * `RESOURCE_CLASSES` is the full map for type-handler lookups (used by
+ * `string.ts`); at generate time we filter out entries whose Spyglass binder
+ * resource isn't supported in the target version so we don't emit imports
+ * for classes that don't exist on this Minecraft version.
+ */
+export function export_resources(): ResolvedSymbol {
+  const supported_categories = get_supported_resource_categories()
+
+  // --- Filter RESOURCE_CLASSES down to supported categories ---
+  const supported_classes = (Object.entries(RESOURCE_CLASSES) as [string, string][])
+    .filter(([type_id]) => supported_categories.has(type_id))
+
+  const class_names = [...supported_classes.map(([, name]) => name), 'TagClass']
   const class_entries: ts.ArrayLiteralExpression[] = []
 
-  // Add regular resource classes
-  for (const [type_id, class_name] of Object.entries(RESOURCE_CLASSES)) {
+  for (const [type_id, class_name] of supported_classes) {
     class_entries.push(factory.createArrayLiteralExpression([
       factory.createIdentifier(class_name),
       factory.createStringLiteral(type_id, true),
@@ -184,7 +241,6 @@ export function export_resources(): ResolvedSymbol {
   return {
     exports: [
       class_import,
-      resource_paths_var,
       class_to_resource_type_var,
     ] as ResolvedSymbol['exports'],
     paths: new Set<string>(),

@@ -4,6 +4,7 @@ import { TypeHandlers, type NonEmptyList, type TypeHandler, type TypeHandlerResu
 import { Assert } from '../assert'
 import { merge_imports } from '../utils'
 import { add } from '../../../util'
+import { ReleaseVersion, TARGET_VERSION } from '../version'
 
 const { factory } = ts
 
@@ -23,6 +24,8 @@ function mcdoc_tuple(type: mcdoc.McdocType) {
 
     let child_dispatcher: NonEmptyList<[parent_count: number, property: string]> | undefined
 
+    let unresolved = false
+
     for (const item of tuple.items) {
       let unsupported = false
       if (item.attributes !== undefined) {
@@ -31,7 +34,7 @@ function mcdoc_tuple(type: mcdoc.McdocType) {
         const attributes = item.attributes
 
         for (const attribute of attributes) {
-          if (attribute.name === 'until' && attribute.value.value.value !== '26.3') {
+          if (attribute.name === 'until' && ReleaseVersion.cmp(attribute.value.value.value as ReleaseVersion, TARGET_VERSION) < 0) {
             unsupported = true
             break
           }
@@ -39,7 +42,7 @@ function mcdoc_tuple(type: mcdoc.McdocType) {
             unsupported = true
             break
           }
-          if (attribute.name === 'since' && attribute.value.value.value === '26.3') {
+          if (attribute.name === 'since' && ReleaseVersion.cmp(attribute.value.value.value as ReleaseVersion, TARGET_VERSION) > 0) {
             unsupported = true
             break
           }
@@ -50,6 +53,10 @@ function mcdoc_tuple(type: mcdoc.McdocType) {
       }
 
       const value = TypeHandlers[item.kind](item)(args)
+
+      if ((value as TypeHandlerResult).unresolved === true) {
+        unresolved = true
+      }
 
       if ('imports' in value) {
         imports = merge_imports(imports, value.imports)
@@ -90,6 +97,7 @@ function mcdoc_tuple(type: mcdoc.McdocType) {
     return {
       type: factory.createTupleTypeNode(members),
       ...add({ imports, child_dispatcher, docs }),
+      ...(unresolved ? { unresolved: true as const } : {}),
     } as const
   }
 }

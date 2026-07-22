@@ -104,6 +104,7 @@ function mcdoc_template(type: mcdoc.McdocType) {
     return {
       type: type_alias as unknown as ts.TypeNode,
       ...add({ imports, child_dispatcher }),
+      ...((child_result as TypeHandlerResult).unresolved === true ? { unresolved: true as const } : {}),
     } as const
   }
 }

@@ -6,6 +6,8 @@ import type { DispatcherInfo } from '..'
 import { add_import, merge_imports, Set } from './utils'
 import { Bind } from './bind'
 import { add, pascal_case } from '../../util'
+import { Assert } from './assert'
+import { ReleaseVersion, TARGET_VERSION } from './version'
 
 const { factory } = ts
 
@@ -58,6 +60,31 @@ type DispatcherSymbolResult = {
 }
 
 type DispatcherMember = { typeDef: mcdoc.McdocType }
+
+/**
+ * Drops dispatcher members that aren't available in the target Minecraft version.
+ *
+ * - `since: X` where X > TARGET → not yet added in our target → drop
+ * - `until: X` where X < TARGET → already removed before our target → drop
+ *
+ * Returns true if the member should be skipped.
+ */
+function is_dispatcher_member_unsupported(type_def: mcdoc.McdocType): boolean {
+  const attrs = type_def.attributes
+  if (attrs === undefined) {
+    return false
+  }
+  Assert.Attributes(attrs, true)
+  for (const attr of attrs) {
+    if (attr.name === 'since' && ReleaseVersion.cmp(attr.value.value.value as ReleaseVersion, TARGET_VERSION) > 0) {
+      return true
+    }
+    if (attr.name === 'until' && ReleaseVersion.cmp(attr.value.value.value as ReleaseVersion, TARGET_VERSION) < 0) {
+      return true
+    }
+  }
+  return false
+}
 
 /**
  * Generates a dispatcher symbol map with the following structure:
@@ -214,6 +241,10 @@ export function dispatcher_symbol(
     }
 
     const member_type = (member.data as DispatcherMember).typeDef!
+
+    if (is_dispatcher_member_unsupported(member_type)) {
+      continue
+    }
 
     const member_type_name = `${name}${pascal_case(member_key.replace(/[/:]/g, '_'))}`
 

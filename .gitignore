@@ -183,3 +183,5 @@ types/
 sandstone-types/
 
 cachehttp
+
+.temp/

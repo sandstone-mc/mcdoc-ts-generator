@@ -1,9 +1,10 @@
 import ts from 'typescript'
 import type * as mcdoc from '@spyglassmc/mcdoc'
-import { TypeHandlers, type NonEmptyList, type TypeHandler } from '..'
+import { TypeHandlers, type NonEmptyList, type TypeHandler, type TypeHandlerResult } from '..'
 import { Assert } from '../assert'
 import { merge_imports } from '../utils'
 import { add } from '../../../util'
+import { ReleaseVersion, TARGET_VERSION } from '../version'
 
 const { factory } = ts
 
@@ -25,6 +26,8 @@ function mcdoc_union(type: mcdoc.McdocType) {
 
     let child_dispatcher: NonEmptyList<[number, string]> | undefined
 
+    let unresolved = false
+
     for (const member of union.members) {
       let unsupported = false
       if (member.attributes !== undefined) {
@@ -33,7 +36,7 @@ function mcdoc_union(type: mcdoc.McdocType) {
         const attributes = member.attributes
 
         for (const attribute of attributes) {
-          if (attribute.name === 'until' && attribute.value.value.value !== '26.3') {
+          if (attribute.name === 'until' && ReleaseVersion.cmp(attribute.value.value.value as ReleaseVersion, TARGET_VERSION) < 0) {
             unsupported = true
             break
           }
@@ -41,7 +44,7 @@ function mcdoc_union(type: mcdoc.McdocType) {
             unsupported = true
             break
           }
-          if (attribute.name === 'since' && attribute.value.value.value === '26.3') {
+          if (attribute.name === 'since' && ReleaseVersion.cmp(attribute.value.value.value as ReleaseVersion, TARGET_VERSION) > 0) {
             unsupported = true
             break
           }
@@ -51,6 +54,10 @@ function mcdoc_union(type: mcdoc.McdocType) {
         continue
       }
       const value = TypeHandlers[member.kind](member)(args)
+
+      if ((value as TypeHandlerResult).unresolved === true) {
+        unresolved = true
+      }
 
       if ('imports' in value) {
         imports = merge_imports(imports, value.imports)
@@ -103,6 +110,7 @@ function mcdoc_union(type: mcdoc.McdocType) {
     return {
       type: result_type,
       ...add({ imports, child_dispatcher, docs }),
+      ...(unresolved ? { unresolved: true as const } : {}),
     } as const
   }
 }

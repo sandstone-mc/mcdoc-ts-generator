@@ -26,7 +26,7 @@ import { fetchWithCache } from './util/fetch'
 import { TypesGenerator } from './typegen'
 import { compile_types } from './typegen/compile'
 import { handle_imports } from './typegen/import'
-import { export_resources } from './typegen/resources'
+import { export_resources, export_resource_paths } from './typegen/resources'
 
 export interface GeneratorOptions {
   /** Output directory for generated types (default: "types") */
@@ -276,6 +276,11 @@ export async function generate(options: GeneratorOptions = {}): Promise<void> {
   const resources_path = join(out_dir, 'resources.ts')
   const resources_code = await compile_types(resources_export.exports, resources_path)
   await writeFile(resources_path, resources_code)
+
+  const resource_paths_export = export_resource_paths()
+  const resource_paths_path = join(out_dir, 'resource-paths.ts')
+  const resource_paths_code = await compile_types(resource_paths_export.exports, resource_paths_path)
+  await writeFile(resource_paths_path, resource_paths_code)
 
   if (tsconfig) {
     const tsconfig_path = join(out_dir, 'tsconfig.json')
