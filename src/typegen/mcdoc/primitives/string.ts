@@ -419,21 +419,16 @@ function mcdoc_string(type: mcdoc.McdocType) {
         } as const)
       })
       .with({ name: 'score_holder' }, () => {
-        const Score = 'Score'
+        const SingleEntityArgument = 'SingleEntityArgument'
         return (args: Record<string, unknown>) => {
-          // Score is not valid for score_holder fields inside text components —
-          // it triggers TS2859 when mixed into the recursive Text union.
-          if (typeof args.current_path === 'string' && args.current_path.startsWith('::java::util::text::')) {
-            return { type: static_value.not_empty } as const
-          }
           return {
             type: factory.createUnionTypeNode([
               static_value.not_empty,
-              factory.createTypeReferenceNode(Score),
+              factory.createTypeReferenceNode(SingleEntityArgument),
             ]),
             imports: {
-              ordered: [`sandstone::${Score}`] as NonEmptyList<string>,
-              check: new Map([[`sandstone::${Score}`, 0]]),
+              ordered: [`sandstone::arguments::${SingleEntityArgument}`] as NonEmptyList<string>,
+              check: new Map([[`sandstone::arguments::${SingleEntityArgument}`, 0]]),
             },
           } as const
         }
