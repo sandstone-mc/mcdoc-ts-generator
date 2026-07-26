@@ -47,13 +47,13 @@ export const RESOURCE_CLASSES = {
   'font': 'FontClass',
   'item_definition': 'ItemModelDefinitionClass',
   'lang': 'LanguageClass',
-  'model': 'ModelClass',
+  'model': ['ModelClass', 'ModelType'],
   'particle': 'ParticleClass',
   'post_effect': 'PostEffectClass',
   'sound': 'SoundEventClass',
-  'texture': 'TextureClass',
+  'texture': ['TextureClass', 'TextureType'],
   'waypoint_style': 'WaypointStyleClass',
-} as const satisfies Record<NormalNonTagResource, string>
+} as const satisfies Record<NormalNonTagResource, string | readonly [string, string]>
 
 export type ResourceClassName = typeof RESOURCE_CLASSES[keyof typeof RESOURCE_CLASSES]
 
@@ -193,10 +193,11 @@ export function export_resources(): ResolvedSymbol {
   const supported_classes = (Object.entries(RESOURCE_CLASSES) as [string, string][])
     .filter(([type_id]) => supported_categories.has(type_id))
 
-  const class_names = [...supported_classes.map(([, name]) => name), 'TagClass']
+  const class_names = [...supported_classes.map(([, entry]) => Array.isArray(entry) ? entry[0] : entry), 'TagClass']
   const class_entries: ts.ArrayLiteralExpression[] = []
 
-  for (const [type_id, class_name] of supported_classes) {
+  for (const [type_id, entry] of supported_classes) {
+    const class_name = Array.isArray(entry) ? entry[0] : entry
     class_entries.push(factory.createArrayLiteralExpression([
       factory.createIdentifier(class_name),
       factory.createStringLiteral(type_id, true),

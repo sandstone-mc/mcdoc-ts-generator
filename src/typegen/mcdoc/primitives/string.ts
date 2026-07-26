@@ -150,6 +150,26 @@ function mcdoc_string(type: mcdoc.McdocType) {
             return undefined
           }
 
+          const make_resource_type_ref = (entry: typeof RESOURCE_CLASSES[NormalNonTagResource]): ts.TypeNode => {
+            if (Array.isArray(entry)) {
+              const [class_name, generic_name] = entry
+              return factory.createTypeReferenceNode(class_name, [
+                factory.createTypeReferenceNode(generic_name),
+              ])
+            }
+            return factory.createTypeReferenceNode(entry as string)
+          }
+
+          const register_resource_imports = (entry: typeof RESOURCE_CLASSES[NormalNonTagResource]) => {
+            if (Array.isArray(entry)) {
+              const [class_name, generic_name] = entry
+              add_import(imports, `sandstone::${class_name}`)
+              add_import(imports, `sandstone::arguments::${generic_name}`)
+            } else {
+              add_import(imports, `sandstone::${entry}`)
+            }
+          }
+
           const registry_import = '::java::registry::Registry'
 
           const types: ts.TypeNode[] = []
@@ -276,8 +296,8 @@ function mcdoc_string(type: mcdoc.McdocType) {
           Resource = Resource()
 
           if (Resource !== undefined) {
-            types.push(factory.createTypeReferenceNode(Resource))
-            add_import(imports, `sandstone::${Resource}`)
+            types.push(make_resource_type_ref(Resource))
+            register_resource_imports(Resource)
             has_non_indexable = true
           } else if (registry_id.endsWith('_variant')) {
             // Handle variant resources with VariantClass<'variant_type'>
@@ -456,6 +476,7 @@ function mcdoc_string(type: mcdoc.McdocType) {
       })
       .with({ name: 'texture_slot' }, ({ value: { values: { kind: { value: { value } } } } }) => {
         const Texture = 'TextureClass'
+        const TextureType = 'TextureType'
         // TODO: Implement Model struct generic, this is `kind="value"` or `kind="reference"`
 
         if (value === 'reference') {
@@ -466,11 +487,19 @@ function mcdoc_string(type: mcdoc.McdocType) {
           type: factory.createUnionTypeNode([
             static_value.not_empty,
             static_value.hash.type,
-            factory.createTypeReferenceNode(Texture),
+            factory.createTypeReferenceNode(Texture, [
+              factory.createTypeReferenceNode(TextureType),
+            ]),
           ]),
           imports: {
-            ordered: [`sandstone::${Texture}`] as NonEmptyList<string>,
-            check: new Map([[`sandstone::${Texture}`, 0]]),
+            ordered: [
+              `sandstone::${Texture}`,
+              `sandstone::arguments::${TextureType}`,
+            ] as NonEmptyList<string>,
+            check: new Map<string, number>([
+              [`sandstone::${Texture}`, 0],
+              [`sandstone::arguments::${TextureType}`, 1],
+            ]),
           },
         } as const)
       })
