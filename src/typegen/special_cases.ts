@@ -81,6 +81,33 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
     }
   }],
 
+  // EnchantmentEffectComponentMap: Direct mapped type over keyof SymbolEffectComponent.
+  // The standard struct handler emits a Registry-based conditional mapped type with NonNullable
+  // and indexed-access, which hits TS2859 (Excessive complexity) at consumers — TS degrades
+  // the value type per-key to a `{ [x: string]: primitive | nested }` view and rejects inline
+  // literals like `{ effect: { type: 'run_function', function: '...' } }`. The simplified form
+  // keeps each key's value resolvable while still indexed over the dispatcher.
+  ['::java::data::enchantment::effect_component::EnchantmentEffectComponentMap', (): SpecialCaseResult => {
+    let imports: TypeHandlerResult['imports'] = undefined as unknown as TypeHandlerResult['imports']
+    imports = add_import(imports, '::java::dispatcher::SymbolEffectComponent')
+
+    // ({ [Key in keyof SymbolEffectComponent]?: SymbolEffectComponent[Key] })
+    const keyof_symbol = factory.createTypeOperatorNode(
+      ts.SyntaxKind.KeyOfKeyword,
+      factory.createTypeReferenceNode('SymbolEffectComponent'),
+    )
+    const value_type = factory.createIndexedAccessTypeNode(
+      factory.createTypeReferenceNode('SymbolEffectComponent'),
+      factory.createTypeReferenceNode('Key'),
+    )
+    const mapped_type = Bind.MappedType(keyof_symbol, value_type, { parenthesized: false })
+
+    return {
+      type: factory.createParenthesizedType(mapped_type) as ts.TypeNode,
+      imports,
+    }
+  }],
+
   // BlockStateProperty: Simple object type instead of dispatcher pattern
   // This type technically works but it is way too large for TS to handle, it needs to be simplified at an unfortunate cost.
   ['::java::data::loot::condition::BlockStateProperty', (): SpecialCaseResult => {
