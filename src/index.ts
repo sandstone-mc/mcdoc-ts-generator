@@ -27,6 +27,7 @@ import { TypesGenerator } from './typegen'
 import { compile_types } from './typegen/compile'
 import { handle_imports } from './typegen/import'
 import { export_resources, export_resource_paths } from './typegen/resources'
+import { TARGET_VERSION } from './typegen/mcdoc/version'
 
 export interface GeneratorOptions {
   /** Output directory for generated types (default: "types") */
@@ -178,8 +179,18 @@ const initialize: ProjectInitializer = async (ctx) => {
 
   const versions: { id: ReleaseVersion, type: 'release' | 'snapshot' }[] = (await (await fetch('https://api.spyglassmc.com/mcje/versions')).json())
 
-  // TODO: We need an option for this when Sandstone 1.1.0 mc 26.2 snapshot alphas start
-  const version = versions.find((v) => v.type === 'release')!
+  // Registries / block states / the mcmeta summary must come from the same
+  // Minecraft version the mcdoc `since`/`until` filters target, otherwise a
+  // pinned build (e.g. sandstone 1.0.x on mc 26.1) gets newer registry entries.
+  const pinned = versions.find((v) => v.id === TARGET_VERSION)
+
+  if (pinned === undefined) {
+    console.warn(
+      `[initialize] MCDOC_TARGET_VERSION="${TARGET_VERSION}" not found in the Spyglass version list; falling back to the latest release. Generated registries will NOT match the target version.`,
+    )
+  }
+
+  const version = pinned ?? versions.find((v) => v.type === 'release')!
 
   const release = version.id
 

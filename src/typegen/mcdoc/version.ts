@@ -11,6 +11,10 @@ import { ReleaseVersion } from '@spyglassmc/java-edition/lib/dependency/index.js
  * than our target. The `since`/`until` filters in struct/union/tuple and
  * dispatcher_symbol use `ReleaseVersion.cmp` against this value to drop
  * entries that aren't available in the targeted Minecraft release.
+ *
+ * This also selects which Minecraft version's registries and block states
+ * Spyglass loads (see `initialize` in `src/index.ts`), so a pinned build gets
+ * that version's registry contents rather than the latest release's.
  */
 export const TARGET_VERSION: ReleaseVersion = (process.env['MCDOC_TARGET_VERSION'] ?? '26.2') as ReleaseVersion
 

@@ -47,7 +47,7 @@ If packages are linked via the workspace `bun dev:link`, the sandstone project w
 ### Entry Point
 `src/index.ts` - Orchestrates the generation process:
 1. Fetches vanilla-mcdoc symbols from Spyglass API
-2. Fetches Minecraft registries and block states for the latest version
+2. Fetches Minecraft registries and block states for `TARGET_VERSION` (falling back to the latest release if that version isn't in the Spyglass version list)
 3. Initializes a Spyglass Service with mcdoc parsers
 4. Uses `TypesGenerator` to resolve and convert mcdoc types to TypeScript AST nodes
 5. Formats output with ESLint and writes to `types/` directory
@@ -161,6 +161,8 @@ MCDOC_TARGET_VERSION=26.3 bun update-from-mcdoc
 | `mcdoc/multi/{struct,union,tuple}.ts` field/item loop | `since > TARGET` (added after target) or `until < TARGET` (removed before target) |
 | `mcdoc/dispatcher_symbol.ts` member loop | same |
 | `resources.ts` `is_resource_supported` | Spyglass binder resources with `since > TARGET` or `until < TARGET`. Used by both `RESOURCE_PATHS` (`resource-paths.ts`) and `RESOURCE_CLASS_TYPES` (`resources.ts`). |
+
+`TARGET_VERSION` additionally selects which Minecraft version `initialize` (`src/index.ts`) loads registries, block states and the mcmeta summary for — it looks for the matching entry in the Spyglass version list and only falls back to the latest release (with a warning) when the target isn't found. Without this, a pinned build would filter mcdoc correctly but still emit the *latest* release's registry unions.
 
 A mcdoc type alias dropped by these filters never reaches the generated output — it would either be missing or produce an import for a class that doesn't exist on the target version (e.g. `DecoratedPotPatternClass`, `SlotSourceClass` are mc 26.3-only and not exported by sandstone 1.1.x).
 
