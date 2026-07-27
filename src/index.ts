@@ -182,15 +182,32 @@ const initialize: ProjectInitializer = async (ctx) => {
   // Registries / block states / the mcmeta summary must come from the same
   // Minecraft version the mcdoc `since`/`until` filters target, otherwise a
   // pinned build (e.g. sandstone 1.0.x on mc 26.1) gets newer registry entries.
-  const pinned = versions.find((v) => v.id === TARGET_VERSION)
+  // Prefer an exact id match. If the target exists only as a snapshot (e.g.
+  // sandstone 1.2.x on a 26.3 snapshot that hasn't shipped a release yet),
+  // fall back to the highest snapshot for that major.minor so the user
+  // gets 26.3 data rather than silently downgrading to 26.2.
+  let version = versions.find((v) => v.id === TARGET_VERSION)
 
-  if (pinned === undefined) {
-    console.warn(
-      `[initialize] MCDOC_TARGET_VERSION="${TARGET_VERSION}" not found in the Spyglass version list; falling back to the latest release. Generated registries will NOT match the target version.`,
-    )
+  if (version === undefined) {
+    const [, targetMaj, targetMin] = TARGET_VERSION.match(/^(\d+)\.(\d+)/)!
+    const sameMinor = versions
+      .filter((v) => v.id.startsWith(`${targetMaj}.${targetMin}-`))
+      .sort((a, b) => b.id.localeCompare(a.id))
+    version = sameMinor[0]
+    if (version !== undefined) {
+      console.warn(
+        `[initialize] MCDOC_TARGET_VERSION="${TARGET_VERSION}" has no exact release on Spyglass; falling back to latest snapshot ${version.id} for that minor.`,
+      )
+    } else {
+      console.warn(
+        `[initialize] MCDOC_TARGET_VERSION="${TARGET_VERSION}" not found in the Spyglass version list; falling back to the latest release. Generated registries will NOT match the target version.`,
+      )
+    }
   }
 
-  const version = pinned ?? versions.find((v) => v.type === 'release')!
+  if (version === undefined) {
+    version = versions.find((v) => v.type === 'release')!
+  }
 
   const release = version.id
 
