@@ -42,7 +42,7 @@ export const RESOURCE_CLASSES = {
 
   // Resourcepack resources
   'atlas': 'AtlasClass',
-  'block_definition': 'BlockStateClass',
+  'block_definition': 'BlockStateDefinitionClass',
   'equipment': 'EquipmentClass',
   'font': 'FontClass',
   'item_definition': 'ItemModelDefinitionClass',
@@ -61,13 +61,14 @@ export type ResourceClassName = typeof RESOURCE_CLASSES[keyof typeof RESOURCE_CL
  * Returns true when the resource is available in the target Minecraft version.
  *
  * A resource is supported when its `since` (if any) is at or before TARGET
- * AND its `until` (if any) is at or after TARGET.
+ * AND its `until` (if any) is strictly after TARGET (inclusive `until` would
+ * be the last version the resource existed in).
  */
 function is_resource_supported(resource: { since?: ReleaseVersion, until?: ReleaseVersion }): boolean {
   if (resource.since !== undefined && ReleaseVersion.cmp(resource.since, TARGET_VERSION) > 0) {
     return false
   }
-  if (resource.until !== undefined && ReleaseVersion.cmp(resource.until, TARGET_VERSION) < 0) {
+  if (resource.until !== undefined && ReleaseVersion.cmp(resource.until, TARGET_VERSION) <= 0) {
     return false
   }
   return true

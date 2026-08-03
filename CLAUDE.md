@@ -158,9 +158,9 @@ MCDOC_TARGET_VERSION=26.3 bun update-from-mcdoc
 
 | Location | Drops |
 |----------|-------|
-| `mcdoc/multi/{struct,union,tuple}.ts` field/item loop | `since > TARGET` (added after target) or `until < TARGET` (removed before target) |
+| `mcdoc/multi/{struct,union,tuple}.ts` field/item loop | `since > TARGET` (added after target) or `until <= TARGET` (removed by target, inclusive) |
 | `mcdoc/dispatcher_symbol.ts` member loop | same |
-| `resources.ts` `is_resource_supported` | Spyglass binder resources with `since > TARGET` or `until < TARGET`. Used by both `RESOURCE_PATHS` (`resource-paths.ts`) and `RESOURCE_CLASS_TYPES` (`resources.ts`). |
+| `resources.ts` `is_resource_supported` | Spyglass binder resources with `since > TARGET` or `until <= TARGET`. Used by both `RESOURCE_PATHS` (`resource-paths.ts`) and `RESOURCE_CLASS_TYPES` (`resources.ts`). |
 
 `TARGET_VERSION` additionally selects which Minecraft version `initialize` (`src/index.ts`) loads registries, block states and the mcmeta summary for — it looks for the matching entry in the Spyglass version list and only falls back to the latest release (with a warning) when the target isn't found. Without this, a pinned build would filter mcdoc correctly but still emit the *latest* release's registry unions.
 

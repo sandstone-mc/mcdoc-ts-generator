@@ -36,7 +36,7 @@ function mcdoc_union(type: mcdoc.McdocType) {
         const attributes = member.attributes
 
         for (const attribute of attributes) {
-          if (attribute.name === 'until' && ReleaseVersion.cmp(attribute.value.value.value as ReleaseVersion, TARGET_VERSION) < 0) {
+          if (attribute.name === 'until' && ReleaseVersion.cmp(attribute.value.value.value as ReleaseVersion, TARGET_VERSION) <= 0) {
             unsupported = true
             break
           }

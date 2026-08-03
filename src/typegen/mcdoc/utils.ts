@@ -48,6 +48,7 @@ const NonNormalAssetsResources = new Set([
 export type NormalNonTagResource = (
   | Exclude<NormalFileCategory,
     | `${string}_variant`
+    | 'number_provider'
     | 'dimension'
     | 'dimension_type'
   >

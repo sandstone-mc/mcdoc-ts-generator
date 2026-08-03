@@ -65,7 +65,7 @@ type DispatcherMember = { typeDef: mcdoc.McdocType }
  * Drops dispatcher members that aren't available in the target Minecraft version.
  *
  * - `since: X` where X > TARGET → not yet added in our target → drop
- * - `until: X` where X < TARGET → already removed before our target → drop
+ * - `until: X` where X <= TARGET → already removed by our target → drop
  *
  * Returns true if the member should be skipped.
  */
@@ -79,7 +79,7 @@ function is_dispatcher_member_unsupported(type_def: mcdoc.McdocType): boolean {
     if (attr.name === 'since' && ReleaseVersion.cmp(attr.value.value.value as ReleaseVersion, TARGET_VERSION) > 0) {
       return true
     }
-    if (attr.name === 'until' && ReleaseVersion.cmp(attr.value.value.value as ReleaseVersion, TARGET_VERSION) < 0) {
+    if (attr.name === 'until' && ReleaseVersion.cmp(attr.value.value.value as ReleaseVersion, TARGET_VERSION) <= 0) {
       return true
     }
   }
