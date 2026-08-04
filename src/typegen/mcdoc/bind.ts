@@ -22,46 +22,6 @@ export class Bind {
   }
 
   /**
-   * Creates a template literal type that represents a non-empty string.
-   * ```ts
-   * type NonEmptyString = `${any}${string}` // <-- This type
-   * ```
-   */
-  static readonly NonEmptyString = factory.createTemplateLiteralType(
-    factory.createTemplateHead(''),
-    [
-      factory.createTemplateLiteralTypeSpan(
-        factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
-        factory.createTemplateMiddle(''),
-      ),
-      factory.createTemplateLiteralTypeSpan(
-        factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-        factory.createTemplateTail(''),
-      ),
-    ],
-  )
-
-  /**
-   * Creates a template literal type that represents a namespaced identifier.
-   * ```ts
-   * type Namespaced = `${string}:${string}` // <-- This type
-   * ```
-   */
-  static readonly Namespaced = factory.createTemplateLiteralType(
-    factory.createTemplateHead(''),
-    [
-      factory.createTemplateLiteralTypeSpan(
-        factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-        factory.createTemplateMiddle(':'),
-      ),
-      factory.createTemplateLiteralTypeSpan(
-        factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-        factory.createTemplateTail(''),
-      ),
-    ],
-  )
-
-  /**
    * Creates a mapped type with optional properties.
    *
    * The key type is always wrapped in `Extract<KeyType, string>` for safety.
@@ -91,7 +51,7 @@ export class Bind {
   static MappedType(key_type: ts.TypeNode, value_type: ts.TypeNode, options?: { key_name?: string, name_type?: ts.TypeNode, parenthesized?: boolean }) {
     const { key_name = 'Key', name_type, parenthesized = true } = options ?? {}
     const constraint_type = key_type.kind === ts.SyntaxKind.StringKeyword ?
-      Bind.NonEmptyString
+      factory.createTypeReferenceNode('NonEmptyString')
       : factory.createTypeReferenceNode('Extract', [
         key_type,
         factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),

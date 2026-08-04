@@ -172,9 +172,12 @@ function mcdoc_struct(type: mcdoc.McdocType) {
               if (pair.key.attributes === undefined) {
                 Assert.StringType(pair.key)
                 // TODO: docs
+                if ((('lengthRange' in pair.key && 'min' in pair.key.lengthRange) ? pair.key.lengthRange.min : 0) >= 1) {
+                  imports = add_import(imports, 'sandstone::NonEmptyString')
+                }
                 inherit.push(Bind.MappedType(
                   ((('lengthRange' in pair.key && 'min' in pair.key.lengthRange) ? pair.key.lengthRange.min : 0) >= 1 ?
-                    Bind.NonEmptyString
+                    factory.createTypeReferenceNode('NonEmptyString')
                     : factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
                   ),
                   value.type,
@@ -192,8 +195,9 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                     let registry_id: NonTagRegistry
 
                     if (id_attr === undefined) {
+                      imports = add_import(imports, 'sandstone::NonEmptyString')
                       inherit.push(Bind.MappedType(
-                        Bind.NonEmptyString,
+                        factory.createTypeReferenceNode('NonEmptyString'),
                         value.type,
                       ))
                       return
@@ -215,8 +219,9 @@ function mcdoc_struct(type: mcdoc.McdocType) {
 
                       if ('path' in id_attr.values) {
                         // Sadly typescript doesn't support JSDoc on Parameter Declarations
+                        imports = add_import(imports, 'sandstone::NamespacedString')
                         inherit.push(Bind.MappedType(
-                          Bind.Namespaced,
+                          factory.createTypeReferenceNode('NamespacedString'),
                           value.type,
                         ))
                         return
@@ -227,8 +232,9 @@ function mcdoc_struct(type: mcdoc.McdocType) {
 
                     // Check if registry exists; if not, fall back to namespaced string
                     if (!is_valid_registry(symbols, registry_id)) {
+                      imports = add_import(imports, 'sandstone::NamespacedString')
                       inherit.push(Bind.MappedType(
-                        Bind.Namespaced,
+                        factory.createTypeReferenceNode('NamespacedString'),
                         value.type,
                       ))
                       return
@@ -274,6 +280,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                   })
                   .with({ name: 'texture_slot' }, () => {
                     // TODO: Implement Model struct generic, this is `kind="definition"`
+                    imports = add_import(imports, 'sandstone::NonEmptyString')
                     inherit.push(Bind.MappedType(
                       factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
                       value.type,
@@ -281,6 +288,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                   })
                   .with({ name: 'criterion' }, () => {
                     // TODO: Implement Advancement struct generic, this is `definition=true`
+                    imports = add_import(imports, 'sandstone::NonEmptyString')
                     inherit.push(Bind.MappedType(
                       factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
                       value.type,
@@ -298,6 +306,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                   })
                   .with({ name: P.union('dispatcher_key', 'translation_key', 'permutation') }, () => {
                     // Permutation will be implemented as an abstracted mode of the Atlas class
+                    imports = add_import(imports, 'sandstone::NonEmptyString')
                     inherit.push(Bind.MappedType(
                       factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
                       value.type,

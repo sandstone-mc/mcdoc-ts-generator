@@ -5,12 +5,19 @@ import type { SymbolUtil } from '@spyglassmc/core'
 import type { NonEmptyList, TypeHandler } from '..'
 import { Assert } from '../assert'
 import { Bind } from '../bind'
-import { add_import, is_valid_registry, NormalNonTagResources, TaggableRegistry, type NonTagRegistry, type NormalNonTagResource } from '../utils'
+import { add_import, is_valid_registry, merge_imports, NormalNonTagResources, TaggableRegistry, type NonTagRegistry, type NormalNonTagResource } from '../utils'
 import { RESOURCE_CLASSES } from '../../resources'
 
 const { factory } = ts
 
 const StringKeyword = factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
+
+const NamespacedStringImport = 'sandstone::NamespacedString'
+
+const NamespacedStringImports = {
+  ordered: [NamespacedStringImport] as NonEmptyList<string>,
+  check: new Map([[NamespacedStringImport, 0]]),
+} as const
 
 const static_value = {
   normal: {
@@ -45,7 +52,8 @@ const static_value = {
     ),
   },
   namespaced: {
-    type: Bind.Namespaced,
+    type: factory.createTypeReferenceNode('NamespacedString'),
+    imports: NamespacedStringImports,
   },
   hash: {
     type: factory.createTemplateLiteralType(
@@ -191,6 +199,7 @@ function mcdoc_string(type: mcdoc.McdocType) {
               )))
             } else {
               types.push(static_value.namespaced.type)
+              add_import(imports, NamespacedStringImport)
             }
           } else {
             registry_id = id_attr.values.registry.value.value as typeof registry_id
@@ -202,18 +211,21 @@ function mcdoc_string(type: mcdoc.McdocType) {
               )))
             } else {
               types.push(static_value.namespaced.type)
+              add_import(imports, NamespacedStringImport)
             }
 
             if ('path' in id_attr.values) {
               return {
                 type: static_value.namespaced.type,
                 docs: ['', `Value: A ${registry_id} ID within a path root of \`(namespace)/textures/${id_attr.values.path!.value.value}\``] as NonEmptyList<string>,
+                imports: NamespacedStringImports,
               } as const
             }
             if ('definition' in id_attr.values) {
               return {
                 type: static_value.namespaced.type,
                 docs: ['', `Value: Defines a \`${registry_id}\` id.`] as NonEmptyList<string>,
+                imports: NamespacedStringImports,
               } as const
             }
             if ('exclude' in id_attr.values) {
@@ -251,6 +263,9 @@ function mcdoc_string(type: mcdoc.McdocType) {
                   has_non_indexable = true
                 } break
                 case 'implicit': {
+                  if (empty_tag_registry) {
+                    add_import(imports, NamespacedStringImport)
+                  }
                   return {
                     type: empty_tag_registry ? static_value.namespaced.type : factory.createParenthesizedType(factory.createUnionTypeNode([
                       factory.createIndexedAccessTypeNode(
