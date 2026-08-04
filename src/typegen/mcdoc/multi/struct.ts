@@ -172,16 +172,8 @@ function mcdoc_struct(type: mcdoc.McdocType) {
               if (pair.key.attributes === undefined) {
                 Assert.StringType(pair.key)
                 // TODO: docs
-                if ((('lengthRange' in pair.key && 'min' in pair.key.lengthRange) ? pair.key.lengthRange.min : 0) >= 1) {
-                  imports = add_import(imports, 'sandstone::NonEmptyString')
-                }
-                inherit.push(Bind.MappedType(
-                  ((('lengthRange' in pair.key && 'min' in pair.key.lengthRange) ? pair.key.lengthRange.min : 0) >= 1 ?
-                    factory.createTypeReferenceNode('NonEmptyString')
-                    : factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
-                  ),
-                  value.type,
-                ))
+                imports = add_import(imports, 'sandstone::NonEmptyString')
+                inherit.push(Bind.MappedType(factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword), value.type))
               } else {
                 Assert.Attributes(pair.key.attributes, true)
 

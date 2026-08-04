@@ -90,6 +90,19 @@ export function is_valid_registry(symbols: SymbolUtil | undefined, registry_id: 
   return Object.keys(registry).length > 0
 }
 
+/**
+ * Returns a fresh `{ ordered, check }` derived from `imports`. Used so that
+ * callers which hand us a shared constant (e.g. `NonEmptyStringImports` in
+ * string.ts) don't have subsequent merges mutate the caller's object — which
+ * would pollute every other handler that returns that same constant.
+ */
+function clone_imports(imports: NonNullable<TypeHandlerResult['imports']>): NonNullable<TypeHandlerResult['imports']> {
+  return {
+    ordered: [...imports.ordered] as NonEmptyList<string>,
+    check: new Map(imports.check),
+  }
+}
+
 export function add_import(imports: TypeHandlerResult['imports'], add_import: string): NonNullable<TypeHandlerResult['imports']> {
   if (imports === undefined) {
     return {
@@ -143,20 +156,23 @@ export function merge_imports(
   new_imports: NonNullable<TypeHandlerResult['imports']>,
   filter?: Set<string>,
 ): NonNullable<TypeHandlerResult['imports']> {
-  if (imports === undefined) {
-    if (filter === undefined) {
-      return new_imports
-    }
-  }
+  // Clone the accumulator so we never mutate the caller's `imports`. Several
+  // call sites pass module-level constants (`NonEmptyStringImports`,
+  // `NamespacedStringImports`) as the accumulator; without this clone,
+  // `add_import` would splice into those shared arrays and pollute every
+  // other handler that returns them.
+  const accumulator = imports === undefined
+    ? { ordered: [] as string[], check: new Map<string, number>() }
+    : clone_imports(imports)
   for (const import_path of new_imports.ordered) {
     if (filter?.has(import_path)) {
       continue
     }
-    if (imports === undefined || !imports.check.has(import_path)) {
-      imports = add_import(imports, import_path)
+    if (!accumulator.check.has(import_path)) {
+      add_import(accumulator as NonNullable<TypeHandlerResult['imports']>, import_path)
     }
   }
-  return imports!
+  return accumulator as unknown as NonNullable<TypeHandlerResult['imports']>
 }
 
 export function op(num: number | bigint, op: '+' | '-' | '*', operand: number | bigint): number | bigint {

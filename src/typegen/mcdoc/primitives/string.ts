@@ -19,23 +19,21 @@ const NamespacedStringImports = {
   check: new Map([[NamespacedStringImport, 0]]),
 } as const
 
+const NonEmptyStringImport = 'sandstone::NonEmptyString'
+
+const NonEmptyStringImports = {
+  ordered: [NonEmptyStringImport] as NonEmptyList<string>,
+  check: new Map([[NonEmptyStringImport, 0]]),
+} as const
+
 const static_value = {
   normal: {
     type: StringKeyword,
   },
-  not_empty: factory.createTemplateLiteralType(
-    factory.createTemplateHead(''),
-    [
-      factory.createTemplateLiteralTypeSpan(
-        factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
-        factory.createTemplateMiddle(''),
-      ),
-      factory.createTemplateLiteralTypeSpan(
-        StringKeyword,
-        factory.createTemplateTail(''),
-      ),
-    ],
-  ),
+  not_empty: {
+    type: factory.createTypeReferenceNode('NonEmptyString'),
+    imports: NonEmptyStringImports,
+  },
   namespaced_tag: {
     type: factory.createTemplateLiteralType(
       factory.createTemplateHead('#'),
@@ -124,7 +122,7 @@ function mcdoc_string(type: mcdoc.McdocType) {
     return (_args: Record<string, unknown>) => static_value.normal
   } else if (string.attributes === undefined) {
     return (_args: Record<string, unknown>) => ({
-      type: static_value.not_empty,
+      ...static_value.not_empty,
       docs: [`String length range: ${mcdoc.NumericRange.toString(string.lengthRange!)}`] as NonEmptyList<string>,
     } as const)
   } else {
@@ -344,15 +342,15 @@ function mcdoc_string(type: mcdoc.McdocType) {
       /* oxlint-disable-next-line no-unused-vars */
       .with({ name: 'command' }, ({ value: { values } }) => {
         // TODO: Implement anonymous command in Sandstone
-        return (_args: Record<string, unknown>) => ({ type: static_value.not_empty } as const)
+        return (_args: Record<string, unknown>) => static_value.not_empty
       })
       .with({ name: 'crafting_ingredient' }, () => {
         // TODO: Implement CraftingShaped struct generic
-        return (_args: Record<string, unknown>) => ({ type: static_value.not_empty } as const)
+        return (_args: Record<string, unknown>) => static_value.not_empty
       })
       .with({ name: 'criterion', value: P.optional(P.nullish) }, () => {
         // TODO: Implement Advancement generics
-        return (_args: Record<string, unknown>) => ({ type: static_value.not_empty } as const)
+        return (_args: Record<string, unknown>) => static_value.not_empty
       })
       .with({ name: 'entity' }, ({ value }) => {
         let Target = 'SingleEntityArgument'
@@ -395,13 +393,13 @@ function mcdoc_string(type: mcdoc.McdocType) {
         const NBT = 'NBTClass'
         return (_args: Record<string, unknown>) => ({
           type: factory.createUnionTypeNode([
-            static_value.not_empty,
+            static_value.not_empty.type,
             factory.createTypeReferenceNode(NBT),
           ]),
-          imports: {
+          imports: merge_imports(static_value.not_empty.imports, {
             ordered: [`sandstone::${NBT}`] as NonEmptyList<string>,
             check: new Map([[`sandstone::${NBT}`, 0]]),
-          },
+          }),
         } as const)
       })
       /* oxlint-disable-next-line no-unused-vars */
@@ -412,23 +410,23 @@ function mcdoc_string(type: mcdoc.McdocType) {
           // DataPointClass is not valid for nbt_path fields inside text components —
           // it triggers TS2859 when mixed into the recursive Text union.
           if (typeof args.current_path === 'string' && args.current_path.startsWith('::java::util::text::')) {
-            return { type: static_value.not_empty } as const
+            return static_value.not_empty
           }
           return {
             type: factory.createUnionTypeNode([
-              static_value.not_empty,
+              static_value.not_empty.type,
               factory.createTypeReferenceNode(DataPoint),
             ]),
-            imports: {
+            imports: merge_imports(static_value.not_empty.imports, {
               ordered: [`sandstone::${DataPoint}`] as NonEmptyList<string>,
               check: new Map([[`sandstone::${DataPoint}`, 0]]),
-            },
+            }),
           } as const
         }
       })
       .with({ name: 'match_regex' }, ({ value: { value: { value } } }) => {
         return (_args: Record<string, unknown>) => ({
-          type: static_value.not_empty,
+          ...static_value.not_empty,
           docs: [`Must match regex of ${value}`] as NonEmptyList<string>,
         } as const)
       })
@@ -436,21 +434,22 @@ function mcdoc_string(type: mcdoc.McdocType) {
         const Objective = 'ObjectiveClass'
         return (_args: Record<string, unknown>) => ({
           type: factory.createUnionTypeNode([
-            static_value.not_empty,
+            static_value.not_empty.type,
             factory.createTypeReferenceNode(Objective),
           ]),
-          imports: {
+          imports: merge_imports(static_value.not_empty.imports, {
             ordered: [`sandstone::${Objective}`] as NonEmptyList<string>,
             check: new Map([[`sandstone::${Objective}`, 0]]),
-          },
+          }),
         } as const)
       })
       .with({ name: 'regex_pattern' }, () => {
         return (_args: Record<string, unknown>) => ({
           type: factory.createUnionTypeNode([
-            static_value.not_empty,
+            static_value.not_empty.type,
             factory.createTypeReferenceNode('RegExp'),
           ]),
+          imports: static_value.not_empty.imports,
         } as const)
       })
       .with({ name: 'score_holder' }, () => {
@@ -458,13 +457,13 @@ function mcdoc_string(type: mcdoc.McdocType) {
         return (args: Record<string, unknown>) => {
           return {
             type: factory.createUnionTypeNode([
-              static_value.not_empty,
+              static_value.not_empty.type,
               factory.createTypeReferenceNode(SingleEntityArgument),
             ]),
-            imports: {
+            imports: merge_imports(static_value.not_empty.imports, {
               ordered: [`sandstone::arguments::${SingleEntityArgument}`] as NonEmptyList<string>,
               check: new Map([[`sandstone::arguments::${SingleEntityArgument}`, 0]]),
-            },
+            }),
           } as const
         }
       })
@@ -472,22 +471,22 @@ function mcdoc_string(type: mcdoc.McdocType) {
         const Label = 'LabelClass'
         return (_args: Record<string, unknown>) => ({
           type: factory.createUnionTypeNode([
-            static_value.not_empty,
+            static_value.not_empty.type,
             factory.createTypeReferenceNode(Label),
           ]),
-          imports: {
+          imports: merge_imports(static_value.not_empty.imports, {
             ordered: [`sandstone::${Label}`] as NonEmptyList<string>,
             check: new Map([[`sandstone::${Label}`, 0]]),
-          },
+          }),
         } as const)
       })
       .with({ name: 'team' }, () => {
         // TODO: Implement team abstraction in Sandstone
-        return (_args: Record<string, unknown>) => ({ type: static_value.not_empty } as const)
+        return (_args: Record<string, unknown>) => static_value.not_empty
       })
       .with({ name: 'text_component' }, () => {
         // This has been phased out by mojang
-        return (_args: Record<string, unknown>) => ({ type: static_value.not_empty } as const)
+        return (_args: Record<string, unknown>) => static_value.not_empty
       })
       .with({ name: 'texture_slot' }, ({ value: { values: { kind: { value: { value } } } } }) => {
         const Texture = 'TextureClass'
@@ -500,13 +499,13 @@ function mcdoc_string(type: mcdoc.McdocType) {
 
         return (_args: Record<string, unknown>) => ({
           type: factory.createUnionTypeNode([
-            static_value.not_empty,
+            static_value.not_empty.type,
             static_value.hash.type,
             factory.createTypeReferenceNode(Texture, [
               factory.createTypeReferenceNode(TextureType),
             ]),
           ]),
-          imports: {
+          imports: merge_imports(static_value.not_empty.imports, {
             ordered: [
               `sandstone::${Texture}`,
               `sandstone::arguments::${TextureType}`,
@@ -515,7 +514,7 @@ function mcdoc_string(type: mcdoc.McdocType) {
               [`sandstone::${Texture}`, 0],
               [`sandstone::arguments::${TextureType}`, 1],
             ]),
-          },
+          }),
         } as const)
       })
       .with({ name: 'time_pattern' }, () => {
@@ -543,9 +542,10 @@ function mcdoc_string(type: mcdoc.McdocType) {
       .with({ name: 'url' }, () => {
         return (_args: Record<string, unknown>) => ({
           type: factory.createUnionTypeNode([
-            static_value.not_empty,
+            static_value.not_empty.type,
             factory.createTypeReferenceNode('URL'),
           ]),
+          imports: static_value.not_empty.imports,
         } as const)
       })
       .with({ name: 'vector' }, () => {
@@ -560,7 +560,7 @@ function mcdoc_string(type: mcdoc.McdocType) {
       })
       .with({ name: P.union('game_rule', 'uuid', 'block_predicate') }, () => {
         // old
-        return (_args: Record<string, unknown>) => ({ type: static_value.not_empty } as const)
+        return (_args: Record<string, unknown>) => static_value.not_empty
       })
       .otherwise(() => {
         console.log(attribute?.name)
