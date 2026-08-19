@@ -63,7 +63,13 @@ function registerAttributes(meta: MetaRegistry, release: ReleaseVersion) {
 
 // Yes this is cursed
 export let mcdoc_raw = ''
-const vanillaMcdocUrl = 'https://api.spyglassmc.com/vanilla-mcdoc/symbols'
+const vanilla_mcdoc_src = [
+  'https://api.spyglassmc.com/vanilla-mcdoc/symbols',
+  'https://raw.githubusercontent.com/SpyglassMC/vanilla-mcdoc/refs/heads/generated/symbols.json',
+]
+
+/** Shared flag: set to false if any required fetch fails. Checked before generation. */
+export let all_fetches_ok = true
 
 export interface VanillaMcdocSymbols {
   ref: string,
@@ -72,10 +78,11 @@ export interface VanillaMcdocSymbols {
 }
 export async function fetchVanillaMcdoc(): Promise<VanillaMcdocSymbols> {
   try {
-    const buffer = await fetchWithCache(vanillaMcdocUrl)
+    const buffer = await fetchWithCache(vanilla_mcdoc_src)
     mcdoc_raw = await buffer.text()
     return JSON.parse(mcdoc_raw) as VanillaMcdocSymbols
   } catch (e) {
+    all_fetches_ok = false
     throw new Error(`Error occurred while fetching vanilla-mcdoc: ${errorMessage(e)}`)
   }
 }
@@ -99,6 +106,7 @@ export async function fetchRegistries(versionId: string) {
     }
     return [result, etag] as const
   } catch (e) {
+    all_fetches_ok = false
     throw new Error(`Error occurred while fetching registries: ${errorMessage(e)}`)
   }
 }
@@ -119,6 +127,7 @@ export async function fetchBlockStates(versionId: string) {
       result.set(id, data[id])
     }
   } catch (e) {
+    all_fetches_ok = false
     console.warn('Error occurred while fetching block states:', errorMessage(e))
   }
   return [result, etag] as const
@@ -132,6 +141,7 @@ export async function fetchTranslationKeys() {
     const data = await req.json() as Record<string, string>
     return Object.keys(data).map((key) => `minecraft:${key}`)
   } catch (e) {
+    all_fetches_ok = false
     console.warn('Error occurred while fetching translation keys:', errorMessage(e))
   }
   return []
@@ -270,13 +280,24 @@ export async function generate(options: GeneratorOptions = {}): Promise<void> {
     },
   })
 
+  service.project.on('ready', () => {
+    if (!all_fetches_ok) {
+      throw new Error('one or more required fetches failed during project init; aborting before generation')
+    }
+  })
+
   await service.project.init()
   await service.project.ready()
   await service.project.cacheService.save()
 
+  const translation_keys = await fetchTranslationKeys()
+  if (!all_fetches_ok) {
+    throw new Error('one or more required fetches failed; aborting before generation')
+  }
+
   const type_gen = new TypesGenerator()
 
-  type_gen.resolve_types(service.project.symbols, await fetchTranslationKeys())
+  type_gen.resolve_types(service.project.symbols, translation_keys)
 
   for await (const [symbol_path, { exports, imports }] of type_gen.resolved_symbols.entries()) {
     const parts = symbol_path.split('::')
