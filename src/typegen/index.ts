@@ -1,9 +1,10 @@
 import { AllCategories, type SymbolMap, type SymbolUtil } from '@spyglassmc/core'
 import type * as mcdoc from '@spyglassmc/mcdoc'
 import ts from 'typescript'
-import { add, pascal_case, pluralize } from '../util'
+import { add, compare_names, pascal_case, pluralize } from '../util'
+import { prefix_import_path, prefix_name } from './prefix'
 import { get_type_handler, type TypeHandlerResult } from './mcdoc'
-import { merge_imports, Set } from './mcdoc/utils'
+import { make_imports, merge_imports, Set } from './mcdoc/utils'
 import { Bind } from './mcdoc/bind'
 import { DispatcherSymbol, dispatcher_symbol_paths } from './mcdoc/dispatcher_symbol'
 import { mcdoc_raw } from '..'
@@ -99,7 +100,7 @@ export class TypesGenerator {
   private precompute_dispatcher_info(dispatchers: SymbolMap) {
     type DispatcherMember = { typeDef: mcdoc.McdocType }
 
-    for (const id of Object.keys(dispatchers)) {
+    for (const id of Object.keys(dispatchers).sort(compare_names)) {
       const { members } = dispatchers[id]
       if (members === undefined) {
         continue
@@ -110,7 +111,7 @@ export class TypesGenerator {
       const symbol_name = `Symbol${name}`
 
       // Determine generic count by checking if first member is a template type
-      const first_member_key = Object.keys(members).find(k => !k.startsWith('%'))
+      const first_member_key = Object.keys(members).sort(compare_names).find(k => !k.startsWith('%'))
       let generic_count = 0
 
       if (first_member_key) {
@@ -135,12 +136,22 @@ export class TypesGenerator {
         continue
       }
 
-      const registry = registry_name === 'translation_key' ? translation_keys : Object.keys(registries.getVisibleSymbols(registry_name))
+      // Sorted - the symbol table's iteration order isn't stable between runs,
+      // and this list is emitted verbatim as the registry's SET contents.
+      const registry = (registry_name === 'translation_key' ? translation_keys : Object.keys(registries.getVisibleSymbols(registry_name)))
+        .slice()
+        .sort(compare_names)
 
       if (registry.length === 0) continue
 
       const type_name = pluralize(registry_name.split('/').join('_')).toUpperCase()
       const symbol_path = `::java::_registry::${type_name.toLowerCase()}`
+
+      // `type_name` stays canonical - it spells the output file path and the
+      // import path other modules look us up by. `emit_name` is what actually
+      // gets declared.
+      const emit_name = prefix_name(type_name)
+      const set_name = `${emit_name}_SET`
 
       // TODO: Special case - sounds registry uses LiteralUnion instead of NamespacedLiteralUnion
       // due to upstream vanilla-mcdoc issue
@@ -150,21 +161,18 @@ export class TypesGenerator {
       this.resolved_symbols.set(
         symbol_path,
         {
-          imports: {
-            check: new Map(),
-            ordered: [`sandstone::${literal_union_type}`, 'sandstone::Set', 'sandstone::SetType'] as const,
-          },
+          imports: make_imports(`sandstone::${literal_union_type}`, 'sandstone::Set', 'sandstone::SetType'),
           exports: [
             factory.createTypeAliasDeclaration(
               [factory.createToken(ts.SyntaxKind.ExportKeyword)],
-              type_name,
+              emit_name,
               undefined,
               factory.createParenthesizedType(factory.createUnionTypeNode([
                 factory.createTypeReferenceNode(
                   literal_union_type,
                   [factory.createTypeReferenceNode(
                     factory.createIdentifier('SetType'),
-                    [factory.createTypeQueryNode(factory.createIdentifier(`${type_name}_SET`))],
+                    [factory.createTypeQueryNode(factory.createIdentifier(set_name))],
                   )],
                 ),
                 factory.createTemplateLiteralType(
@@ -172,7 +180,7 @@ export class TypesGenerator {
                   [factory.createTemplateLiteralTypeSpan(
                     factory.createTypeReferenceNode(
                       factory.createIdentifier('SetType'),
-                      [factory.createTypeQueryNode(factory.createIdentifier(`${type_name}_SET`))],
+                      [factory.createTypeQueryNode(factory.createIdentifier(set_name))],
                     ),
                     factory.createTemplateTail(''),
                   )],
@@ -183,7 +191,7 @@ export class TypesGenerator {
               [factory.createToken(ts.SyntaxKind.ExportKeyword)],
               factory.createVariableDeclarationList(
                 [factory.createVariableDeclaration(
-                  `${type_name}_SET`,
+                  set_name,
                   undefined,
                   undefined,
                   factory.createNewExpression(
@@ -207,7 +215,7 @@ export class TypesGenerator {
       )
 
       this.resolved_registries.set(registry_name, {
-        registry: factory.createIdentifier(type_name),
+        registry: factory.createIdentifier(emit_name),
         import_path: `${symbol_path}::${type_name}`,
       })
     }
@@ -235,7 +243,7 @@ export class TypesGenerator {
       if (data !== null && typeof data === 'object' && 'typeDef' in data) {
         const type = data.typeDef as mcdoc.McdocType
         const path = _path.split('::')
-        const name = path.at(-1)!
+        const name = prefix_name(path.at(-1)!)
         const module_path = path.slice(0, -1).join('::')
 
         // Check for special case overrides first
@@ -330,7 +338,10 @@ export class TypesGenerator {
   }
 
   private resolve_dispatcher_symbols(dispatchers: SymbolMap, module_map: SymbolMap, symbols: SymbolUtil) {
-    for (const id of Object.keys(dispatchers)) {
+    // Sorted for the same reason as `precompute_dispatcher_info` - this loop's
+    // order decides where in-module dispatcher types land in their file and the
+    // order `dispatcher_symbol_paths` is populated in.
+    for (const id of Object.keys(dispatchers).sort(compare_names)) {
       const { members } = dispatchers[id]
       if (members === undefined) {
         continue
@@ -370,10 +381,14 @@ export class TypesGenerator {
       const dispatcher_type_name = `Symbol${name}`
       this.resolved_dispatchers.set(id, {
         import_path: `${symbol_path}::${dispatcher_type_name}`,
-        type: factory.createTypeReferenceNode(dispatcher_type_name),
+        type: factory.createTypeReferenceNode(prefix_name(dispatcher_type_name)),
         generic_count,
         symbol_name: dispatcher_type_name,
       })
+
+      // Imports carry prefixed type names (see `add_import`), so the self-import
+      // we're filtering out has to be spelled the same way.
+      const self_import = prefix_import_path(`::java::dispatcher::${dispatcher_type_name}`)
 
       if (in_module && this.resolved_symbols.has(symbol_path)) {
         const mod = this.resolved_symbols.get(symbol_path)!
@@ -391,14 +406,14 @@ export class TypesGenerator {
           // Regex matches symbol_path::TypeName but not symbol_path::SubModule::TypeName
           const same_module_pattern = new RegExp(`^${symbol_path}::[^:]+$`)
           // @ts-ignore
-          mod.imports.ordered = mod.imports.ordered.filter((imp) => imp !== `::java::dispatcher::Symbol${name}` && !same_module_pattern.test(imp))
+          mod.imports.ordered = mod.imports.ordered.filter((imp) => imp !== self_import && !same_module_pattern.test(imp))
         }
       } else {
         // Filter imports for standalone dispatcher files too
         let filtered_imports = imports
         if (imports !== undefined) {
           const same_module_pattern = new RegExp(`^${symbol_path}::[^:]+$`)
-          const filtered_ordered = imports.ordered.filter((imp) => imp !== `::java::dispatcher::Symbol${name}` && !same_module_pattern.test(imp))
+          const filtered_ordered = imports.ordered.filter((imp) => imp !== self_import && !same_module_pattern.test(imp))
           if (filtered_ordered.length > 0) {
             filtered_imports = {
               ordered: filtered_ordered as typeof imports.ordered,

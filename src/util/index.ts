@@ -22,6 +22,26 @@ export function camel_case(name: string) {
     .join('')}`
 }
 
+/**
+ * Locale-independent alphabetical comparator.
+ *
+ * `localeCompare` varies with the host's ICU collation, which makes generated
+ * output depend on the machine that produced it. This orders case-insensitively
+ * (so it reads alphabetically) and falls back to code-unit order for ties, so
+ * it is total and stable everywhere.
+ */
+export function compare_names(a: string, b: string): number {
+  const lower_a = a.toLowerCase()
+  const lower_b = b.toLowerCase()
+  if (lower_a !== lower_b) {
+    return lower_a < lower_b ? -1 : 1
+  }
+  if (a === b) {
+    return 0
+  }
+  return a < b ? -1 : 1
+}
+
 export function pluralize(name: string) {
   // Words ending in vowel + y get 's' (e.g., display -> displays, key -> keys)
   if (/[aeiou]y$/i.test(name)) {

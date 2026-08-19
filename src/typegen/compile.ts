@@ -7,6 +7,20 @@ import wrap from '@seahax/eslint-plugin-wrap'
 import tsparser from '@typescript-eslint/parser'
 
 /**
+ * Skips the ESLint formatting pass, emitting the TypeScript printer's raw
+ * output instead.
+ *
+ * Set `MCDOC_SKIP_FORMAT` to any non-empty value when diffing two generations
+ * against each other. The wrap plugin reflows on line length, so a change that
+ * only renames identifiers (see `MCDOC_TYPE_PREFIX`) still produces sprawling
+ * formatting-only diffs. Unformatted output is stable under renames.
+ *
+ * Not for producing real output - the result is valid TypeScript but ignores
+ * every style rule below.
+ */
+const SKIP_FORMAT = (process.env['MCDOC_SKIP_FORMAT'] ?? '') !== ''
+
+/**
  * Custom ESLint rule to remove semicolons in mapped type members.
  * The built-in member-delimiter-style rule doesn't handle mapped types.
  */
@@ -139,6 +153,10 @@ export async function compile_types(nodes: ts.Node[], file = 'code.ts') {
     console.log(file)
     console.error(e)
     throw e
+  }
+
+  if (SKIP_FORMAT) {
+    return printed
   }
 
   const results = await eslint.lintText(printed, { filePath: file })

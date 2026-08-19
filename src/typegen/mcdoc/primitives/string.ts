@@ -2,11 +2,12 @@ import ts from 'typescript'
 import { match, P } from 'ts-pattern'
 import * as mcdoc from '@spyglassmc/mcdoc'
 import type { SymbolUtil } from '@spyglassmc/core'
-import type { NonEmptyList, TypeHandler } from '..'
+import type { NonEmptyList, TypeHandler, TypeHandlerResult } from '..'
 import { Assert } from '../assert'
 import { Bind } from '../bind'
-import { add_import, is_valid_registry, merge_imports, NormalNonTagResources, TaggableRegistry, type NonTagRegistry, type NormalNonTagResource } from '../utils'
+import { add_import, is_valid_registry, make_imports, merge_imports, NormalNonTagResources, TaggableRegistry, type NonTagRegistry, type NormalNonTagResource } from '../utils'
 import { RESOURCE_CLASSES } from '../../resources'
+import { prefix_name } from '../../prefix'
 
 const { factory } = ts
 
@@ -182,17 +183,14 @@ function mcdoc_string(type: mcdoc.McdocType) {
 
           let has_non_indexable = false
 
-          const imports = {
-            ordered: [registry_import] as NonEmptyList<string>,
-            check: new Map([[registry_import, 0]]),
-          }
+          const imports = add_import(undefined as unknown as TypeHandlerResult['imports'], registry_import)
 
           if (id_attr.kind === 'literal') {
             registry_id = id_attr.value.value as typeof registry_id
 
             if (is_valid_registry(symbols, registry_id)) {
               types.push(exclude(factory.createIndexedAccessTypeNode(
-                factory.createTypeReferenceNode('Registry'),
+                factory.createTypeReferenceNode(prefix_name('Registry')),
                 Bind.StringLiteral(`minecraft:${registry_id}`),
               )))
             } else {
@@ -204,7 +202,7 @@ function mcdoc_string(type: mcdoc.McdocType) {
 
             if (is_valid_registry(symbols, registry_id)) {
               types.push(exclude(factory.createIndexedAccessTypeNode(
-                factory.createTypeReferenceNode('Registry'),
+                factory.createTypeReferenceNode(prefix_name('Registry')),
                 Bind.StringLiteral(`minecraft:${registry_id}`),
               )))
             } else {
@@ -246,7 +244,7 @@ function mcdoc_string(type: mcdoc.McdocType) {
                       factory.createTemplateHead('#'),
                       [factory.createTemplateLiteralTypeSpan(
                         factory.createIndexedAccessTypeNode(
-                          factory.createTypeReferenceNode('Registry'),
+                          factory.createTypeReferenceNode(prefix_name('Registry')),
                           Bind.StringLiteral(`minecraft:${tag_registry_id}`),
                         ),
                         factory.createTemplateTail(''),
@@ -267,7 +265,7 @@ function mcdoc_string(type: mcdoc.McdocType) {
                   return {
                     type: empty_tag_registry ? static_value.namespaced.type : factory.createParenthesizedType(factory.createUnionTypeNode([
                       factory.createIndexedAccessTypeNode(
-                        factory.createTypeReferenceNode('Registry'),
+                        factory.createTypeReferenceNode(prefix_name('Registry')),
                         Bind.StringLiteral(`minecraft:${tag_registry_id}`),
                       ),
                     ])),
@@ -282,7 +280,7 @@ function mcdoc_string(type: mcdoc.McdocType) {
                         factory.createTemplateHead('#'),
                         [factory.createTemplateLiteralTypeSpan(
                           factory.createIndexedAccessTypeNode(
-                            factory.createTypeReferenceNode('Registry'),
+                            factory.createTypeReferenceNode(prefix_name('Registry')),
                             Bind.StringLiteral(`minecraft:${tag_registry_id}`),
                           ),
                           factory.createTemplateTail(''),
@@ -505,16 +503,10 @@ function mcdoc_string(type: mcdoc.McdocType) {
               factory.createTypeReferenceNode(TextureType),
             ]),
           ]),
-          imports: merge_imports(static_value.not_empty.imports, {
-            ordered: [
-              `sandstone::${Texture}`,
-              `sandstone::arguments::${TextureType}`,
-            ] as NonEmptyList<string>,
-            check: new Map<string, number>([
-              [`sandstone::${Texture}`, 0],
-              [`sandstone::arguments::${TextureType}`, 1],
-            ]),
-          }),
+          imports: merge_imports(static_value.not_empty.imports, make_imports(
+            `sandstone::${Texture}`,
+            `sandstone::arguments::${TextureType}`,
+          )),
         } as const)
       })
       .with({ name: 'time_pattern' }, () => {
@@ -526,13 +518,10 @@ function mcdoc_string(type: mcdoc.McdocType) {
 
         return (_args: Record<string, unknown>) => ({
           type: factory.createIndexedAccessTypeNode(
-            factory.createTypeReferenceNode('Registry'),
+            factory.createTypeReferenceNode(prefix_name('Registry')),
             Bind.StringLiteral('minecraft:translation_key'),
           ),
-          imports: {
-            ordered: [Registry] as NonEmptyList<string>,
-            check: new Map([[Registry, 0]]),
-          },
+          imports: add_import(undefined as unknown as TypeHandlerResult['imports'], Registry),
         } as const)
       })
       .with({ name: 'translation_value' }, () => {

@@ -1,7 +1,8 @@
 import { TaggableResourceLocationCategories } from '@spyglassmc/core'
 import ts from 'typescript'
 import { add_import, Set, type NonEmptyList } from './mcdoc/utils'
-import { add } from '../util'
+import { prefix_name } from './prefix'
+import { add, compare_names } from '../util'
 import type { ResolvedRegistry, ResolvedSymbol } from '.'
 
 const { factory } = ts
@@ -13,18 +14,20 @@ const { factory } = ts
 export function export_dispatchers(paths: Map<string, { symbol_name: string, base_name: string, has_fallback_type: boolean }>): ResolvedSymbol {
   const exports: ts.ExportDeclaration[] = []
 
-  for (const [path, info] of paths) {
+  // Sorted by output path so the re-export list doesn't inherit the order
+  // dispatchers happened to be resolved in.
+  for (const [path, info] of [...paths].sort(([a], [b]) => compare_names(a, b))) {
     // Convert `::java::_dispatcher::entity_effect` to `./_dispatcher/entity_effect.ts`
     const relative_path = `./${path.split('::').slice(2).join('/')}.ts`
 
     // Build the list of named exports (all are types, so use type-only exports)
     const export_specifiers: ts.ExportSpecifier[] = [
-      factory.createExportSpecifier(true, undefined, info.symbol_name),
+      factory.createExportSpecifier(true, undefined, prefix_name(info.symbol_name)),
     ]
 
     if (info.has_fallback_type) {
       export_specifiers.push(
-        factory.createExportSpecifier(true, undefined, `${info.base_name}FallbackType`),
+        factory.createExportSpecifier(true, undefined, prefix_name(`${info.base_name}FallbackType`)),
       )
     }
 
@@ -53,7 +56,7 @@ export function export_registry_sets(resolved_registries: Map<string, ResolvedRe
     // import_path is like `::java::_registry::blocks::BLOCKS`
     const parts = import_path.split('::')
     const type_name = parts.at(-1)! // e.g., 'BLOCKS'
-    const set_name = `${type_name}_SET` // e.g., 'BLOCKS_SET'
+    const set_name = prefix_name(`${type_name}_SET`) // e.g., 'BLOCKS_SET'
     const relative_path = `./${parts.slice(2, -1).join('/')}.ts` // e.g., './_registry/blocks.ts'
 
     exports.push(factory.createExportDeclaration(
@@ -99,7 +102,7 @@ export function export_registry(resolved_registries: Map<string, ResolvedRegistr
   // Create: export type Registry = { ... }
   const registry_type = factory.createTypeAliasDeclaration(
     [factory.createToken(ts.SyntaxKind.ExportKeyword)],
-    'Registry',
+    prefix_name('Registry'),
     undefined,
     factory.createTypeLiteralNode(properties),
   )
@@ -109,7 +112,7 @@ export function export_registry(resolved_registries: Map<string, ResolvedRegistr
     [factory.createToken(ts.SyntaxKind.ExportKeyword)],
     factory.createVariableDeclarationList(
       [factory.createVariableDeclaration(
-        'REGISTRIES_SET',
+        prefix_name('REGISTRIES_SET'),
         undefined,
         undefined,
         factory.createNewExpression(
@@ -133,11 +136,11 @@ export function export_registry(resolved_registries: Map<string, ResolvedRegistr
   // Create: export type REGISTRIES = SetType<typeof REGISTRIES_SET>
   const registries_type = factory.createTypeAliasDeclaration(
     [factory.createToken(ts.SyntaxKind.ExportKeyword)],
-    'REGISTRIES',
+    prefix_name('REGISTRIES'),
     undefined,
     factory.createTypeReferenceNode(
       'SetType',
-      [factory.createTypeQueryNode(factory.createIdentifier('REGISTRIES_SET'))],
+      [factory.createTypeQueryNode(factory.createIdentifier(prefix_name('REGISTRIES_SET')))],
     ),
   )
 

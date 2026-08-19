@@ -5,7 +5,8 @@ import { get_type_handler, type NonEmptyList, type TypeHandlerResult } from '.'
 import type { DispatcherInfo } from '..'
 import { add_import, merge_imports, Set } from './utils'
 import { Bind } from './bind'
-import { add, pascal_case } from '../../util'
+import { add, compare_names, pascal_case } from '../../util'
+import { prefix_import_path, prefix_name } from '../prefix'
 import { Assert } from './assert'
 import { ReleaseVersion, TARGET_VERSION } from './version'
 
@@ -118,15 +119,30 @@ export function dispatcher_symbol(
   let imports = undefined as unknown as TypeHandlerResult['imports']
   let has_references = false
 
+  // Every name this dispatcher declares. `name` itself stays canonical - it is
+  // only ever a building block here, never emitted on its own.
+  const symbol_id = prefix_name(`Symbol${name}`)
+  const fallback_type_id = prefix_name(`${name}FallbackType`)
+  const none_type_id = prefix_name(`${name}NoneType`)
+  const map_id = prefix_name(`${name}DispatcherMap`)
+  const keys_id = prefix_name(`${name}Keys`)
+  const fallback_id = prefix_name(`${name}Fallback`)
+
   // Self-import path to filter out to prevent cycles
-  const self_import = new Set([`::java::dispatcher::Symbol${name}`])
+  const self_import = new Set([prefix_import_path(`::java::dispatcher::Symbol${name}`)])
 
   const member_types: ts.TypeAliasDeclaration[] = []
   const map_properties: ts.PropertySignature[] = []
   const member_type_refs: ts.TypeReferenceNode[] = []
 
-  // Check first member for generics (if dispatcher has generics, all members have them)
-  const first_member = members[Object.keys(members)[0]]
+  // Sorted so the emitted map, member aliases and generics check don't track
+  // Spyglass's symbol iteration order, which isn't stable between runs.
+  const member_keys = Object.keys(members).sort(compare_names)
+
+  // Check first member for generics (if dispatcher has generics, all members have them).
+  // Skip the special keys - `precompute_dispatcher_info` runs the same check against the
+  // first non-special member, and the two have to agree on the answer.
+  const first_member = members[member_keys.find((key) => !key.startsWith('%')) ?? member_keys[0]]
   const first_type = (first_member.data as DispatcherMember).typeDef
 
   const has_generics = first_type.kind === 'template'
@@ -167,11 +183,9 @@ export function dispatcher_symbol(
   if ('%unknown' in members) {
     const unknown_member = (members['%unknown'].data as DispatcherMember).typeDef!
 
-    const unknown_type_name = `${name}FallbackType`
-
     const result = get_type_handler(unknown_member)(unknown_member)({
       root_type: true,
-      name: unknown_type_name,
+      name: fallback_type_id,
       dispatcher_symbol: add_reference,
       dispatcher_info,
       module_map,
@@ -184,7 +198,7 @@ export function dispatcher_symbol(
     }
 
     fallback_type_name = factory.createTypeReferenceNode(
-      unknown_type_name,
+      fallback_type_id,
       has_generics ? generic_names : undefined,
     )
     if (ts.isTypeAliasDeclaration(result.type)) {
@@ -192,7 +206,7 @@ export function dispatcher_symbol(
     } else {
       member_types.push(factory.createTypeAliasDeclaration(
         [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
-        unknown_type_name,
+        fallback_type_id,
         undefined,
         result.type as ts.TypeNode,
       ))
@@ -205,11 +219,9 @@ export function dispatcher_symbol(
   if (has_none) {
     const none_member = (members['%none'].data as DispatcherMember).typeDef!
 
-    const none_type_name = `${name}NoneType`
-
     const result = get_type_handler(none_member)(none_member)({
       root_type: true,
-      name: none_type_name,
+      name: none_type_id,
       dispatcher_symbol: add_reference,
       dispatcher_info,
       module_map,
@@ -226,14 +238,14 @@ export function dispatcher_symbol(
     } else {
       member_types.push(factory.createTypeAliasDeclaration(
         undefined,
-        none_type_name,
+        none_type_id,
         undefined,
         result.type as ts.TypeNode,
       ))
     }
   }
 
-  for (const member_key of Object.keys(members)) {
+  for (const member_key of member_keys) {
     const member = members[member_key]
     // Skip special keys
     if (member_key.startsWith('%')) {
@@ -246,7 +258,7 @@ export function dispatcher_symbol(
       continue
     }
 
-    const member_type_name = `${name}${pascal_case(member_key.replace(/[/:]/g, '_'))}`
+    const member_type_name = prefix_name(`${name}${pascal_case(member_key.replace(/[/:]/g, '_'))}`)
 
     // Resolve the member type using the mcdoc type handlers
     const result = get_type_handler(member_type)(member_type)({
@@ -305,7 +317,7 @@ export function dispatcher_symbol(
   // If %unknown is present, intersect with an index signature for arbitrary keys
   const map_type = factory.createTypeAliasDeclaration(
     undefined,
-    `${name}DispatcherMap`,
+    map_id,
     has_generics ? generic_params : undefined,
     factory.createTypeLiteralNode(map_properties),
   )
@@ -313,12 +325,12 @@ export function dispatcher_symbol(
   // Create NameKeys type (no generics needed - keys don't depend on type params)
   const keys_type = factory.createTypeAliasDeclaration(
     undefined,
-    `${name}Keys`,
+    keys_id,
     undefined,
     factory.createTypeOperatorNode(
       ts.SyntaxKind.KeyOfKeyword,
       factory.createTypeReferenceNode(
-        `${name}DispatcherMap`,
+        map_id,
         has_generics ? generic_names.map(() => factory.createTypeReferenceNode('NBTObject')) : undefined,
       ),
     ),
@@ -330,7 +342,7 @@ export function dispatcher_symbol(
     : member_type_refs
   const fallback_type = factory.createTypeAliasDeclaration(
     undefined,
-    `${name}Fallback`,
+    fallback_id,
     has_generics ? generic_params : undefined,
     factory.createParenthesizedType(factory.createUnionTypeNode(fallback_union_members)),
   )
@@ -360,7 +372,7 @@ export function dispatcher_symbol(
     innermost_conditional = factory.createConditionalTypeNode(
       factory.createTypeReferenceNode('CASE'),
       Bind.StringLiteral('%unknown'),
-      factory.createTypeReferenceNode(`${name}FallbackType`, has_generics ? generic_names : undefined),
+      factory.createTypeReferenceNode(fallback_type_id, has_generics ? generic_names : undefined),
       innermost_conditional,
     )
   }
@@ -370,27 +382,27 @@ export function dispatcher_symbol(
     innermost_conditional = factory.createConditionalTypeNode(
       factory.createTypeReferenceNode('CASE'),
       Bind.StringLiteral('%none'),
-      factory.createTypeReferenceNode(`${name}NoneType`, has_generics ? generic_names : undefined),
+      factory.createTypeReferenceNode(none_type_id, has_generics ? generic_names : undefined),
       innermost_conditional,
     )
   }
 
   const symbol_type = factory.createTypeAliasDeclaration(
     [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
-    `Symbol${name}`,
+    symbol_id,
     generic_params,
     factory.createConditionalTypeNode(
       factory.createTypeReferenceNode('CASE'),
       Bind.StringLiteral('map'),
-      factory.createTypeReferenceNode(`${name}DispatcherMap`, has_generics ? generic_names : undefined),
+      factory.createTypeReferenceNode(map_id, has_generics ? generic_names : undefined),
       factory.createConditionalTypeNode(
         factory.createTypeReferenceNode('CASE'),
         Bind.StringLiteral('keys'),
-        factory.createTypeReferenceNode(`${name}Keys`),
+        factory.createTypeReferenceNode(keys_id),
         factory.createConditionalTypeNode(
           factory.createTypeReferenceNode('CASE'),
           Bind.StringLiteral('%fallback'),
-          factory.createTypeReferenceNode(`${name}Fallback`, has_generics ? generic_names : undefined),
+          factory.createTypeReferenceNode(fallback_id, has_generics ? generic_names : undefined),
           innermost_conditional,
         ),
       ),

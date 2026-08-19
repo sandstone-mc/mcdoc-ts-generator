@@ -6,6 +6,7 @@ import { TypeHandlers, type NonEmptyList, type TypeHandler, type TypeHandlerResu
 import { Assert } from '../assert'
 import { add_import, is_valid_registry, merge_imports, type NonTagRegistry } from '../utils'
 import { add, pascal_case } from '../../../util'
+import { prefix_name } from '../../prefix'
 import { ReleaseVersion, TARGET_VERSION } from '../version'
 import { Bind } from '../bind'
 
@@ -239,7 +240,7 @@ function mcdoc_struct(type: mcdoc.McdocType) {
 
                     inherit.push(Bind.MappedType(
                       exclude(factory.createIndexedAccessTypeNode(
-                        factory.createTypeReferenceNode('Registry'),
+                        factory.createTypeReferenceNode(prefix_name('Registry')),
                         Bind.StringLiteral(`minecraft:${registry_id}`),
                       )),
                       value.type,

@@ -5,6 +5,7 @@ import type { DispatcherInfo } from '../..'
 import { Assert } from '../assert'
 import { Bind } from '../bind'
 import { add_import } from '../utils'
+import { prefix_name } from '../../prefix'
 import { add } from '../../../util'
 
 const { factory } = ts
@@ -207,13 +208,12 @@ function mcdoc_dispatcher(type: mcdoc.McdocType) {
       throw new Error(`[mcdoc_dispatcher] Unknown dispatcher: ${registry}`)
     }
 
-    const { symbol_name, has_fallback_type, supports_none } = info
-    const import_path = `::java::dispatcher::${symbol_name}`
+    const { has_fallback_type, supports_none } = info
+    // The path stays canonical for `add_import`; every emission below uses the
+    // prefixed name.
+    const symbol_name = prefix_name(info.symbol_name)
 
-    let imports: TypeHandlerResult['imports'] = {
-      ordered: [import_path] as NonEmptyList<string>,
-      check: new Map([[import_path, 0]]),
-    }
+    let imports: TypeHandlerResult['imports'] = add_import(undefined, `::java::dispatcher::${info.symbol_name}`)
 
     let result_type: ts.TypeNode
 

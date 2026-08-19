@@ -3,6 +3,7 @@ import * as je from '@spyglassmc/java-edition'
 import type { ResolvedSymbol } from '.'
 import { Set, type NormalNonTagResource } from './mcdoc/utils'
 import { ReleaseVersion, TARGET_VERSION } from './mcdoc/version'
+import { prefix_name } from './prefix'
 
 const { factory } = ts
 
@@ -160,7 +161,7 @@ export function export_resource_paths(): ResolvedSymbol {
     [factory.createToken(ts.SyntaxKind.ExportKeyword)],
     factory.createVariableDeclarationList(
       [factory.createVariableDeclaration(
-        'RESOURCE_PATHS',
+        prefix_name('RESOURCE_PATHS'),
         undefined,
         undefined,
         factory.createAsExpression(
@@ -215,7 +216,7 @@ export function export_resources(): ResolvedSymbol {
     [factory.createToken(ts.SyntaxKind.ExportKeyword)],
     factory.createVariableDeclarationList(
       [factory.createVariableDeclaration(
-        'RESOURCE_CLASS_TYPES',
+        prefix_name('RESOURCE_CLASS_TYPES'),
         undefined,
         undefined,
         factory.createAsExpression(

@@ -62,7 +62,7 @@ If packages are linked via the workspace `bun dev:link`, the sandstone project w
 
 #### Mcdoc Handlers (`src/typegen/mcdoc/`)
 - `index.ts` - `TypeHandlers`: Registry mapping mcdoc type kinds to handler functions
-- `utils.ts` - `add_import()`, `merge_imports()`, `NonEmptyList` type, custom `Set` class
+- `utils.ts` - `add_import()`, `make_imports()`, `merge_imports()`, `NonEmptyList` type, custom `Set` class
 - `bind.ts` - Helpers for creating TypeScript AST nodes (docs, literals, type references)
 - `assert.ts` - Type assertion utilities for mcdoc types
 - `dispatcher_symbol.ts` - Generates dispatcher symbol types; filters members by `since`/`until` against `TARGET_VERSION`
@@ -75,7 +75,7 @@ Handler subdirectories:
 - `complex/` - dispatcher, template, indexed
 
 ### Utilities (`src/util/`)
-- `index.ts` - String utilities (pascal_case, camel_case, pluralize), path joining, `add()` helper
+- `index.ts` - String utilities (pascal_case, camel_case, pluralize, compare_names), path joining, `add()` helper
 - `fetch.ts` - HTTP fetch with caching
 - `config.ts` - Configuration handling
 
@@ -165,6 +165,47 @@ MCDOC_TARGET_VERSION=26.3 bun update-from-mcdoc
 `TARGET_VERSION` additionally selects which Minecraft version `initialize` (`src/index.ts`) loads registries, block states and the mcmeta summary for — it looks for the matching entry in the Spyglass version list and only falls back to the latest release (with a warning) when the target isn't found. Without this, a pinned build would filter mcdoc correctly but still emit the *latest* release's registry unions.
 
 A mcdoc type alias dropped by these filters never reaches the generated output — it would either be missing or produce an import for a class that doesn't exist on the target version (e.g. `DecoratedPotPatternClass`, `SlotSourceClass` are mc 26.3-only and not exported by sandstone 1.1.x).
+
+### Type Name Prefixing
+
+Every identifier the generator declares — type aliases, dispatcher `Symbol*` types, and value consts (`BLOCKS_SET`, `REGISTRIES_SET`, `RESOURCE_PATHS`, `RESOURCE_CLASS_TYPES`) — can be prefixed via `MCDOC_TYPE_PREFIX` (`src/typegen/prefix.ts`):
+
+```bash
+MCDOC_TYPE_PREFIX=Mc bun compile   # McRegistry, McSymbolDataComponent, MCBLOCKS
+```
+
+Defaults to `''`, which leaves every name untouched. Use it when the generated types are consumed alongside declarations that would otherwise collide. Sandstone exports (`NonEmptyString`, `TagClass`, …) and TypeScript builtins are never prefixed.
+
+The prefix is joined verbatim, so separators are the caller's business (`Mc_` → `Mc_Registry`). The one exception is casing: a SCREAMING_CASE name gets an upper-cased prefix so it stays screaming (`BLOCKS` → `MCBLOCKS`).
+
+**The invariant that makes this tractable:** every `::java::…` path string stays *canonical* (unprefixed) — they're lookup keys, and mcdoc hands them to us that way. `add_import()` (`mcdoc/utils.ts`) is the single place a path's type name gains the prefix; `merge_imports()` uses the private `add_import_raw()` so already-prefixed paths aren't prefixed twice. Emitted identifiers gain it at their creation site via `prefix_name()`. The prefix always lands at the *front of the complete identifier* (`McSymbolFoo`, never `SymbolMcFoo`) so the two rules can't disagree.
+
+Consequences when editing the generator:
+
+- New `::java::…` import? Pass the canonical path to `add_import`, or use `make_imports()` — never hand-write the `{ ordered, check }` object. (`sandstone::…` paths pass through untouched.)
+- New reference to a generated type? Wrap the name in `prefix_name()`.
+- New string compared against a *stored* import path? Run it through `prefix_import_path()` — see the dispatcher self-import filters in `typegen/index.ts` and `dispatcher_symbol.ts`.
+
+Enabling the prefix reorders import *lines* in some files: `add_import` sorts by the full path, and a prefixed type name can sort either side of a submodule's types. The import sets are unchanged.
+
+### Deterministic Output
+
+Generated output is a pure function of its input. Spyglass's `getVisibleSymbols()` iteration order is **not** stable between runs, so anything derived from it is sorted before emission with `compare_names()` (`src/util/index.ts`) — a locale-independent comparator, since `localeCompare` varies with the host's ICU collation:
+
+| Sorted | Why |
+|--------|-----|
+| `Object.keys(dispatchers)` in `precompute_dispatcher_info` / `resolve_dispatcher_symbols` | decides `dispatcher.ts` export order and where in-module dispatcher types land |
+| `Object.keys(members)` in `dispatcher_symbol.ts` | dispatcher map key order, and which member the generics check inspects |
+| registry contents in `resolve_registry_symbols` | emitted verbatim as `BLOCKS_SET` etc. |
+| `dispatcher_symbol_paths` in `export_dispatchers` | `dispatcher.ts` re-export order |
+
+**`getVisibleSymbols('mcdoc')` is deliberately NOT sorted** — declaration order within each generated file follows mcdoc's own order, which is stable (it comes from `symbols.json` key order).
+
+Import order is kept canonical by `add_import` inserting in sorted position. That only holds if `ordered` is genuinely sorted and `check` lists every path, so build import sets with `make_imports()` rather than object literals — a literal that gets either wrong silently corrupts the ordering of everything merged in afterwards.
+
+### Skipping Formatting
+
+`MCDOC_SKIP_FORMAT=1` skips the ESLint pass in `typegen/compile.ts` and emits the TypeScript printer's raw output. The wrap plugin reflows on line length, so a rename-only change produces sprawling formatting-only diffs; unformatted output is stable under renames, which makes it the right mode for diffing two generations against each other. Not for producing real output.
 
 ### Indexed-Access on Dispatcher Key Unions
 

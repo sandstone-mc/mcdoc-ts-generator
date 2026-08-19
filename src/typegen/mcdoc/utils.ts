@@ -11,6 +11,8 @@ import {
   type TagFileCategory,
 } from '@spyglassmc/core'
 import type { TypeHandlerResult } from '.'
+import { prefix_import_path } from '../prefix'
+import { compare_names } from '../../util'
 
 export type NonEmptyList<T> = T[] & { 0: T }
 
@@ -103,26 +105,33 @@ function clone_imports(imports: NonNullable<TypeHandlerResult['imports']>): NonN
   }
 }
 
-export function add_import(imports: TypeHandlerResult['imports'], add_import: string): NonNullable<TypeHandlerResult['imports']> {
+/**
+ * Inserts an import path verbatim, without applying `TYPE_PREFIX`.
+ *
+ * For paths that have already been through `add_import` — notably when
+ * `merge_imports` folds one result's imports into another's. Prefixing there
+ * would apply `TYPE_PREFIX` a second time.
+ */
+function add_import_raw(imports: TypeHandlerResult['imports'], import_path: string): NonNullable<TypeHandlerResult['imports']> {
   if (imports === undefined) {
     return {
-      ordered: [add_import] as NonEmptyList<string>,
-      check: new Map<string, number>([[add_import, 0]]),
+      ordered: [import_path] as NonEmptyList<string>,
+      check: new Map<string, number>([[import_path, 0]]),
     } as const
   }
-  if (imports.check.has(add_import)) {
+  if (imports.check.has(import_path)) {
     return imports
   }
   if (imports.ordered.length === 1) {
     // If there's only one import, skip the binary search.
     const existing_import = imports.ordered[0]
-    if (add_import.localeCompare(existing_import) < 0) {
-      imports.ordered.unshift(add_import)
-      imports.check.set(add_import, 0)
+    if (compare_names(import_path, existing_import) < 0) {
+      imports.ordered.unshift(import_path)
+      imports.check.set(import_path, 0)
       imports.check.set(existing_import, 1)
     } else {
-      imports.ordered.push(add_import)
-      imports.check.set(add_import, 1)
+      imports.ordered.push(import_path)
+      imports.check.set(import_path, 1)
     }
     return imports
   }
@@ -133,15 +142,15 @@ export function add_import(imports: TypeHandlerResult['imports'], add_import: st
   while (left < right) {
     const mid = Math.floor((left + right) / 2)
     const mid_path = imports.ordered[mid]
-    if (add_import.localeCompare(mid_path) < 0) {
+    if (compare_names(import_path, mid_path) < 0) {
       right = mid
     } else {
       left = mid + 1
     }
   }
 
-  imports.ordered.splice(left, 0, add_import)
-  imports.check.set(add_import, left)
+  imports.ordered.splice(left, 0, import_path)
+  imports.check.set(import_path, left)
 
   // Update indices in the map for all subsequent imports using ordered as a reference
   for (let i = left + 1; i < imports.ordered.length; i++) {
@@ -149,6 +158,34 @@ export function add_import(imports: TypeHandlerResult['imports'], add_import: st
   }
 
   return imports
+}
+
+/**
+ * Inserts a canonical import path, applying `TYPE_PREFIX` to its type name.
+ *
+ * This is the single place a `::java::…` path's type name gains the prefix, so
+ * every caller may — and must — pass the path exactly as mcdoc spells it.
+ * `sandstone::…` paths pass through untouched.
+ */
+export function add_import(imports: TypeHandlerResult['imports'], import_path: string): NonNullable<TypeHandlerResult['imports']> {
+  return add_import_raw(imports, prefix_import_path(import_path))
+}
+
+/**
+ * Builds an import set from a list of canonical paths.
+ *
+ * Prefer this over writing an `{ ordered, check }` object literal by hand.
+ * `add_import` relies on `ordered` already being sorted to place new entries
+ * with a binary search, and on `check` listing every path for dedup - a
+ * hand-written literal that gets either wrong silently corrupts the ordering
+ * of every import merged in afterwards.
+ */
+export function make_imports(...import_paths: NonEmptyList<string>): NonNullable<TypeHandlerResult['imports']> {
+  let imports = undefined as unknown as TypeHandlerResult['imports']
+  for (const import_path of import_paths) {
+    imports = add_import(imports, import_path)
+  }
+  return imports as NonNullable<TypeHandlerResult['imports']>
 }
 
 export function merge_imports(
@@ -169,7 +206,7 @@ export function merge_imports(
       continue
     }
     if (!accumulator.check.has(import_path)) {
-      add_import(accumulator as NonNullable<TypeHandlerResult['imports']>, import_path)
+      add_import_raw(accumulator as NonNullable<TypeHandlerResult['imports']>, import_path)
     }
   }
   return accumulator as unknown as NonNullable<TypeHandlerResult['imports']>

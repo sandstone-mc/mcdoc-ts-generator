@@ -2,6 +2,7 @@ import ts from 'typescript'
 import type { TypeHandlerResult } from './mcdoc'
 import { add_import } from './mcdoc/utils'
 import { Bind } from './mcdoc/bind'
+import { prefix_name } from './prefix'
 
 const { factory } = ts
 
@@ -43,7 +44,7 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
     const key_type = factory.createTypeReferenceNode('LiteralUnion', [
       factory.createTypeOperatorNode(
         ts.SyntaxKind.KeyOfKeyword,
-        factory.createTypeReferenceNode('SymbolEntityEffect'),
+        factory.createTypeReferenceNode(prefix_name('SymbolEntityEffect')),
       ),
     ])
 
@@ -60,10 +61,10 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
         factory.createTypeReferenceNode('S'),
         factory.createTypeOperatorNode(
           ts.SyntaxKind.KeyOfKeyword,
-          factory.createTypeReferenceNode('SymbolEntityEffect'),
+          factory.createTypeReferenceNode(prefix_name('SymbolEntityEffect')),
         ),
         factory.createIndexedAccessTypeNode(
-          factory.createTypeReferenceNode('SymbolEntityEffect'),
+          factory.createTypeReferenceNode(prefix_name('SymbolEntityEffect')),
           factory.createTypeReferenceNode('S'),
         ),
         factory.createTypeReferenceNode('RootNBT'),
@@ -94,10 +95,10 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
     // ({ [Key in keyof SymbolEffectComponent]?: SymbolEffectComponent[Key] })
     const keyof_symbol = factory.createTypeOperatorNode(
       ts.SyntaxKind.KeyOfKeyword,
-      factory.createTypeReferenceNode('SymbolEffectComponent'),
+      factory.createTypeReferenceNode(prefix_name('SymbolEffectComponent')),
     )
     const value_type = factory.createIndexedAccessTypeNode(
-      factory.createTypeReferenceNode('SymbolEffectComponent'),
+      factory.createTypeReferenceNode(prefix_name('SymbolEffectComponent')),
       factory.createTypeReferenceNode('Key'),
     )
     const mapped_type = Bind.MappedType(keyof_symbol, value_type, { parenthesized: false })
@@ -126,7 +127,7 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
           'block',
           undefined,
           factory.createIndexedAccessTypeNode(
-            factory.createTypeReferenceNode('Registry'),
+            factory.createTypeReferenceNode(prefix_name('Registry')),
             Bind.StringLiteral('minecraft:block'),
           ),
         ),
@@ -134,7 +135,7 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
           undefined,
           'properties',
           factory.createToken(ts.SyntaxKind.QuestionToken),
-          factory.createTypeReferenceNode('SymbolMcdocBlockStates', [
+          factory.createTypeReferenceNode(prefix_name('SymbolMcdocBlockStates'), [
             Bind.StringLiteral('%none'),
           ]),
         ),
@@ -159,13 +160,13 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
     // )
     const keyof_symbol = factory.createTypeOperatorNode(
       ts.SyntaxKind.KeyOfKeyword,
-      factory.createTypeReferenceNode('SymbolDataComponent'),
+      factory.createTypeReferenceNode(prefix_name('SymbolDataComponent')),
     )
 
     const base_mapped_type = Bind.MappedType(
       keyof_symbol,
       factory.createParenthesizedType(factory.createIndexedAccessTypeNode(
-        factory.createTypeReferenceNode('SymbolDataComponent'),
+        factory.createTypeReferenceNode(prefix_name('SymbolDataComponent')),
         factory.createTypeReferenceNode('Key'),
       )),
       { parenthesized: false },
@@ -215,7 +216,7 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
     // }))
     const keyof_symbol = factory.createTypeOperatorNode(
       ts.SyntaxKind.KeyOfKeyword,
-      factory.createTypeReferenceNode('SymbolDataComponent'),
+      factory.createTypeReferenceNode(prefix_name('SymbolDataComponent')),
     )
 
     const component_property = factory.createPropertySignature(
@@ -234,9 +235,9 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
 
     const value_type = factory.createParenthesizedType(factory.createIntersectionTypeNode([
       factory.createTypeLiteralNode([component_property_with_doc]),
-      factory.createTypeReferenceNode('SelectCases', [
+      factory.createTypeReferenceNode(prefix_name('SelectCases'), [
         factory.createIndexedAccessTypeNode(
-          factory.createTypeReferenceNode('SymbolDataComponent'),
+          factory.createTypeReferenceNode(prefix_name('SymbolDataComponent')),
           factory.createTypeReferenceNode('S'),
         ),
       ]),
@@ -300,9 +301,9 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
     return {
       type: factory.createParenthesizedType(factory.createUnionTypeNode([
         factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-        factory.createTypeReferenceNode('TextObject'),
+        factory.createTypeReferenceNode(prefix_name('TextObject')),
         factory.createTypeReferenceNode('TextComponentClass'),
-        factory.createArrayTypeNode(factory.createTypeReferenceNode('Text')),
+        factory.createArrayTypeNode(factory.createTypeReferenceNode(prefix_name('Text'))),
       ])) as ts.TypeNode,
       imports,
     }
@@ -351,13 +352,13 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
         factory.createTypeReferenceNode('P2'),
         factory.createTypeReferenceNode('P3'),
       ]),
-      factory.createTypeReferenceNode('Ingredient'),
+      factory.createTypeReferenceNode(prefix_name('Ingredient')),
     ])
 
     // Build the type body
     const typeBody = factory.createParenthesizedType(factory.createIntersectionTypeNode([
-      factory.createTypeReferenceNode('NotificationInfo'),
-      factory.createTypeReferenceNode('CraftingBookInfo'),
+      factory.createTypeReferenceNode(prefix_name('NotificationInfo')),
+      factory.createTypeReferenceNode(prefix_name('CraftingBookInfo')),
       factory.createTypeLiteralNode([
         factory.createPropertySignature(undefined, 'pattern', undefined, patternType),
         factory.createPropertySignature(undefined, 'key', undefined, keyType),
@@ -365,7 +366,7 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
           undefined,
           'result',
           undefined,
-          factory.createTypeReferenceNode('ItemStackTemplate'),
+          factory.createTypeReferenceNode(prefix_name('ItemStackTemplate')),
         ),
       ]),
     ]))
@@ -382,7 +383,7 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
 
     return {
       type: factory.createTypeReferenceNode(
-        factory.createIdentifier('SymbolMcdocBlockStates'),
+        prefix_name('SymbolMcdocBlockStates'),
         [Bind.StringLiteral('%unknown')]
       ),
       imports,

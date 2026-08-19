@@ -5,6 +5,8 @@ import { Assert } from '../assert'
 import type { DispatcherReferenceCounter } from '../dispatcher_symbol'
 import type { SymbolMap } from '@spyglassmc/core'
 import { enum_docs } from '../multi/enum'
+import { add_import } from '../utils'
+import { prefix_name } from '../../prefix'
 import { add } from '../../../util'
 
 const { factory } = ts
@@ -54,7 +56,7 @@ function mcdoc_reference(type: mcdoc.McdocType) {
     }
 
     const type_name_point = import_path.lastIndexOf(':')
-    const type_name = import_path.slice(type_name_point + 1)
+    const type_name = prefix_name(import_path.slice(type_name_point + 1))
     const base_path = import_path.slice(0, type_name_point - 1)
 
     if ('dispatcher_symbol' in args) {
@@ -70,10 +72,7 @@ function mcdoc_reference(type: mcdoc.McdocType) {
     }
 
     // Don't import modules that will end up in the same file
-    const imports = args.module_path === base_path ? undefined : {
-      ordered: [import_path] as NonEmptyList<string>,
-      check: new Map([[import_path, 0]]) as Map<string, number>,
-    } as const
+    const imports = args.module_path === base_path ? undefined : add_import(undefined, import_path)
 
     let docs: NonEmptyList<(string | [string])> | undefined
 
