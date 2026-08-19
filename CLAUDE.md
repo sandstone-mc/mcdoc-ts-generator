@@ -228,6 +228,23 @@ The NBT number classes exist to keep Minecraft's numeric tag types apart — `NB
 
 Everything routes through `with_js_number()`, so the flag can't be half-applied: handlers wrap the type they were going to emit and pass an optional alternative.
 
+### Import Root
+
+`MCDOC_IMPORT_ROOT` sets the module specifier that generated `::java::…` imports resolve against (`src/typegen/import.ts`). Defaults to `sandstone/arguments/generated`.
+
+This is **separate from `-o`**, which only decides where files are written. The two must be kept in sync when generating a second set of types beside the first — otherwise the output's cross-module imports point at the sibling generation, which exports different names (see `MCDOC_TYPE_PREFIX`), and every cross-module reference breaks.
+
+It won't fail loudly on its own: the generated `tsconfig.json` maps the same root back to `./*`, so a mismatched generation still typechecks standalone and only breaks once dropped into sandstone.
+
+```bash
+MCDOC_TYPE_PREFIX=JSON \
+MCDOC_ALLOW_JS_NUMBER=1 \
+MCDOC_IMPORT_ROOT=sandstone/arguments/generated/_json \
+  bun update-from-mcdoc -o src/arguments/generated/_json
+```
+
+Note that `resources.ts` and `resource-paths.ts` emit *runtime values* and import sandstone classes (`AdvancementClass`, `TagClass`) as values, so a second generation duplicates that array under a prefixed name.
+
 ### Skipping Formatting
 
 `MCDOC_SKIP_FORMAT=1` skips the ESLint pass in `typegen/compile.ts` and emits the TypeScript printer's raw output. The wrap plugin reflows on line length, so a rename-only change produces sprawling formatting-only diffs; unformatted output is stable under renames, which makes it the right mode for diffing two generations against each other. Not for producing real output.

@@ -25,7 +25,7 @@ import { errorMessage, join } from './util'
 import { fetchWithCache } from './util/fetch'
 import { TypesGenerator } from './typegen'
 import { compile_types } from './typegen/compile'
-import { handle_imports } from './typegen/import'
+import { handle_imports, IMPORT_ROOT } from './typegen/import'
 import { export_resources, export_resource_paths } from './typegen/resources'
 import { TARGET_VERSION } from './typegen/mcdoc/version'
 
@@ -342,7 +342,7 @@ export async function generate(options: GeneratorOptions = {}): Promise<void> {
         paths: {
           'sandstone': ['../sandstone-types/index.ts'],
           'sandstone/arguments': ['../sandstone-types/arguments/index.ts'],
-          'sandstone/arguments/generated/*': ['./*'],
+          [`${IMPORT_ROOT}/*`]: ['./*'],
         },
       },
     }, null, 2))

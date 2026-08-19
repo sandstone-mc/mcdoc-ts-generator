@@ -3,6 +3,22 @@ import type { NonEmptyList } from './mcdoc/utils'
 
 const { factory } = ts
 
+/**
+ * Module specifier root that generated `::java::…` imports resolve against.
+ *
+ * Override with `MCDOC_IMPORT_ROOT` when generating a second set of types that
+ * lives beside the first, so its cross-module imports point at its own
+ * directory rather than the default one:
+ *
+ *   MCDOC_IMPORT_ROOT=sandstone/arguments/generated/_json bun update-from-mcdoc -o src/arguments/generated/_json
+ *
+ * This is separate from the output directory (`-o`), which only decides where
+ * files are written. Getting them out of sync emits imports that resolve to a
+ * sibling generation - and since that sibling exports different names (see
+ * `MCDOC_TYPE_PREFIX`), every cross-module reference breaks.
+ */
+export const IMPORT_ROOT = (process.env['MCDOC_IMPORT_ROOT'] ?? 'sandstone/arguments/generated').replace(/\/+$/, '')
+
 function BindImports(module_path: string, modules: string[], is_type_only = true) {
   return factory.createImportDeclaration(
     undefined,
@@ -31,8 +47,8 @@ export function handle_imports(imports?: { readonly ordered: NonEmptyList<string
     if (path.length === 0) {
       throw new Error(`[mcdoc_import] Import path has no module prefix: "${import_path}"`)
     } else if (path[1] === 'java') {
-      // java::* → sandstone/arguments/generated/*
-      file = `sandstone/arguments/generated/${path.slice(2).join('/')}.ts`
+      // java::* → <IMPORT_ROOT>/*
+      file = `${IMPORT_ROOT}/${path.slice(2).join('/')}.ts`
     } else if (path[0] === 'sandstone') {
       // sandstone::* → sandstone/*
       if (path.length === 1) {
