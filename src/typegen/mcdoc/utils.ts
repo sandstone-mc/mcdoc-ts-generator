@@ -97,8 +97,15 @@ export function is_valid_registry(symbols: SymbolUtil | undefined, registry_id: 
  * callers which hand us a shared constant (e.g. `NonEmptyStringImports` in
  * string.ts) don't have subsequent merges mutate the caller's object — which
  * would pollute every other handler that returns that same constant.
+ *
+ * Exported because `list.ts` (and potentially other compound handlers) need
+ * to clone an inner type's `imports` before using it as a mutation target —
+ * the inner handler may have returned a shared module-level constant
+ * (`any`'s `static_value.imports`, `string`'s `static_value.not_empty`,
+ * `string`'s `static_value.namespaced`), and any `add_import` after that would
+ * leak the new path into every subsequent handler.
  */
-function clone_imports(imports: NonNullable<TypeHandlerResult['imports']>): NonNullable<TypeHandlerResult['imports']> {
+export function clone_imports(imports: NonNullable<TypeHandlerResult['imports']>): NonNullable<TypeHandlerResult['imports']> {
   return {
     ordered: [...imports.ordered] as NonEmptyList<string>,
     check: new Map(imports.check),

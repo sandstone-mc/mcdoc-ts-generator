@@ -5,7 +5,7 @@ import { TypeHandlers, type NonEmptyList, type TypeHandler, type TypeHandlerResu
 import { Assert } from '../assert'
 import { Bind } from '../bind'
 import { integer_range_size } from '../primitives/int'
-import { add_import, op } from '../utils'
+import { add_import, clone_imports, op } from '../utils'
 import { add } from '../../../util'
 
 const { factory } = ts
@@ -22,7 +22,12 @@ function mcdoc_list(type: mcdoc.McdocType) {
     args.root_type = false
     const item = TypeHandlers[list.item.kind](list.item)(args)
 
-    let imports: TypeHandlerResult['imports'] = 'imports' in item ? item.imports : undefined
+    // Snapshot if the inner type is sharing a module-level import set
+    // (e.g. `any`'s `static_value.imports`, or string's `static_value.not_empty`).
+    // Without the clone, `add_import(imports, NBTListImport)` below would splice
+    // NBTList into that shared object and every subsequent handler would inherit
+    // a leaked NBTList import.
+    let imports: TypeHandlerResult['imports'] = 'imports' in item ? clone_imports(item.imports!) : undefined
 
     const child_dispatcher = 'child_dispatcher' in item ? ((item.child_dispatcher as NonEmptyList<[number, string]>).map(([parent_count, property]) => {
       if (parent_count === 0) {
