@@ -6,6 +6,12 @@ const { factory } = ts
 type NonEmptyList<T> = T[] & { 0: T }
 
 export class Bind {
+  // TODO: The bigint branch interpolates the outer `literal` instead of its own
+  // `num` argument, so a negative bigint emits the sign twice - `-5n` becomes
+  // `-(-5n)`. Harmless today: nothing reaches it, since vanilla-mcdoc has no
+  // SNBT long literals and long ranges come through as numbers. Fix the
+  // interpolation (`${num}n`) if long literals ever show up, which is also when
+  // `MCDOC_ALLOW_JS_NUMBER` would start emitting them (see literal.ts).
   static NumericLiteral(literal: number | bigint) {
     const innerLiteral = (num: number | bigint) => typeof num === 'number' ? factory.createNumericLiteral(num) : factory.createBigIntLiteral(`${literal}n`)
     if (sign(literal) === -1) {

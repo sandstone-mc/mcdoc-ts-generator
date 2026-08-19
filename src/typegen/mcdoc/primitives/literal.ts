@@ -4,6 +4,7 @@ import type { NonEmptyList, TypeHandler } from '..'
 import { Assert } from '../assert'
 import { match } from 'ts-pattern'
 import { Bind } from '../bind'
+import { with_js_number } from '../../numbers'
 
 const { factory } = ts
 
@@ -30,9 +31,9 @@ function mcdoc_literal(type: mcdoc.McdocType) {
       const type = 'NBTByte'
 
       return {
-        type: factory.createTypeReferenceNode(type, [
+        type: with_js_number(factory.createTypeReferenceNode(type, [
           Bind.NumericLiteral(byte.value),
-        ]),
+        ]), Bind.NumericLiteral(byte.value)),
         imports: {
           ordered: [`sandstone::${type}`] as NonEmptyList<string>,
           check: new Map([[`sandstone::${type}`, 0]]) as Map<string, number>,
@@ -46,9 +47,9 @@ function mcdoc_literal(type: mcdoc.McdocType) {
       const type = 'NBTFloat'
 
       return {
-        type: factory.createTypeReferenceNode(type, [
+        type: with_js_number(factory.createTypeReferenceNode(type, [
           Bind.NumericLiteral(float.value),
-        ]),
+        ]), Bind.NumericLiteral(float.value)),
         imports: {
           ordered: [`sandstone::${type}`] as NonEmptyList<string>,
           check: new Map([[`sandstone::${type}`, 0]]) as Map<string, number>,
@@ -59,9 +60,9 @@ function mcdoc_literal(type: mcdoc.McdocType) {
       const type = 'NBTLong'
 
       return {
-        type: factory.createTypeReferenceNode(type, [
+        type: with_js_number(factory.createTypeReferenceNode(type, [
           Bind.StringLiteral(`${long.value}`),
-        ]),
+        ]), Bind.NumericLiteral(long.value)),
         imports: {
           ordered: [`sandstone::${type}`] as NonEmptyList<string>,
           check: new Map([[`sandstone::${type}`, 0]]) as Map<string, number>,
@@ -72,9 +73,9 @@ function mcdoc_literal(type: mcdoc.McdocType) {
       const type = 'NBTShort'
 
       return {
-        type: factory.createTypeReferenceNode(type, [
+        type: with_js_number(factory.createTypeReferenceNode(type, [
           Bind.NumericLiteral(short.value),
-        ]),
+        ]), Bind.NumericLiteral(short.value)),
         imports: {
           ordered: [`sandstone::${type}`] as NonEmptyList<string>,
           check: new Map([[`sandstone::${type}`, 0]]) as Map<string, number>,

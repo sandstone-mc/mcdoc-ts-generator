@@ -203,6 +203,31 @@ Generated output is a pure function of its input. Spyglass's `getVisibleSymbols(
 
 Import order is kept canonical by `add_import` inserting in sorted position. That only holds if `ordered` is genuinely sorted and `check` lists every path, so build import sets with `make_imports()` rather than object literals — a literal that gets either wrong silently corrupts the ordering of everything merged in afterwards.
 
+### Allowing Plain JS Numbers
+
+`MCDOC_ALLOW_JS_NUMBER` (any non-empty value) makes the generated NBT number types accept a plain `number` alongside the SNBT class type (`src/typegen/numbers.ts`):
+
+```bash
+MCDOC_ALLOW_JS_NUMBER=1 bun compile
+```
+
+| mcdoc | flag off | flag on |
+|-------|----------|---------|
+| `int` | `NBTInt` | `(NBTInt \| number)` |
+| `int @ 0..10` | `NBTInt<{min:0,max:10}>` | `(NBTInt<{min:0,max:10}> \| number)` |
+| `float` / `long` / `short` / `byte` | `NBTFloat` … | same union |
+| `1b` (literal) | `NBTByte<1>` | `(NBTByte<1> \| 1)` |
+| `123L` (literal) | `NBTLong<'123'>` | `(NBTLong<'123'> \| 123n)` |
+| `double` | `(NBTDouble \| number)` | unchanged |
+
+Defaults to off, leaving every number type exactly as it was. `NBTDouble` is untouched either way — it already accepts `number`, being what a bare JS number naturally maps to.
+
+Literals widen to the *literal value* rather than to `number`, so the exact value stays pinned. `int` and `double` literals already emit a bare numeric literal (no NBT wrapper), so they need nothing.
+
+The NBT number classes exist to keep Minecraft's numeric tag types apart — `NBTInt` and `NBTShort` aren't interchangeable and a bare `number` can't say which it is. This flag trades that away for ergonomics. Ranged types also lose their range checking, since the range lives in the class's generic parameter (see the `WholeNumber` note in `whole_number_generic`).
+
+Everything routes through `with_js_number()`, so the flag can't be half-applied: handlers wrap the type they were going to emit and pass an optional alternative.
+
 ### Skipping Formatting
 
 `MCDOC_SKIP_FORMAT=1` skips the ESLint pass in `typegen/compile.ts` and emits the TypeScript printer's raw output. The wrap plugin reflows on line length, so a rename-only change produces sprawling formatting-only diffs; unformatted output is stable under renames, which makes it the right mode for diffing two generations against each other. Not for producing real output.

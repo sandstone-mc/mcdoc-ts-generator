@@ -1,6 +1,7 @@
 import * as mcdoc from '@spyglassmc/mcdoc'
 import ts from 'typescript'
 import { Assert } from '../assert'
+import { with_js_number } from '../../numbers'
 import { Bind } from '../bind'
 import type { NonEmptyList, TypeHandler } from '..'
 import { op } from '../utils';
@@ -16,7 +17,7 @@ function mcdoc_int(type: mcdoc.McdocType) {
   return (_args: Record<string, unknown>) => {
     if (int.valueRange === undefined) {
       return {
-        type: factory.createTypeReferenceNode(NBTIntType),
+        type: with_js_number(factory.createTypeReferenceNode(NBTIntType)),
         imports: {
           ordered: [`sandstone::${NBTIntType}`] as NonEmptyList<string>,
           check: new Map([[`sandstone::${NBTIntType}`, 0]]) as Map<string, number>,
@@ -127,11 +128,13 @@ export function whole_number_generic<TYPE extends string>(range: mcdoc.NumericRa
 
   /**
    * We don't allow for `number` for int because the `WholeNumber` trick only works for function generics, not type aliases.
+   *
+   * `MCDOC_ALLOW_JS_NUMBER` opts out of that, accepting the loss of range checking.
    */
   return {
-    type: factory.createTypeReferenceNode(type, [
+    type: with_js_number(factory.createTypeReferenceNode(type, [
       factory.createTypeLiteralNode(generic),
-    ]),
+    ])),
     docs: docs as NonEmptyList<string>,
     imports: {
       ordered: [`sandstone::${type}`] as NonEmptyList<string>,

@@ -2,6 +2,7 @@ import ts from 'typescript'
 import type * as mcdoc from '@spyglassmc/mcdoc'
 import type { NonEmptyList, TypeHandler } from '..'
 import { Assert } from '../assert'
+import { with_js_number } from '../../numbers'
 import { whole_number_generic } from './int'
 
 const { factory } = ts
@@ -15,7 +16,7 @@ function mcdoc_short(type: mcdoc.McdocType) {
   return (_args: Record<string, unknown>) => {
     if (short.valueRange === undefined) {
       return {
-        type: factory.createTypeReferenceNode(NBTShortType),
+        type: with_js_number(factory.createTypeReferenceNode(NBTShortType)),
         imports: {
           ordered: [`sandstone::${NBTShortType}`] as NonEmptyList<string>,
           check: new Map([[`sandstone::${NBTShortType}`, 0]]) as Map<string, number>,

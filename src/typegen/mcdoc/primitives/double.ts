@@ -3,6 +3,7 @@ import ts from 'typescript'
 import { Assert } from '../assert'
 import { Bind } from '../bind'
 import type { NonEmptyList, TypeHandler } from '..'
+import { with_js_number } from '../../numbers'
 
 const { factory } = ts
 
@@ -32,7 +33,7 @@ function mcdoc_double(type: mcdoc.McdocType) {
 
 export const McdocDouble = mcdoc_double satisfies TypeHandler
 
-export function non_integral_generic<TYPE extends string, JS_NUMBER_ALLOWED extends (true | undefined)>(range: mcdoc.NumericRange, type: TYPE, allow_js_number?: JS_NUMBER_ALLOWED) {
+export function non_integral_generic<TYPE extends string>(range: mcdoc.NumericRange, type: TYPE, allow_js_number?: boolean) {
   const docs: string[] & { 0: string } = [
     `Range: ${mcdoc.NumericRange.toString(range)}`,
   ]
@@ -163,22 +164,24 @@ export function non_integral_generic<TYPE extends string, JS_NUMBER_ALLOWED exte
     }
   }
 
-  const returned_type = allow_js_number ?
+  // `NBTDouble` passes `true` outright; every other non-integral type gets the
+  // union only when `MCDOC_ALLOW_JS_NUMBER` is set.
+  const returned_type = allow_js_number === true ?
     factory.createParenthesizedType(factory.createUnionTypeNode([
       factory.createTypeReferenceNode(type, [
         factory.createTypeLiteralNode(generic),
       ]),
-      /** 
+      /**
        * Yes this could be made more type-safe using the same conditional types that are being used in NBTDouble, but generally speaking if people want higher type-safety they should be using the NBT types anyway.
        */
       factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
     ])) :
-    factory.createTypeReferenceNode(type, [
+    with_js_number(factory.createTypeReferenceNode(type, [
       factory.createTypeLiteralNode(generic),
-    ])
+    ]))
 
   return {
-    type: returned_type as JS_NUMBER_ALLOWED extends true ? ts.ParenthesizedTypeNode : ts.TypeReferenceNode,
+    type: returned_type,
     docs: docs as NonEmptyList<string>,
     imports: {
       ordered: [`sandstone::${type}`] as NonEmptyList<string>,
