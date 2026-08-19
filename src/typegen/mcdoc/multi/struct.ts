@@ -310,6 +310,70 @@ function mcdoc_struct(type: mcdoc.McdocType) {
                   })
               }
             })
+            .with('union', () => {
+              Assert.UnionType(pair.key)
+
+              const surviving_members: mcdoc.McdocType[] = []
+
+              for (const member of pair.key.members) {
+                let unsupported = false
+                if (member.attributes !== undefined) {
+                  Assert.Attributes(member.attributes, true)
+                  for (const attribute of member.attributes) {
+                    if (attribute.name === 'until' && ReleaseVersion.cmp(attribute.value!.value.value as ReleaseVersion, TARGET_VERSION) <= 0) {
+                      unsupported = true
+                      break
+                    }
+                    if (attribute.name === 'since' && ReleaseVersion.cmp(attribute.value!.value.value as ReleaseVersion, TARGET_VERSION) > 0) {
+                      unsupported = true
+                      break
+                    }
+                  }
+                }
+                if (!unsupported) {
+                  surviving_members.push(member)
+                }
+              }
+
+              if (surviving_members.length === 0) {
+                // All union members filtered out by version. Fall back to a `string`-keyed
+                // index so the field still emits valid syntax instead of `Record<string, never>`.
+                imports = add_import(imports, 'sandstone::NonEmptyString')
+                inherit.push(Bind.MappedType(
+                  factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                  value.type,
+                ))
+                return
+              }
+
+              const key_types: ts.TypeNode[] = []
+
+              for (const member of surviving_members) {
+                const key = TypeHandlers[member.kind](member)(args)
+
+                if ((key as TypeHandlerResult).unresolved === true) {
+                  unresolved = true
+                }
+
+                if ('imports' in key) {
+                  imports = merge_imports(imports, key.imports)
+                }
+                if ('child_dispatcher' in key) {
+                  if (child_dispatcher === undefined) {
+                    child_dispatcher = [] as unknown as typeof child_dispatcher
+                  }
+                  child_dispatcher!.push(...(key.child_dispatcher as NonEmptyList<[number, string]>))
+                }
+
+                key_types.push(key.type)
+              }
+
+              const combined_key = key_types.length === 1
+                ? key_types[0]
+                : factory.createUnionTypeNode(key_types)
+
+              inherit.push(Bind.MappedType(combined_key, value.type))
+            })
 
         })
         .with({ kind: 'spread' }, (_spread) => {
