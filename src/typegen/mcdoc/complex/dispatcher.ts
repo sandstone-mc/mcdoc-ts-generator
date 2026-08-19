@@ -5,13 +5,13 @@ import type { DispatcherInfo } from '../..'
 import { Assert } from '../assert'
 import { Bind } from '../bind'
 import { add_import } from '../utils'
-import { prefix_name } from '../../prefix'
+import { prefix_name, prefix_sandstone_name } from '../../prefix'
 import { add } from '../../../util'
 
 const { factory } = ts
 
 const Unknown = Bind.StringLiteral('%unknown')
-const RootNBT = factory.createTypeReferenceNode('RootNBT')
+const RootNBT = factory.createTypeReferenceNode(prefix_sandstone_name('RootNBT'))
 const RootNBTImport = 'sandstone::arguments::nbt::RootNBT'
 
 function DispatcherArgs(_args: Record<string, unknown>): asserts _args is {

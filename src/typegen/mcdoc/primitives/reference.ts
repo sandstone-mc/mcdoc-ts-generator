@@ -56,7 +56,19 @@ function mcdoc_reference(type: mcdoc.McdocType) {
     }
 
     const type_name_point = import_path.lastIndexOf(':')
-    const type_name = prefix_name(import_path.slice(type_name_point + 1))
+
+    // Generic parameters must NOT be prefixed. `template.ts` and
+    // `dispatcher_symbol.ts` declare them straight from the mcdoc path, so
+    // prefixing the reference would leave the declaration (`T`) and its uses
+    // (`McT`) unable to find each other. Single-letter names make it worse:
+    // `prefix_name` upper-cases the prefix for a name with no lowercase in it,
+    // so `T` came out as `MCT`.
+    const is_generic_parameter = 'generics' in args
+      && args.generics !== undefined
+      && (args.generics.has(import_path) || args.generics.has(reference.path))
+
+    const raw_type_name = import_path.slice(type_name_point + 1)
+    const type_name = is_generic_parameter ? raw_type_name : prefix_name(raw_type_name)
     const base_path = import_path.slice(0, type_name_point - 1)
 
     if ('dispatcher_symbol' in args) {

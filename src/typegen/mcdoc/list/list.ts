@@ -1,3 +1,4 @@
+import { prefix_sandstone_name } from '../../prefix'
 import ts from 'typescript'
 import * as mcdoc from '@spyglassmc/mcdoc'
 import { TypeHandlers, type NonEmptyList, type TypeHandler, type TypeHandlerResult } from '..'
@@ -35,7 +36,7 @@ function mcdoc_list(type: mcdoc.McdocType) {
 
       imports = add_import(imports, NBTListImport)
 
-      const list_type = factory.createTypeReferenceNode(NBTListType, [
+      const list_type = factory.createTypeReferenceNode(prefix_sandstone_name(NBTListType), [
         item.type,
         factory.createTypeLiteralNode(generic),
       ])

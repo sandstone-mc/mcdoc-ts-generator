@@ -6,13 +6,13 @@ import type { DispatcherInfo } from '..'
 import { add_import, merge_imports, Set } from './utils'
 import { Bind } from './bind'
 import { add, compare_names, pascal_case } from '../../util'
-import { prefix_import_path, prefix_name } from '../prefix'
+import { prefix_import_path, prefix_name, prefix_sandstone_name } from '../prefix'
 import { Assert } from './assert'
 import { ReleaseVersion, TARGET_VERSION } from './version'
 
 const { factory } = ts
 
-const NBTObject = factory.createTypeReferenceNode('NBTObject')
+const NBTObject = factory.createTypeReferenceNode(prefix_sandstone_name('NBTObject'))
 const NBTObjectImport = 'sandstone::arguments::nbt::NBTObject'
 
 export type DispatcherReferenceCounter = {
@@ -331,7 +331,7 @@ export function dispatcher_symbol(
       ts.SyntaxKind.KeyOfKeyword,
       factory.createTypeReferenceNode(
         map_id,
-        has_generics ? generic_names.map(() => factory.createTypeReferenceNode('NBTObject')) : undefined,
+        has_generics ? generic_names.map(() => factory.createTypeReferenceNode(prefix_sandstone_name('NBTObject'))) : undefined,
       ),
     ),
   )

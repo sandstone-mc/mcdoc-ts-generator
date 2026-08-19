@@ -2,7 +2,7 @@ import ts from 'typescript'
 import type { TypeHandlerResult } from './mcdoc'
 import { add_import } from './mcdoc/utils'
 import { Bind } from './mcdoc/bind'
-import { prefix_name } from './prefix'
+import { prefix_name, prefix_sandstone_name } from './prefix'
 
 const { factory } = ts
 
@@ -67,7 +67,7 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
           factory.createTypeReferenceNode(prefix_name('SymbolEntityEffect')),
           factory.createTypeReferenceNode('S'),
         ),
-        factory.createTypeReferenceNode('RootNBT'),
+        factory.createTypeReferenceNode(prefix_sandstone_name('RootNBT')),
       )),
     ]))
 
@@ -256,7 +256,7 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
 
     // Fallback: (RootNBT & { component: `${string}${string}` })
     const fallback_type = factory.createParenthesizedType(factory.createIntersectionTypeNode([
-      factory.createTypeReferenceNode('RootNBT'),
+      factory.createTypeReferenceNode(prefix_sandstone_name('RootNBT')),
       factory.createTypeLiteralNode([
         factory.createPropertySignature(
           undefined,

@@ -1,16 +1,15 @@
+import { prefix_sandstone_name } from '../../prefix'
 import ts from 'typescript'
 import type * as mcdoc from '@spyglassmc/mcdoc'
-import type { NonEmptyList, TypeHandler } from '..'
+import type { TypeHandler } from '..'
 import { Assert } from '../assert'
+import { make_imports } from '../utils'
 
 const { factory } = ts
 
 const static_value = {
-  type: factory.createTypeReferenceNode('NBTObject'),
-  imports: {
-    ordered: ['sandstone::arguments::nbt::NBTObject'] as NonEmptyList<string>,
-    check: new Map([['sandstone::arguments::nbt::NBTObject', 0]]),
-  },
+  type: factory.createTypeReferenceNode(prefix_sandstone_name('NBTObject')),
+  imports: make_imports('sandstone::arguments::nbt::NBTObject'),
 } as const
 
 function mcdoc_any(type: mcdoc.McdocType) {

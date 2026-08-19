@@ -1,3 +1,4 @@
+import { prefix_sandstone_name } from '../../prefix'
 import ts from 'typescript'
 import type * as mcdoc from '@spyglassmc/mcdoc'
 import { TypeHandlers, type NonEmptyList, type TypeHandler, type TypeHandlerResult } from '..'
@@ -7,7 +8,7 @@ import { add } from '../../../util'
 
 const { factory } = ts
 
-const NBTObject = factory.createTypeReferenceNode('NBTObject')
+const NBTObject = factory.createTypeReferenceNode(prefix_sandstone_name('NBTObject'))
 const NBTObjectImport = 'sandstone::arguments::nbt::NBTObject'
 
 /**
