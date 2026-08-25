@@ -15,6 +15,7 @@ export const RESOURCE_CLASSES = {
   // Datapack resources
   'advancement': 'AdvancementClass',
   'banner_pattern': 'BannerPatternClass',
+  'block_transformer': 'BlockTransformerClass',
   'chat_type': 'ChatTypeClass',
   'damage_type': 'DamageTypeClass',
   'decorated_pot_pattern': 'DecoratedPotPatternClass',
