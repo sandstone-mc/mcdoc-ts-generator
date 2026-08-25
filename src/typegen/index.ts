@@ -1,6 +1,6 @@
 import { AllCategories, type SymbolMap, type SymbolUtil } from '@spyglassmc/core'
 import type * as mcdoc from '@spyglassmc/mcdoc'
-import ts from 'typescript'
+import ts from '@typescript/typescript6'
 import { add, compare_names, pascal_case, pluralize } from '../util'
 import { prefix_import_path, prefix_name } from './prefix'
 import { get_type_handler, type TypeHandlerResult } from './mcdoc'

@@ -1,5 +1,5 @@
 import type * as mcdoc from '@spyglassmc/mcdoc'
-import ts from 'typescript'
+import ts from '@typescript/typescript6'
 import { Assert } from '../assert'
 import { with_js_number } from '../../numbers'
 import type { NonEmptyList, TypeHandler } from '..'

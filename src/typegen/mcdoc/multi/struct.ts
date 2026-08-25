@@ -1,4 +1,4 @@
-import ts from 'typescript'
+import ts from '@typescript/typescript6'
 import { match, P } from 'ts-pattern'
 import type * as mcdoc from '@spyglassmc/mcdoc'
 import type { SymbolUtil, TaggableResourceLocationCategory } from '@spyglassmc/core'

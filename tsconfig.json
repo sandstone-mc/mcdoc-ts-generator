@@ -16,6 +16,7 @@
     // Emit declarations only (bundling done by Bun)
     "declaration": true,
     "emitDeclarationOnly": true,
+    "rootDir": "./src",
 
     // Best practices
     "strict": true,

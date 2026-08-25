@@ -1,4 +1,4 @@
-import ts from 'typescript'
+import ts from '@typescript/typescript6'
 import { ESLint } from 'eslint'
 import { ESLintUtils } from '@typescript-eslint/utils'
 import type { FlatConfig } from '@typescript-eslint/utils/ts-eslint'

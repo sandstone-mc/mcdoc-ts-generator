@@ -1,4 +1,4 @@
-import ts from 'typescript'
+import ts from '@typescript/typescript6'
 import type { TypeHandlerResult } from './mcdoc'
 import { add_import } from './mcdoc/utils'
 import { Bind } from './mcdoc/bind'

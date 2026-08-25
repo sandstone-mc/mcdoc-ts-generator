@@ -1,4 +1,4 @@
-import ts from 'typescript'
+import ts from '@typescript/typescript6'
 import type { NonEmptyList } from './mcdoc/utils'
 
 const { factory } = ts

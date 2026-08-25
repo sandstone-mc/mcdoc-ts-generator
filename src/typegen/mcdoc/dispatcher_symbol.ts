@@ -1,4 +1,4 @@
-import ts from 'typescript'
+import ts from '@typescript/typescript6'
 import type { SymbolMap, SymbolUtil } from '@spyglassmc/core'
 import type * as mcdoc from '@spyglassmc/mcdoc'
 import { get_type_handler, type NonEmptyList, type TypeHandlerResult } from '.'

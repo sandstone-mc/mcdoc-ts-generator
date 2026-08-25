@@ -1,4 +1,4 @@
-import ts from 'typescript'
+import ts from '@typescript/typescript6'
 import { abs, sign } from './utils'
 
 const { factory } = ts

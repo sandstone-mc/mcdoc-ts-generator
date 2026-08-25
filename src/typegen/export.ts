@@ -1,5 +1,5 @@
 import { TaggableResourceLocationCategories } from '@spyglassmc/core'
-import ts from 'typescript'
+import ts from '@typescript/typescript6'
 import { add_import, Set, type NonEmptyList } from './mcdoc/utils'
 import { prefix_name } from './prefix'
 import { add, compare_names } from '../util'

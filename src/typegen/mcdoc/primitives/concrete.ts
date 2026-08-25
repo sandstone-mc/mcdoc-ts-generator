@@ -1,4 +1,4 @@
-import type ts from 'typescript'
+import type ts from '@typescript/typescript6'
 import type * as mcdoc from '@spyglassmc/mcdoc'
 import { TypeHandlers, type NonEmptyList, type TypeHandler, type TypeHandlerResult } from '..'
 import { Assert } from '../assert'

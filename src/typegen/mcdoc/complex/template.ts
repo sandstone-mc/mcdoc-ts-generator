@@ -1,5 +1,5 @@
 import { prefix_sandstone_name } from '../../prefix'
-import ts from 'typescript'
+import ts from '@typescript/typescript6'
 import type * as mcdoc from '@spyglassmc/mcdoc'
 import { TypeHandlers, type NonEmptyList, type TypeHandler, type TypeHandlerResult } from '..'
 import { Assert } from '../assert'

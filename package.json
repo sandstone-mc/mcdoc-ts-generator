@@ -1,6 +1,6 @@
 {
   "name": "@sandstone-mc/mcdoc-ts-generator",
-  "version": "0.3.18",
+  "version": "0.3.19",
   "description": "Generate TypeScript types from Minecraft mcdoc definitions",
   "type": "module",
   "main": "./dist/index.js",
@@ -58,10 +58,10 @@
     "@typescript-eslint/type-utils": "8.67.0",
     "@typescript-eslint/typescript-estree": "8.67.0",
     "@typescript-eslint/utils": "8.67.0",
+    "@typescript/typescript6": "^6.0.2",
     "eslint": "^10.8.1",
     "ts-api-utils": "2.5.0",
     "ts-pattern": "^5.9.0",
-    "typescript": "^5.9.3",
     "typescript-eslint": "8.67.0"
   },
   "patchedDependencies": {

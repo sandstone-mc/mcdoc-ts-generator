@@ -1,4 +1,4 @@
-import ts from 'typescript'
+import ts from '@typescript/typescript6'
 import * as je from '@spyglassmc/java-edition'
 import type { ResolvedSymbol } from '.'
 import { Set, type NormalNonTagResource } from './mcdoc/utils'
