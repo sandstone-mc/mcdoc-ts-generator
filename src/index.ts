@@ -200,9 +200,31 @@ const initialize: ProjectInitializer = async (ctx) => {
 
   if (version === undefined) {
     const [, targetMaj, targetMin] = TARGET_VERSION.match(/^(\d+)\.(\d+)/)!
+    // Spyglass ids look like `26.1`, `26.1.1`, `26.1-rc-1`, `26.1-pre-1`,
+    // `26.1-snapshot-1`. `ReleaseVersion.cmp` only understands major.minor.patch,
+    // so strip the trailing `-kind-N` suffix before comparing bases and rank
+    // suffixes separately. Newest-first: release > rc > pre > snapshot.
+    const KIND_PRIORITY: Record<string, number> = { rc: 3, pre: 2, snapshot: 1 }
+    const parseVersionId = (id: string) => {
+      const dashIdx = id.indexOf('-')
+      if (dashIdx === -1) return { base: id, kind: '', num: 0 }
+      const rest = id.slice(dashIdx + 1)
+      const [kind, numStr] = rest.split('-')
+      return { base: id.slice(0, dashIdx), kind: kind ?? '', num: Number(numStr ?? 0) }
+    }
+    const compareVersionIds = (a: string, b: string): number => {
+      const va = parseVersionId(a)
+      const vb = parseVersionId(b)
+      const baseCmp = ReleaseVersion.cmp(va.base as ReleaseVersion, vb.base as ReleaseVersion)
+      if (baseCmp !== 0) return baseCmp
+      const pa = va.kind === '' ? 4 : KIND_PRIORITY[va.kind] ?? 0
+      const pb = vb.kind === '' ? 4 : KIND_PRIORITY[vb.kind] ?? 0
+      if (pa !== pb) return pa - pb
+      return va.num - vb.num
+    }
     const sameMinor = versions
       .filter((v) => v.id.startsWith(`${targetMaj}.${targetMin}-`))
-      .sort((a, b) => b.id.localeCompare(a.id))
+      .sort((a, b) => compareVersionIds(b.id, a.id))
     version = sameMinor[0]
     if (version !== undefined) {
       console.warn(

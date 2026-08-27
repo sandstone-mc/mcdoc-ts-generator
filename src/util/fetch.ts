@@ -27,19 +27,27 @@ class HttpCache implements Cache {
     }
 
     const fileName = this.#getFileName(request)
+    const etagPath = join(this.#cacheRoot, `${fileName}.etag`)
+    const binPath = join(this.#cacheRoot, `${fileName}.bin`)
     try {
-      const etag = (await fsp.readFile(join(this.#cacheRoot, `${fileName}.etag`), 'utf8'))
-        .trim()
-      const binPath = join(this.#cacheRoot, `${fileName}.bin`)
-      const bodyStream = fs.createReadStream(binPath)
-      return new Response(
-        stream.Readable.toWeb(bodyStream) as unknown as ReadableStream,
-        //              \___/
-        // stream Readable -> stream/web ReadableStream
-        //                                \_______________/
-        //                 stream/web ReadableStream -> DOM ReadableStream
-        { headers: { etag } },
-      )
+      const etag = (await fsp.readFile(etagPath, 'utf8')).trim()
+      // Buffer the body so we can validate before handing it off. Every URL
+      // this cache is wired to (Spyglass versions/registries/block_states,
+      // vanilla-mcdoc symbols, en_us.json) returns JSON, so a parse failure
+      // means the entry is corrupt — likely an interrupted write that left
+      // null-byte padding past the JSON. Discard and force a refetch.
+      const body = await fsp.readFile(binPath)
+      try {
+        JSON.parse(body.toString('utf8'))
+      } catch {
+        console.warn(`[HttpCache] discarding corrupt cache for ${request instanceof Request ? request.url : request.toString()}`)
+        await Promise.all([
+          fsp.unlink(binPath).catch(() => {}),
+          fsp.unlink(etagPath).catch(() => {}),
+        ])
+        return undefined
+      }
+      return new Response(body, { headers: { etag } })
     } catch (e) {
       if ((e as NodeJS.ErrnoException)?.code === 'ENOENT') {
         return undefined
