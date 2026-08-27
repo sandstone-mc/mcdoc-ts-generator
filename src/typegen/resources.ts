@@ -27,6 +27,7 @@ export const RESOURCE_CLASSES = {
   'item_modifier': 'ItemModifierClass',
   'jukebox_song': 'JukeboxSongClass',
   'loot_table': 'LootTableClass',
+  'number_provider': 'NumberProviderClass',
   'predicate': 'PredicateClass',
   'recipe': 'RecipeClass',
   'slot_source': 'SlotSourceClass',
