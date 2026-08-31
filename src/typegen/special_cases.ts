@@ -82,6 +82,65 @@ export const SPECIAL_CASES = new Map<string, () => SpecialCaseResult>([
     }
   }],
 
+  // AnyEntity: Use keyof SymbolEntity instead of Registry-based pattern
+  // (matches the hand-written form in arguments/generated/world/entity.ts).
+  // Same rationale as EntityEffect: reduces type complexity for sandstone,
+  // and is the precondition for converting the involved types to interfaces.
+  ['::java::world::entity::AnyEntity', (): SpecialCaseResult => {
+    let imports: TypeHandlerResult['imports'] = undefined as unknown as TypeHandlerResult['imports']
+    imports = add_import(imports, '::java::dispatcher::SymbolEntity')
+    imports = add_import(imports, 'sandstone::arguments::nbt::RootNBT')
+
+    // Extract<keyof SymbolEntity, string>
+    const key_type = factory.createTypeReferenceNode('Extract', [
+      factory.createTypeOperatorNode(
+        ts.SyntaxKind.KeyOfKeyword,
+        factory.createTypeReferenceNode(prefix_name('SymbolEntity')),
+      ),
+      factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+    ])
+
+    // {
+    //   id: S
+    // } & (S extends keyof SymbolEntity ? SymbolEntity[S] : RootNBT)
+    const value_type = factory.createParenthesizedType(factory.createIntersectionTypeNode([
+      factory.createTypeLiteralNode([
+        factory.createPropertySignature(
+          undefined,
+          'id',
+          undefined,
+          factory.createTypeReferenceNode('S'),
+        ),
+      ]),
+      factory.createParenthesizedType(factory.createConditionalTypeNode(
+        factory.createTypeReferenceNode('S'),
+        factory.createTypeOperatorNode(
+          ts.SyntaxKind.KeyOfKeyword,
+          factory.createTypeReferenceNode(prefix_name('SymbolEntity')),
+        ),
+        factory.createIndexedAccessTypeNode(
+          factory.createTypeReferenceNode(prefix_name('SymbolEntity')),
+          factory.createTypeReferenceNode('S'),
+        ),
+        factory.createTypeReferenceNode(prefix_sandstone_name('RootNBT')),
+      )),
+    ]))
+
+    // { [S in Extract<keyof SymbolEntity, string>]?: value_type }
+    const mapped_type = Bind.MappedType(key_type, value_type, { key_name: 'S', parenthesized: false })
+
+    // NonNullable<{[...]: ...}[Extract<keyof SymbolEntity, string>]>
+    return {
+      type: factory.createTypeReferenceNode('NonNullable', [
+        factory.createParenthesizedType(factory.createIndexedAccessTypeNode(
+          factory.createParenthesizedType(mapped_type),
+          key_type,
+        )),
+      ]) as ts.TypeNode,
+      imports,
+    }
+  }],
+
   // EnchantmentEffectComponentMap: Direct mapped type over keyof SymbolEffectComponent.
   // The standard struct handler emits a Registry-based conditional mapped type with NonNullable
   // and indexed-access, which hits TS2859 (Excessive complexity) at consumers — TS degrades
