@@ -1,6 +1,6 @@
 {
   "name": "@sandstone-mc/mcdoc-ts-generator",
-  "version": "0.3.22",
+  "version": "0.3.23",
   "description": "Generate TypeScript types from Minecraft mcdoc definitions",
   "type": "module",
   "main": "./dist/index.js",
@@ -45,13 +45,13 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "oxlint": "^1.79.0"
+    "oxlint": "1.79.0"
   },
   "dependencies": {
     "@seahax/eslint-plugin-wrap": "^0.6.11",
-    "@spyglassmc/core": "^0.4.53",
-    "@spyglassmc/java-edition": "^0.3.66",
-    "@spyglassmc/mcdoc": "^0.3.57",
+    "@spyglassmc/core": "^0.4.55",
+    "@spyglassmc/java-edition": "^0.3.68",
+    "@spyglassmc/mcdoc": "^0.3.59",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@typescript-eslint/eslint-plugin": "8.67.0",
     "@typescript-eslint/parser": "8.67.0",
@@ -59,7 +59,7 @@
     "@typescript-eslint/typescript-estree": "8.67.0",
     "@typescript-eslint/utils": "8.67.0",
     "@typescript/typescript6": "^6.0.2",
-    "eslint": "^10.8.1",
+    "eslint": "10.8.1",
     "ts-api-utils": "2.5.0",
     "ts-pattern": "^5.9.0",
     "typescript-eslint": "8.67.0"
