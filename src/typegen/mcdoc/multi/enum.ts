@@ -33,6 +33,14 @@ function mcdoc_enum(type: mcdoc.McdocType) {
   Assert.EnumType(enum_type)
 
   return (_args: Record<string, unknown>) => {
+    // Empty enum body (e.g. `enum(string) {}`) has no members — `createUnionTypeNode([])`
+    // would print as `()`, which is invalid TS. Resolve to `never` instead.
+    if (enum_type.values.length === 0) {
+      return {
+        type: factory.createKeywordTypeNode(ts.SyntaxKind.NeverKeyword),
+      } as const
+    }
+
     const bind_value = (() => enum_type.enumKind === 'string'
       ? (value: string | number | bigint) => Bind.StringLiteral(value as string)
       : (value: number | bigint | string) => Bind.NumericLiteral(value as number | bigint))()
